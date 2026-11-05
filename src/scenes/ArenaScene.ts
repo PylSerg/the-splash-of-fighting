@@ -210,7 +210,9 @@ export class ArenaScene extends Phaser.Scene {
       this.resolveStrike(this.nara,this.evi);
     }
 
-    if(this.evi.knockedOut||this.nara.knockedOut||this.roundTime<=0){
+    // Allow a KO caused by a throw to finish its landing animation first.
+    const anyKnockedOut=this.evi.knockedOut||this.nara.knockedOut;
+    if ((anyKnockedOut && !this.evi.knockedDown && !this.nara.knockedDown) || this.roundTime<=0) {
       this.finishRound();
     }
   }
@@ -219,6 +221,7 @@ export class ArenaScene extends Phaser.Scene {
     return !attacker.knockedOut && !defender.knockedOut &&
       attacker.stunned<=0 && defender.stunned<=0 &&
       !attacker.airborne && !defender.airborne &&
+      !attacker.knockedDown && !defender.knockedDown &&
       attacker.grabRecovery<=0 &&
       attacker.attack?.name!=='special' &&
       Math.abs(attacker.x-defender.x)<=GRAB_MAX_START;
@@ -307,7 +310,7 @@ export class ArenaScene extends Phaser.Scene {
       this.cameras.main.shake(120,.006);
       this.combatNotice('THROW!',g.defender.x,240,0xffd29b);
       this.onStatus((g.attacker.id==='evi'?'Еві':'Нара')+
-        ' виконує кидок! -'+THROW_DAMAGE+' HP.');
+        ' перекидає суперника за спину! -'+THROW_DAMAGE+' HP. Падіння, 0,5 с лежачи й 0,5 с підйому.');
       this.grapple=null;
     }
   }
@@ -333,7 +336,7 @@ export class ArenaScene extends Phaser.Scene {
           this.aiCount%3!==0) input.block=true;
       return input;
     }
-    if(this.nara.stunned>0||this.nara.knockedOut)return input;
+    if(this.nara.stunned>0||this.nara.knockedOut||this.nara.knockedDown)return input;
     if(distance>130)input[forward]=true;
     else if(distance<75 && this.aiCount%5===0)input.block=true;
     if(distance<160 && this.evi.attack && this.aiCount%4===0) input.block=true;
@@ -361,6 +364,10 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private preventOverlap(): void {
+    // A thrown fighter must be able to pass THROUGH the thrower to land
+    // behind them. Ordinary overlap resolution would push the victim back
+    // to the original side on every frame, cancelling the reversed throw.
+    if (this.evi.knockedDown || this.nara.knockedDown) return;
     const dx=this.nara.x-this.evi.x;
     if(Math.abs(dx)>=51)return;
     const sign=dx>=0?1:-1;
@@ -371,7 +378,7 @@ export class ArenaScene extends Phaser.Scene {
 
   private resolveStrike(attacker: Fighter, target: Fighter): void {
     const strike=attacker.getActiveStrike();
-    if(!strike||target.knockedOut)return;
+    if(!strike||target.knockedOut||target.knockedDown)return;
     const box=attacker.strikeBox();
     if(!box||!overlap(box,target.bodyBox()))return;
     strike.connected=true;

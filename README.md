@@ -21,6 +21,14 @@ npm run build
 npm run preview
 ```
 
+## Alpha 0.4.1 · L1 throw and grounded recovery
+
+- **L1 / LB (button 4)** now starts a grab directly; **X+A**, the one-finger swipe **X↔A**, **G** and **Numpad3** remain available. Gamepad jump stays on **up** with the stick or D-pad, while keyboard Space/Numpad0 still jump.
+- A completed throw launches the opponent **behind the thrower**, farther than before, with a visible rotating tumble in flight.
+- **After landing:** the thrown fighter lies prone for **0.5 s**, then spends another **0.5 s** standing back up. They cannot move, block, attack, or start a new grab during either knockdown or recovery.
+- Downed fighters cannot be struck or grabbed mid-recovery. A throw knockout completes the falling animation before announcing the winner.
+- The defender can still interrupt the *grab attempt* or *hold* with **A** or **X** before the throw is executed.
+
 ## Alpha 0.4.0 · Two-stage grapples and throws
 
 **New grapple:** press **X+A** together (or swipe from X into A, or from A into X, on mobile). Optional keyboard shortcuts: **G** for player 1, **Numpad3** for player 2. The input is universal for the gamepad and touchscreen without adding another on-screen button.

@@ -41,6 +41,10 @@ export class Fighter {
   // Two-stage throw animations are controlled by the arena's grapple state.
   grabPose: 'reach' | 'hold' | 'held' | 'throw' | null = null;
   grabRecovery = 0;
+  // Throw knockdown has a landing, 0.5 s prone and 0.5 s get-up phase.
+  knockdownPhase: 'flying' | 'prone' | 'rising' | null = null;
+  private knockdownTimer = 0;
+  private knockdownFlightAge = 0;
   hitFlash = 0;
   private blockFlash = 0;
   private impactVelocity = 0;
@@ -73,7 +77,8 @@ export class Fighter {
     const edge = evi ? 0xdab875 : 0x8d5c95;
 
     this.rig = scene.add.container(initialX, GROUND_Y);
-    this.shadow = scene.add.ellipse(0, 5, 90, 17, 0x060c1d, .50);
+    // Keep the shadow in world coordinates while the fighter rotates and tumbles.
+    this.shadow = scene.add.ellipse(initialX, GROUND_Y+5, 90, 17, 0x060c1d, .50);
     this.guardAura = scene.add.ellipse(4, -78, 83, 154, 0x66e1d2, .12)
       .setStrokeStyle(3, 0x8cf2f2, .85).setVisible(false);
     this.cape = scene.add.graphics();
@@ -153,7 +158,7 @@ export class Fighter {
     }
 
     this.rig.add([
-      this.shadow,this.guardAura,this.cape,this.backArm,this.leftLeg,this.rightLeg,
+      this.guardAura,this.cape,this.backArm,this.leftLeg,this.rightLeg,
       this.body,this.weapon,this.frontArm,this.hair,this.head
     ]);
     this.draw(0);
@@ -161,6 +166,7 @@ export class Fighter {
 
   get airborne(): boolean { return this.yOffset < -.1; }
   get knockedOut(): boolean { return this.hp <= 0; }
+  get knockedDown(): boolean { return this.knockdownPhase !== null; }
 
   reset(x: number, face: 1 | -1): void {
     this.x=x; this.face=face; this.hp=100; this.energy=50;
@@ -169,19 +175,27 @@ export class Fighter {
     this.hitFlash=0; this.blockFlash=0; this.impactVelocity=0; this.time=0;
     this.queuedSolo=null; this.queuedSpecial=0;
     this.grabPose=null; this.grabRecovery=0;
+    this.knockdownPhase=null;this.knockdownTimer=0;this.knockdownFlightAge=0;
+    this.rig.rotation=0;
     this.draw(0);
   }
 
   step(dt: number, input: InputState, just: InputState, opponentX: number): void {
     this.time += dt;
-    this.face = opponentX >= this.x ? 1 : -1;
+    // Keep the original orientation while tumbling behind the thrower.
+    if (!this.knockedDown) this.face = opponentX >= this.x ? 1 : -1;
     this.hitFlash = Math.max(0, this.hitFlash-dt);
     this.blockFlash = Math.max(0, this.blockFlash-dt);
     const knock = this.impactVelocity;
-    this.x += knock*dt;
+    this.x = Phaser.Math.Clamp(this.x + knock*dt,STAGE_MIN_X,STAGE_MAX_X);
     this.impactVelocity *= Math.pow(.055,dt);
     if (Math.abs(this.impactVelocity)<1) this.impactVelocity=0;
 
+    if (this.knockedDown) {
+      this.advanceKnockdown(dt);
+      this.draw(dt);
+      return;
+    }
     if (this.knockedOut) { this.draw(dt); return; }
     if (this.stunned>0) this.stunned=Math.max(0,this.stunned-dt);
 
@@ -280,6 +294,37 @@ export class Fighter {
     this.draw(dt);
   }
 
+  private advanceKnockdown(dt: number): void {
+    this.blocking=false;
+    this.crouching=false;
+    this.walking=false;
+    this.attack=null;
+    this.grabPose=null;
+
+    if (this.knockdownPhase==='flying') {
+      this.knockdownFlightAge+=dt;
+      this.advanceGravity(dt);
+      if (!this.airborne && this.vy===0) {
+        this.knockdownPhase='prone';
+        this.knockdownTimer=.5;
+        // Stop sliding once the thrown fighter hits the ground.
+        this.impactVelocity=0;
+      }
+    } else if (this.knockdownPhase==='prone' || this.knockdownPhase==='rising') {
+      this.knockdownTimer=Math.max(0,this.knockdownTimer-dt);
+      if (this.knockdownTimer===0) {
+        if (this.knockdownPhase==='prone') {
+          this.knockdownPhase='rising';
+          this.knockdownTimer=.5;
+        } else {
+          this.knockdownPhase=null;
+          this.knockdownFlightAge=0;
+          this.stunned=0;
+        }
+      }
+    }
+  }
+
   private advanceGravity(dt: number): void {
     if(this.airborne || this.vy!==0) {
       this.vy += 1180*dt;
@@ -324,10 +369,17 @@ export class Fighter {
     this.queuedSpecial=0;
     this.hp=Math.max(0,this.hp-damage);
     this.energy=Math.min(100,this.energy+12);
-    this.stunned=.70;
-    this.impactVelocity=attackerFace*320;
-    this.vy=-420;
+    // Send the victim BEHIND the thrower, with much greater travel.
+    // Facing is frozen throughout the tumble and restored on recovery.
+    this.face=attackerFace;
+    this.stunned=0;
+    this.impactVelocity=-attackerFace*1120;
+    this.vy=-540;
     this.yOffset=-1;
+    this.knockdownPhase='flying';
+    this.knockdownTimer=0;
+    this.knockdownFlightAge=0;
+    this.grabRecovery=0;
     this.hitFlash=.18;
   }
 
@@ -408,6 +460,15 @@ export class Fighter {
       } else if(a.name==='heavy') this.weapon.rotation=-recoil*1.5;
     }
     if(this.stunned>0) this.frontArm.rotation=-.5;
+    if (this.knockedDown) {
+      this.leftLeg.rotation=-.45;
+      this.rightLeg.rotation=.5;
+      this.frontArm.rotation=-.75;
+      this.backArm.rotation=.35;
+      this.body.y=0;
+      this.head.y=0;
+      this.hair.y=0;
+    }
     if (this.grabPose==='reach') {
       this.frontArm.rotation=-1.30;this.backArm.rotation=-.60;
       this.weapon.rotation=-.40;
@@ -421,8 +482,23 @@ export class Fighter {
       this.frontArm.rotation=-2.60;this.backArm.rotation=-2.10;
       this.body.y=-9;
     }
+    // Tilt the entire body in mid-air, stay horizontal for half a second
+    // after landing, then smoothly rotate upright over another half second.
+    let fallAngle=0;
+    if (this.knockdownPhase==='flying') {
+      fallAngle=Math.min(1,this.knockdownFlightAge/.48)*Math.PI*.47;
+    } else if (this.knockdownPhase==='prone') {
+      fallAngle=Math.PI*.47;
+    } else if (this.knockdownPhase==='rising') {
+      const progress=1-this.knockdownTimer/.5;
+      const smooth=progress*progress*(3-2*progress);
+      fallAngle=Math.PI*.47*(1-smooth);
+    }
     this.rig.setPosition(this.x,GROUND_Y+this.yOffset);
     this.rig.setScale(this.face,1);
+    this.rig.setRotation(this.face*fallAngle);
+    // A separate world-space shadow stays flat underneath the trajectory.
+    this.shadow.setPosition(this.x,GROUND_Y+5);
     this.rig.alpha=this.knockedOut ? .65 : 1;
     this.guardAura.setVisible(this.blocking);
     this.guardAura.setAlpha(this.blockFlash>0 ? .90 : .44);

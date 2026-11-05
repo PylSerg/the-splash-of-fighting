@@ -39,8 +39,10 @@ function gamepadInput(pad: Gamepad | null): InputState {
   state.light = held(2);
   state.heavy = held(3);
   state.special = held(5) || (state.kick && state.heavy);
-  state.grab = state.light && state.block; // X+A: grapple
-  state.jump = held(4); // Optional LB/L1 jump; stick up remains the primary jump control.
+  // L1/LB (button 4) is an independent grab shortcut.
+  // X+A still triggers the same grab as before.
+  state.grab = held(4) || (state.light && state.block);
+  // Jump stays on stick-up / D-pad up; L1 no longer jumps.
   return state;
 }
 
