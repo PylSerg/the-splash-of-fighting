@@ -21,6 +21,14 @@ npm run build
 npm run preview
 ```
 
+## Alpha 0.5.0 · Single-screen pause menu
+
+The whole game now fits on one 16:9 screen. A centered **☰ Меню** button inside the arena opens a glass-like overlay for **CPU / 2 players**, hitbox debugging, full-screen toggle, new round and an expandable controls guide. There is no longer a separate toolbar, controls text or footer below the stage.
+
+Opening the menu **pauses the Phaser Arena scene**. Gameplay, round time, AI, animations and tweens stop completely, and held touch / keyboard states are cleared so no attack or movement leaks through the menu. Press **▶ Продовжити**, **Escape**, **P**, or **Start** (gamepad) to resume. Switching modes or restarting also resumes. Switching away from the tab pauses automatically.
+
+Phone landscape layout uses the full available viewport height for the game and menu. Controls and the menu work from inside the game frame even in fullscreen.
+
 ## Alpha 0.4.1 · L1 throw and grounded recovery
 
 - **L1 / LB (button 4)** now starts a grab directly; **X+A**, the one-finger swipe **X↔A**, **G** and **Numpad3** remain available. Gamepad jump stays on **up** with the stick or D-pad, while keyboard Space/Numpad0 still jump.
@@ -91,7 +99,7 @@ Turn the phone to **landscape**. The left thumb controls a floating **8-directio
 | Special | K+L or I | Numpad 2+4 or Numpad 6 | B+Y or R1/RB (button 5) |
 
 On touchscreens, move the virtual joystick and tap the **ABXY** diamond simultaneously. Press **B+Y** with two fingers for a special. Play in landscape orientation.
-Press **1** for CPU opponent, **2** for local versus, **R** to restart, **H** for hitbox debug overlay.
+Press **1** for CPU opponent, **2** for local versus, **R** to restart. Toggle hitbox debug using the pause menu (keyboard H remains the block key for player one).
 
 ## Features in the first milestone
 

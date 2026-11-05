@@ -9,10 +9,6 @@
 </head>
 <body>
 <main class="site">
-  <header class="topbar">
-    <div class="brand"><span class="star">✦</span><span><strong>THE SPLASH</strong><small>OF FIGHTING · ALPHA 0.4.1</small></span></div>
-    <div class="top-actions"><span class="online">● LOCAL ARCADE</span><button id="btn-fullscreen" title="На весь екран" aria-label="На весь екран">⛶</button></div>
-  </header>
   <section class="game-shell" aria-label="Арена">
     <div id="game-frame">
       <div id="game-canvas"></div>
@@ -34,14 +30,56 @@
         </div>
       </div>
       <div class="portrait-warning">↻ Поверни телефон горизонтально, щоб грати</div>
+      <button id="btn-menu" class="menu-toggle" type="button" aria-expanded="false"
+        aria-controls="pause-overlay" aria-label="Відкрити меню та поставити гру на паузу">
+        <span aria-hidden="true">☰</span> Меню
+      </button>
+      <section id="pause-overlay" class="pause-overlay" role="dialog" aria-modal="true"
+        aria-labelledby="pause-title" hidden>
+        <div class="pause-panel">
+          <header class="pause-heading">
+            <div>
+              <div class="pause-eyebrow">THE SPLASH OF FIGHTING <span>• ALPHA 0.5.0</span></div>
+              <h1 id="pause-title">ПАУЗА <span>Ⅱ</span></h1>
+              <p>Бій зупинено. Можна змінити налаштування.</p>
+            </div>
+            <button id="btn-resume" type="button" class="pause-resume">▶ Продовжити</button>
+          </header>
+          <div class="pause-grid">
+            <section class="pause-section" aria-label="Режим бою">
+              <h2>Режим гри</h2>
+              <div class="pause-choices">
+                <button id="btn-cpu" class="pill selected" type="button">⚡ Проти CPU</button>
+                <button id="btn-versus" class="pill" type="button">🎮 Два гравці</button>
+              </div>
+            </section>
+            <section class="pause-section" aria-label="Інструменти">
+              <h2>Налаштування</h2>
+              <div class="pause-choices">
+                <button id="btn-debug" class="pill" type="button">▣ Хітбокси: викл.</button>
+                <button id="btn-fullscreen" class="pill" type="button">⛶ На весь екран</button>
+              </div>
+            </section>
+          </div>
+          <div class="pause-actions">
+            <button id="btn-restart" class="pill primary" type="button">↻ Новий раунд</button>
+            <details class="pause-help">
+              <summary>⌨ Керування та комбінації</summary>
+              <div class="pause-help-content">
+                <p><b>Телефон:</b> лівий джойстик керує рухом, стрибком і присіданням. Справа: X швидкий удар, Y сильний, B нога, A блок.</p>
+                <p><b>Комбінації:</b> B+Y спецприйом, X+A захват. Можна натискати двома пальцями або ковзати одним між кнопками.</p>
+                <p><b>Геймпад:</b> ABXY, R1 спецприйом, L1 захват, стік угору для стрибка. Start відкриває меню.</p>
+                <p><b>Клавіатура:</b> WASD рух, J/K/L удари, H блок, I спецприйом, G захват; Space стрибок. Другий гравець: стрілки й Num1/2/4/5, Num3 захват, Num6 спецприйом.</p>
+                <p><b>Блок:</b> A спрацьовує на місці або при відступі. Y завдає 25% шкоди крізь блок. Під час захвату A або X допомагають звільнитися.</p>
+                <p><b>Меню:</b> Escape, P або Start на геймпаді. R новий раунд, 1/2 зміна режиму. Хітбокси вмикаються в меню.</p>
+              </div>
+            </details>
+          </div>
+          <p id="game-status" class="pause-status" aria-live="polite">Готуємо арену…</p>
+        </div>
+      </section>
     </div>
   </section>
-  <section class="toolbar" aria-label="Налаштування бою">
-    <div class="toolbar-group"><button id="btn-cpu" class="pill selected">⚡ Проти CPU</button><button id="btn-versus" class="pill">🎮 Два гравці</button></div>
-    <div class="toolbar-group"><button id="btn-debug" class="pill">▣ Хітбокси: викл.</button><button id="btn-restart" class="pill primary">↻ Новий раунд</button></div>
-  </section>
-  <div class="details"><p id="game-status" aria-live="polite">Готуємо арену…</p><details><summary>⌨ Керування</summary><p><b>Гравець 1:</b> WASD рух, J (X) швидкий, K (Y) сильний, L (B) нога, H (A) блок, J+H або G захват, K+L або I спецприйом. Space також стрибок.</p><p><b>Гравець 2:</b> стрілки рух, Num1 (X), Num2 (Y), Num4 (B), Num5 (A), Num1+Num5 або Num3 захват, Num2+Num4 або Num6 спецприйом.</p><p><b>Геймпад:</b> стік / D-pad рух, A блок, B удар ногою, X легкий, Y сильний; B+Y або R1 спецприйом, X+A або L1 захват; стрибок — стік угору.</p><p><b>Телефон:</b> джойстик зліва (вгору для стрибка), справа ромб ABXY: X швидкий, Y сильний, B нога, A блок. Спецприйом: B+Y двома пальцями або проведи одним пальцем від B до Y (чи навпаки), потрібна енергія. <b>Захват:</b> X+A (або проведи пальцем X↔A) біля суперника, L1 на геймпаді: спершу захват, потім кидок за спину з падінням і підйомом. Суперник може звільнитися A або X. Клавіатура: G / Num3. <b>Блок:</b> A діє лише на місці або під час відступу, зокрема вниз + назад навприсядки. При русі вперед і стрибку блок не працює. Сильний Y завдає 25% шкоди крізь блок. <b>Інше:</b> R рестарт, H хітбокси, 1/2 режим.</p></details></div>
-  <footer>FIRST PLAYABLE · EVI × NARA · WORK IN PROGRESS</footer>
 </main>
 <script type="module" src="/src/main.ts"></script>
 </body>
