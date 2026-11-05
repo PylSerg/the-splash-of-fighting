@@ -21,6 +21,15 @@ npm run build
 npm run preview
 ```
 
+## Alpha 0.9.4 · In-game confirmation before losing round progress
+
+A custom, touch-friendly **unsaved progress** warning appears before **Рестарт**, **Змінити персонажа**, **Змінити арену** and **Вийти** in the fight menu. There is no browser `window.confirm()`. Each action has a specific warning that accurately describes what changes and what stays unchanged.
+
+- **Скасувати** returns to the paused fight menu, preserving HP, meter, round time and current opponents.
+- **Підтвердити** performs only the requested action. Changing fighters/stages still preserves the unchanged dimension, and backing out of either selection without a new choice leaves the current match intact.
+- Game time, AI and fighter movement remain paused until the player resumes, and the warning blocks interaction with the underlying menu.
+- **Escape / P / gamepad Start** cancels the warning. The quick shortcuts **R**, **1**, **2** also ask for confirmation when invoked in the middle of a fight.
+
 ## Alpha 0.9.3 · Universal menu close button
 
 A prominent, touch-friendly **✕** in the top-right of the settings/pause panel closes it **from any tab**: when opened from the title screen, it returns to the title; when opened during battle, it resumes the paused match immediately. This avoids having to open the **Бій** tab just to continue playing. Existing Escape/P/Start shortcuts and character-select back navigation remain unchanged.

@@ -669,3 +669,60 @@ body { min-height:0; }
   .pause-heading-actions .pause-context-label {display:none;}
   .pause-close {width:43px;height:43px;font-size:24px;}
 }
+
+/* Alpha 0.9.4: custom loss-of-progress confirmation above the paused fight. */
+.action-confirm{
+  position:absolute;inset:0;z-index:32;
+  display:grid;place-items:center;
+  padding:clamp(12px,2.8vmin,26px);
+  background:linear-gradient(130deg,#090e22e8,#15152aef 50%,#130d25ed);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  overflow:hidden;
+  touch-action:manipulation;
+}
+.confirm-panel{
+  width:min(520px,100%);max-height:100%;overflow-y:auto;overflow-x:hidden;
+  padding:clamp(15px,3.3vmin,27px);
+  border:1px solid #e6b4dc8f;border-radius:20px;
+  background:linear-gradient(145deg,#343054,#1c233f 85%);
+  box-shadow:0 15px 70px #000b,inset 0 1px #ffffff32;
+  color:#fff4ff;
+}
+.confirm-eyebrow{
+  color:#ffd2ac;font:700 clamp(11px,1.8vmin,15px)/1.1 Rajdhani,sans-serif;
+  letter-spacing:1.1px;
+}
+.confirm-eyebrow span{font-size:1.4em;vertical-align:-.1em}
+.confirm-panel h2{
+  margin:9px 0 8px;color:#ffe5f3;
+  font:700 clamp(24px,4.5vmin,36px)/1.08 Rajdhani,system-ui,sans-serif;
+}
+.confirm-panel p{
+  margin:0 0 clamp(14px,2.4vmin,24px);
+  color:#d7deef;font:500 clamp(13px,2.1vmin,16px)/1.4 Inter,system-ui,sans-serif;
+}
+.confirm-actions{display:grid;grid-template-columns:1fr 1fr;gap:clamp(9px,2vmin,15px)}
+.confirm-actions button{
+  min-height:clamp(46px,9vmin,60px);border-radius:12px;
+  padding:9px 13px;touch-action:manipulation;
+  font:700 clamp(16px,2.7vmin,21px)/1.1 Rajdhani,system-ui,sans-serif;
+}
+.confirm-cancel{
+  background:linear-gradient(125deg,#a9e8da,#bcdaea);
+  color:#15293c;border:1px solid #c6fff0;
+}
+.confirm-accept{
+  background:linear-gradient(125deg,#78495c,#60394e);
+  color:#ffe9ef;border:1px solid #c998ad;
+}
+.confirm-actions button:hover{filter:brightness(1.12)}
+.confirm-actions button:active{transform:scale(.98)}
+.confirm-actions button:focus-visible{
+  outline:3px solid #ffe5b6;outline-offset:3px;
+}
+@media(orientation:landscape) and (max-height:340px){
+  .confirm-panel{padding:12px 16px;border-radius:14px}
+  .confirm-panel h2{margin:5px 0;font-size:23px}
+  .confirm-panel p{margin-bottom:9px;font-size:12px}
+  .confirm-actions button{min-height:43px;padding:6px}
+}

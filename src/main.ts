@@ -12,6 +12,7 @@ import type { FighterId } from './combat/Fighter';
 type Pair = { first: FighterId; second: FighterId; mode: MatchMode };
 type Screen = 'home' | 'characters' | 'stages' | 'battle' | 'menu' | 'layout';
 type MenuTab = 'game' | 'controls' | 'display' | 'help';
+type DisruptiveAction = 'restart' | 'characters' | 'stage' | 'exit';
 const get = <T extends HTMLElement>(selector: string): T => {
   const el=document.querySelector<T>(selector);
   if(!el) throw new Error('Missing interface element: ' + selector);
@@ -39,6 +40,11 @@ const menuOverlay=get<HTMLElement>('#pause-overlay');
 const home=get<HTMLElement>('#home-screen');
 const resumeButton=get<HTMLButtonElement>('#btn-resume');
 const closeMenuButton=get<HTMLButtonElement>('#btn-close-menu');
+const confirmDialog=get<HTMLElement>('#action-confirm');
+const confirmTitle=get<HTMLElement>('#confirm-title');
+const confirmDescription=get<HTMLElement>('#confirm-description');
+const confirmCancel=get<HTMLButtonElement>('#btn-confirm-cancel');
+const confirmAccept=get<HTMLButtonElement>('#btn-confirm-accept');
 const restartButton=get<HTMLButtonElement>('#btn-restart');
 const debugButton=get<HTMLButtonElement>('#btn-debug');
 const fullscreenButton=get<HTMLButtonElement>('#btn-fullscreen');
@@ -58,6 +64,33 @@ let pendingPair: Pair | null=null;
 let activeStage: StageId='city';
 let logicalWidth=960;
 let gamepadStartHeld=false;
+let pendingConfirmation: DisruptiveAction | null=null;
+let confirmationReturnFocus: HTMLElement | null=null;
+
+const confirmationCopy: Record<DisruptiveAction,{
+  title:string; description:string; accept:string;
+}> = {
+  restart: {
+    title:'Почати раунд заново?',
+    description:'Поточний бій, здоров’я, енергія та час раунду будуть скинуті. Персонажі й арена залишаться без змін.',
+    accept:'↻ Так, рестарт',
+  },
+  characters: {
+    title:'Перейти до вибору бійців?',
+    description:'Якщо обереш інших персонажів, поточний раунд почнеться заново на цій самій арені. Повернення без змін збереже бій.',
+    accept:'🧑‍🤝‍🧑 Обрати бійців',
+  },
+  stage: {
+    title:'Змінити арену?',
+    description:'Якщо обереш іншу арену, поточний раунд почнеться заново, але бійці залишаться ті самі. Повернення без змін збереже бій.',
+    accept:'🌄 Обрати арену',
+  },
+  exit: {
+    title:'Вийти з поєдинку?',
+    description:'Ти повернешся на головний екран, а весь прогрес поточного раунду буде втрачено.',
+    accept:'⌂ Так, вийти',
+  },
+};
 
 const characterSelector=new CharacterSelector(onCharacterChosen, backFromCharacter);
 const stageSelector=new StageSelector(onStageChosen, backFromStage);
@@ -236,6 +269,51 @@ function finishLayout(): void {
   showMenu(menuOrigin,'controls');
   layoutEditButton.focus({preventScroll:true});
 }
+/** Never use the browser's blocking window.confirm: this is an in-game dialog.
+ *  Arena is paused throughout, including when the player cancels.
+ */
+function requestConfirmation(action: DisruptiveAction): void {
+  if(!activePair) return;
+  // Keyboard shortcuts can request a destructive action mid-fight.
+  // Open the pause menu first, so time, AI and animations all stop.
+  if(screen==='battle') showMenu('battle','game');
+  if(screen!=='menu' || menuOrigin!=='battle' || pendingConfirmation) return;
+  const copy=confirmationCopy[action];
+  pendingConfirmation=action;
+  confirmationReturnFocus=document.activeElement instanceof HTMLElement
+    ? document.activeElement : null;
+  confirmTitle.textContent=copy.title;
+  confirmDescription.textContent=copy.description;
+  confirmAccept.textContent=copy.accept;
+  confirmDialog.hidden=false;
+  // Prevent activating underlying menu tabs or buttons with touch/keyboard.
+  menuOverlay.inert=true;
+  confirmCancel.focus({preventScroll:true});
+}
+function dismissConfirmation(restoreFocus=true): void {
+  if(!pendingConfirmation) return;
+  pendingConfirmation=null;
+  confirmDialog.hidden=true;
+  menuOverlay.inert=false;
+  const element=confirmationReturnFocus;
+  confirmationReturnFocus=null;
+  if(restoreFocus && element?.isConnected) element.focus({preventScroll:true});
+}
+function executeDisruptiveAction(action: DisruptiveAction): void {
+  switch(action){
+    case 'restart': restart(); break;
+    case 'characters': showCharacters('menu'); break;
+    case 'stage': showStageSelect('menu'); break;
+    case 'exit': goHome(); break;
+  }
+}
+function confirmDisruptiveAction(): void {
+  const action=pendingConfirmation;
+  if(!action) return;
+  dismissConfirmation(false);
+  executeDisruptiveAction(action);
+}
+
 function toggleDebug(): void {
   arena.setDebug(!arena.getDebug());
   debugButton.textContent='▣ Хітбокси: '+(arena.getDebug()?'увімк.':'викл.');
@@ -250,6 +328,8 @@ async function toggleFullscreen(): Promise<void> {
   }
 }
 function togglePause(): void {
+  // Escape / P / Start cancels the warning without discarding the match.
+  if(pendingConfirmation){ dismissConfirmation(); return; }
   if(screen==='battle') showMenu('battle');
   else if(screen==='menu') leaveMenu();
   else if(screen==='layout') finishLayout();
@@ -266,14 +346,28 @@ homeFullscreen.addEventListener('click',()=>{void toggleFullscreen();});
 menuButton.addEventListener('click',()=>showMenu('battle'));
 resumeButton.addEventListener('click',leaveMenu);
 closeMenuButton.addEventListener('click',leaveMenu);
-restartButton.addEventListener('click',restart);
-get<HTMLButtonElement>('#btn-choose-characters').addEventListener('click',()=>{
-  if(activePair) showCharacters('menu');
+restartButton.addEventListener('click',()=>requestConfirmation('restart'));
+get<HTMLButtonElement>('#btn-choose-characters').addEventListener('click',
+  ()=>requestConfirmation('characters'));
+get<HTMLButtonElement>('#btn-choose-stage').addEventListener('click',
+  ()=>requestConfirmation('stage'));
+get<HTMLButtonElement>('#btn-exit').addEventListener('click',
+  ()=>requestConfirmation('exit'));
+confirmCancel.addEventListener('click',()=>dismissConfirmation());
+confirmAccept.addEventListener('click',confirmDisruptiveAction);
+confirmDialog.addEventListener('keydown',event=>{
+  // Keep keyboard focus inside the warning until confirmed or canceled.
+  if(event.key!=='Tab') return;
+  const buttons=[confirmCancel,confirmAccept];
+  const index=buttons.indexOf(document.activeElement as HTMLButtonElement);
+  if(event.shiftKey && index<=0){
+    event.preventDefault();
+    confirmAccept.focus({preventScroll:true});
+  } else if(!event.shiftKey && index===buttons.length-1){
+    event.preventDefault();
+    confirmCancel.focus({preventScroll:true});
+  }
 });
-get<HTMLButtonElement>('#btn-choose-stage').addEventListener('click',()=>{
-  if(activePair) showStageSelect('menu');
-});
-get<HTMLButtonElement>('#btn-exit').addEventListener('click',goHome);
 
 layoutEditButton.addEventListener('click',editLayout);
 get<HTMLButtonElement>('#btn-layout-done').addEventListener('click',finishLayout);
@@ -299,9 +393,9 @@ window.addEventListener('keydown',event=>{
   }
   if(screen!=='battle')return;
   switch(event.code){
-    case 'KeyR':restart();break;
-    case 'Digit1':showCharacters('menu');break;
-    case 'Digit2':showStageSelect('menu');break;
+    case 'KeyR':requestConfirmation('restart');break;
+    case 'Digit1':requestConfirmation('characters');break;
+    case 'Digit2':requestConfirmation('stage');break;
   }
 });
 function pollGamepadMenu(): void {
