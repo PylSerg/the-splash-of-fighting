@@ -21,6 +21,25 @@ npm run build
 npm run preview
 ```
 
+## Alpha 0.9.0 · Title screen, three fighters, two arenas and tabbed pause menu
+
+A complete game flow is now available:
+
+1. **Title screen:** THE SPLASH OF FIGHTING with centered **Почати**, **Налаштування**, **На весь екран**. Settings opens the same tabbed controls/display menu without beginning a match.
+2. **Character select:** choose one of **Evi**, **Nara** or the new fire-themed fighter **Lyra**, wearing a navy/gold outfit and carrying an amber fan blade. Portraits and the fight HUD support all three.
+3. **Stage select:** choose **Неонове місто** or the new **Місячна лагуна**, a moonlit seaside arena with distant islands, stars, rippling water and shoreline lights.
+4. **Fight:** the selected pair enters the chosen stage. CPU randomly selects from all other available roster members, and PvP forbids mirror matches.
+
+During a fight, **☰ Меню** freezes all animation and combat. Settings are split into tabs:
+- **Бій:** **Продовжити**, **Рестарт**, **Змінити персонажа**, **Змінити арену**, **Вийти**.
+- **Керування:** independent joystick/ABXY scaling, draggable positions and reset.
+- **Графіка:** hitbox display and fullscreen control.
+- **Довідка:** controls and combat instructions.
+
+Changing characters **restarts the round but keeps the current arena**. Confirming an unchanged pair returns to the pause menu without restarting. Changing arenas **restarts the round with the same fighters**; selecting the same arena doesn't restart. Restart preserves both fighters and arena. Exit returns to the title screen. A fresh title-screen start always proceeds through character and arena selection.
+
+Both worlds share the same fighter physics, hitbox, counterattack and block rules. Lethal throws leave their victims down through the final result.
+
 ## Alpha 0.8.0 · Fighter portraits and character select
 
 - **Character selection on launch:** no match timer or CPU logic runs until the player explicitly chooses a fighter and starts the match.

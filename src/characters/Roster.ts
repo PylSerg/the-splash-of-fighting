@@ -12,6 +12,7 @@ export interface CharacterInfo {
 export const CHARACTERS: readonly CharacterInfo[] = [
   { id: 'evi', name: 'ЕВІ', title: 'Стиль і швидкість', color: '#f49bc8', glow: '#e8abff' },
   { id: 'nara', name: 'НАРА', title: 'Сила і натиск', color: '#69e5da', glow: '#9ba7ff' },
+  { id: 'lyra', name: 'ЛІРА', title: 'Полум’я та точність', color: '#ffaf69', glow: '#ffdd93' },
 ];
 
 export const getCharacter = (id: FighterId): CharacterInfo => {
@@ -22,6 +23,27 @@ export const getCharacter = (id: FighterId): CharacterInfo => {
 
 /** Original stylized SVG headshots, used for both the roster and fight HUD. */
 export function portraitSvg(id: FighterId): string {
+  if (id === 'lyra') {
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Портрет Ліри">
+      <defs>
+        <linearGradient id="lyr-bg" x2="1" y2="1"><stop stop-color="#8b4c6a"/><stop offset="1" stop-color="#243858"/></linearGradient>
+        <linearGradient id="lyr-hair" x2=".7" y2="1"><stop stop-color="#ffcf82"/><stop offset=".55" stop-color="#fb9857"/><stop offset="1" stop-color="#ca5a55"/></linearGradient>
+      </defs>
+      <rect width="120" height="120" rx="16" fill="url(#lyr-bg)"/>
+      <circle cx="98" cy="29" r="31" fill="#ffb960" opacity=".19"/>
+      <path d="M15 120Q16 90 42 85L81 86Q107 91 112 120Z" fill="#233650"/>
+      <path d="M38 78Q15 44 34 21Q50 7 76 21Q95 32 84 66L94 83 74 91 47 93Z" fill="url(#lyr-hair)"/>
+      <path d="M82 36Q111 42 114 65L101 73 92 58Z" fill="#d46653"/>
+      <path d="M39 43Q42 28 61 29Q79 29 82 46L78 73Q71 89 60 88Q47 87 42 71Z" fill="#f0bca2"/>
+      <path d="M35 43Q38 19 62 19Q82 16 87 42Q71 33 58 36Q46 43 35 43" fill="#ffbd79"/>
+      <path d="M44 54 55 53M67 54 79 53" stroke="#5b3c53" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="50" cy="60" r="2.5" fill="#a76b43"/><circle cx="73" cy="60" r="2.5" fill="#a76b43"/>
+      <path d="M55 76Q61 78 68 74" stroke="#b36c73" stroke-width="3" fill="none"/>
+      <path d="M30 120Q34 93 47 87L61 106 77 87Q90 93 101 120" fill="#263a59" stroke="#f6b377" stroke-width="2"/>
+      <path d="M44 90 60 104 78 90" fill="none" stroke="#ffd997" stroke-width="4"/>
+      <circle cx="61" cy="110" r="6" fill="#ffcb75"/>
+    </svg>`;
+  }
   if (id === 'evi') {
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Портрет Еві">
       <defs>

@@ -21,6 +21,7 @@ export class CharacterSelector {
   private p1: FighterId | null = null;
   private p2: FighterId | null = null;
   private allowBack = false;
+  private previousCpuPair: { first: FighterId; second: FighterId } | null = null;
 
   constructor(
     private readonly onStart: (p1: FighterId, p2: FighterId, mode: MatchMode) => void,
@@ -64,10 +65,16 @@ export class CharacterSelector {
     this.paint();
   }
 
-  show(mode: MatchMode, allowBack: boolean): void {
+  show(
+    mode: MatchMode,
+    allowBack: boolean,
+    previous?: { first: FighterId; second: FighterId },
+  ): void {
     this.mode = mode;
-    this.p1 = null;
-    this.p2 = null;
+    this.p1 = previous?.first ?? null;
+    this.p2 = mode === 'versus' ? previous?.second ?? null : null;
+    this.previousCpuPair = previous && mode === 'cpu'
+      ? previous : null;
     this.allowBack = allowBack;
     this.root.hidden = false;
     this.paint();
@@ -154,8 +161,14 @@ export class CharacterSelector {
     } else {
       const candidates = CHARACTERS.filter(item => item.id !== this.p1);
       if (candidates.length === 0) return;
-      const index = Math.floor(Math.random() * candidates.length);
-      second = candidates[index].id;
+      // Re-selecting the same character during a CPU match should preserve
+      // the existing opponent, rather than silently creating a new fight.
+      if (this.previousCpuPair?.first === this.p1) {
+        second = this.previousCpuPair.second;
+      } else {
+        const index = Math.floor(Math.random() * candidates.length);
+        second = candidates[index].id;
+      }
     }
     this.onStart(this.p1, second, this.mode);
   }

@@ -374,3 +374,162 @@ button:focus-visible,summary:focus-visible{outline:3px solid #7bd3f9;outline-off
  .select-roster{grid-template-columns:1fr}
  .select-heading h1{font-size:25px}
 }
+
+/* 0.9.0: stable splash -> fighters -> arena -> match navigation. */
+.front-screen .touch-controls,.front-screen .menu-toggle,
+.front-screen .hud-portraits{display:none!important}
+.home-screen,.stage-select{
+  position:absolute;inset:0;display:grid;place-items:center;
+  z-index:24;overflow:auto;overscroll-behavior:contain;
+  padding:clamp(7px,2vmin,19px);
+  background:radial-gradient(ellipse 95% 115% at 50% 37%,#342f66ed 0%,#1b1f42f4 53%,#0b142cfa 100%);
+  backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
+}
+.home-screen{
+  grid-template-rows:1fr auto 1fr;
+  text-align:center;gap:min(4vh,22px);
+}
+.home-screen::before{
+  content:'';position:absolute;inset:-15%;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(ellipse 13% 55% at 19% 70%,#d782bc36,transparent 85%),
+    radial-gradient(ellipse 13% 56% at 83% 72%,#5bebe64a,transparent 85%),
+    radial-gradient(ellipse 30% 25% at 50% 20%,#c4a3ef24,transparent);
+}
+.home-logo{grid-row:1;align-self:end;filter:drop-shadow(0 5px 12px #10091f)}
+.home-kicker,.home-version,.select-eyebrow{
+  font:700 clamp(9px,1.6vmin,14px) Rajdhani,sans-serif;
+  letter-spacing:clamp(1px,.36vmin,3px);color:#b9e9e4
+}
+.home-logo h1{
+  font:700 clamp(40px,11.4vmin,100px)/.88 Rajdhani,sans-serif;
+  letter-spacing:clamp(1px,.6vmin,6px);
+  margin:clamp(4px,1.4vmin,12px) 0;color:#ffe1ef;
+  text-shadow:0 4px #634272,0 0 29px #e597c85c;
+}
+.home-logo h1 span{display:block}
+.home-logo h1 small{
+  display:block;margin-top:clamp(4px,2vmin,17px);
+  color:#aff0ec;font-size:.55em;letter-spacing:.17em;
+  text-shadow:0 3px #2c6975,0 0 25px #82e3df72
+}
+.home-version{color:#edcefa;letter-spacing:.9px}
+.home-buttons{
+  grid-row:2;display:flex;flex-direction:column;gap:clamp(7px,1.5vmin,13px);
+  width:min(305px,calc(100% - 20px));align-self:center
+}
+.home-buttons button{
+  padding:clamp(8px,2vmin,17px) 15px;border-radius:15px;
+  border:1px solid #9293c6;color:#f9f1ff;
+  background:linear-gradient(135deg,#434d80ec,#272747f2);
+  font:700 clamp(17px,3.3vmin,25px) Rajdhani,sans-serif;
+  box-shadow:0 5px 23px #03091892,inset 0 1px #ffffff38;
+}
+.home-buttons button.home-primary{
+  background:linear-gradient(115deg,#ffc5d9,#e9b6ec 52%,#a4e0e5);
+  color:#201f39;border-color:#fff1f9
+}
+.home-buttons button:hover{filter:brightness(1.15)}
+.home-buttons button:active{transform:scale(.98)}
+/* Pause menu's tab pages: no controls spill beneath the game viewport. */
+.pause-panel{width:min(720px,100%)}
+.pause-context-label{font:700 12px Rajdhani,sans-serif;color:#aee2e4}
+.pause-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:9px 0 11px}
+.pause-tab{
+  border:1px solid #737ea7;border-radius:9px;
+  padding:8px 5px;background:#242b4a;color:#d9e0f4;
+  font:700 14px Rajdhani,sans-serif;
+}
+.pause-tab.selected{border-color:#e8bada;background:#64406f;color:#fff;box-shadow:0 0 10px #d281ae50}
+.pause-pane{min-height:100px}
+.pause-game-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.pause-game-actions .pill{font:700 17px Rajdhani,sans-serif;padding:12px 8px}
+.pause-game-actions .pill:first-child{grid-column:span 2}
+.pause-game-actions .pill:last-child{grid-column:span 2;background:#3c2f4e;border-color:#b59bc0}
+.pause-display-choices{margin:13px 0}
+.pause-pane .pause-help-content{max-height:min(36vh,250px);padding:5px 7px}
+.pause-pane .pause-help-content p{margin:7px 0}
+.pause-pane .pause-touch-settings{display:block;margin:0}
+.pause-status{font-size:11px}
+@media(max-height:480px){
+  .pause-tabs{margin:5px 0 7px}
+  .pause-tab{padding:5px 3px;font-size:12px}
+  .pause-game-actions{gap:5px}
+  .pause-game-actions .pill{padding:7px 5px;font-size:14px}
+  .pause-pane{min-height:0}
+  .home-logo h1{font-size:min(12.5vh,80px)}
+  .home-buttons{gap:5px}
+  .home-buttons button{padding:7px 13px;font-size:17px;border-radius:10px}
+}
+.stage-select{z-index:23}
+.stage-panel{
+  width:min(790px,100%);max-height:100%;overflow:auto;
+  padding:clamp(10px,2.3vmin,22px);
+  border:1px solid #b9bedc74;border-radius:18px;
+  background:linear-gradient(135deg,#252b4ef2,#161f3dfa);
+  box-shadow:0 15px 62px #090e25b2;
+}
+.stage-panel h1{
+  font:700 clamp(26px,5vmin,44px)/1 Rajdhani,sans-serif;
+  color:#ffe2f3;margin:5px 0
+}
+.stage-panel h1 span{color:#90e3dd}
+.stage-panel>p{font:500 12px Inter,sans-serif;color:#bbc9df;margin:5px 0 13px}
+.stage-roster{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.stage-card{
+  min-width:0;display:flex;flex-direction:column;gap:0;
+  text-align:left;padding:0;border:2px solid #6e84a0;border-radius:15px;
+  background:#1d2744;color:#fff;overflow:hidden;
+  box-shadow:0 4px 19px #070f2790
+}
+.stage-card.selected{border-color:#ffd6ea;box-shadow:0 0 0 2px #b9e3e19e,0 0 22px #a5d8dd53}
+.stage-card:hover{filter:brightness(1.1)}
+.stage-preview{display:block;position:relative;overflow:hidden;width:100%;height:clamp(68px,19vmin,165px)}
+.stage-preview-city{
+  background:radial-gradient(circle at 55% 25%,#695276 0 9%,transparent 10%),
+    linear-gradient(180deg,#101632 0%,#23254b 63%,#182742 64%,#23324d 100%)
+}
+.stage-preview-lagoon{
+  background:radial-gradient(circle at 56% 29%,#ffe7c4 0 10%,#d0dbe66b 11%,transparent 20%),
+    linear-gradient(180deg,#111e48,#284662 67%,#18556a 70%,#3d5857 100%)
+}
+.stage-preview-city .stage-skyline{
+  position:absolute;bottom:25%;width:100%;height:54%;
+  background:repeating-linear-gradient(90deg,#17203e 0 13px,#263650 13px 23px,#161c39 23px 32px);
+  clip-path:polygon(0 34%,6% 34%,6% 8%,14% 8%,14% 46%,20% 46%,20% 18%,27% 18%,27% 52%,35% 52%,35% 11%,44% 11%,44% 38%,52% 38%,52% 5%,60% 5%,60% 47%,69% 47%,69% 23%,77% 23%,77% 60%,87% 60%,87% 9%,95% 9%,95% 38%,100% 38%,100% 100%,0 100%)
+}
+.stage-preview-city .stage-horizon{
+  position:absolute;bottom:0;height:24%;width:100%;
+  background:repeating-linear-gradient(90deg,transparent 0 33px,#a6b5cc6c 34px 35px),
+    linear-gradient(180deg,#363e64,#20253f);border-top:2px solid #c28fba
+}
+.stage-preview-lagoon .stage-skyline{
+  position:absolute;bottom:28%;height:34%;width:100%;
+  background:#162e4d;clip-path:polygon(0 100%,0 72%,13% 11%,29% 93%,45% 55%,63% 100%,78% 28%,94% 81%,100% 42%,100% 100%)
+}
+.stage-preview-lagoon .stage-horizon{
+  position:absolute;bottom:0;height:27%;width:100%;
+  background:repeating-linear-gradient(175deg,#89dce03b 0 2px,transparent 3px 11px),
+    linear-gradient(180deg,#316f7b,#314956);border-top:2px solid #a5eee4
+}
+.stage-symbol{
+  position:absolute;right:10px;top:6px;z-index:2;
+  font-size:clamp(17px,3.5vmin,32px);color:#ffe2c1;text-shadow:0 0 12px #e5cee8
+}
+.stage-card-caption{display:flex;flex-direction:column;gap:3px;padding:9px 12px;min-height:52px}
+.stage-card-caption strong{font:700 19px Rajdhani,sans-serif;color:#fff5fc}
+.stage-card-caption small{font:500 10px Inter,sans-serif;color:#b9cadf;line-height:1.25}
+.stage-choice-mark{position:absolute;visibility:hidden}
+.stage-actions{display:flex;justify-content:space-between;gap:8px;margin-top:12px}
+.stage-actions .pill{flex:1;padding:8px;font:700 15px Rajdhani,sans-serif}
+@media(max-height:460px){
+ .stage-panel{padding:8px 12px}
+ .stage-panel h1{font-size:26px;margin:2px 0}
+ .stage-panel>p{margin:3px 0 7px}
+ .stage-preview{height:clamp(60px,18vmin,95px)}
+ .stage-card-caption{padding:5px 9px;min-height:40px}
+ .stage-card-caption strong{font-size:15px}
+ .stage-card-caption small{font-size:9px}
+ .stage-actions{margin-top:6px}
+ .stage-actions .pill{padding:6px}
+}

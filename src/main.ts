@@ -4,257 +4,307 @@ import { Controls } from './input/Controls';
 import { ArenaScene } from './scenes/ArenaScene';
 import { TouchLayoutEditor } from './ui/TouchLayoutEditor';
 import { CharacterSelector, type MatchMode } from './ui/CharacterSelector';
+import { StageSelector } from './ui/StageSelector';
 import { getCharacter, portraitSvg } from './characters/Roster';
+import { getStage, type StageId } from './stages/Stages';
 import type { FighterId } from './combat/Fighter';
 
-const status = document.querySelector<HTMLElement>('#game-status');
-const controls = new Controls();
-const game = new Phaser.Game({
-  type: Phaser.AUTO,
-  parent: 'game-canvas',
-  width: 960,
-  height: 540,
-  backgroundColor: '#10152b',
-  pixelArt: true,
-  antialias: false,
-  roundPixels: true,
-  scale: {
-    mode: Phaser.Scale.NONE,
-    autoCenter: Phaser.Scale.NO_CENTER,
-    parent: 'game-canvas',
-    width: 960,
-    height: 540,
+type Pair = { first: FighterId; second: FighterId; mode: MatchMode };
+type Screen = 'home' | 'characters' | 'stages' | 'battle' | 'menu' | 'layout';
+type MenuTab = 'game' | 'controls' | 'display' | 'help';
+const get = <T extends HTMLElement>(selector: string): T => {
+  const el=document.querySelector<T>(selector);
+  if(!el) throw new Error('Missing interface element: ' + selector);
+  return el;
+};
+
+const status=get<HTMLElement>('#game-status');
+const controls=new Controls();
+const game=new Phaser.Game({
+  type:Phaser.AUTO,
+  parent:'game-canvas',
+  width:960,height:540,backgroundColor:'#10152b',
+  pixelArt:true,antialias:false,roundPixels:true,
+  scale:{
+    mode:Phaser.Scale.NONE,autoCenter:Phaser.Scale.NO_CENTER,
+    parent:'game-canvas',width:960,height:540,
   },
 });
+const arena=new ArenaScene(controls, message => { status.textContent=message; });
+game.scene.add('Arena',arena,true);
 
-const arena = new ArenaScene(controls, message => {
-  if (status) status.textContent = message;
-});
-game.scene.add('Arena', arena, true);
+const frame=get<HTMLElement>('#game-frame');
+const menuButton=get<HTMLButtonElement>('#btn-menu');
+const menuOverlay=get<HTMLElement>('#pause-overlay');
+const home=get<HTMLElement>('#home-screen');
+const resumeButton=get<HTMLButtonElement>('#btn-resume');
+const restartButton=get<HTMLButtonElement>('#btn-restart');
+const debugButton=get<HTMLButtonElement>('#btn-debug');
+const fullscreenButton=get<HTMLButtonElement>('#btn-fullscreen');
+const homeFullscreen=get<HTMLButtonElement>('#btn-home-fullscreen');
+const menuContext=get<HTMLElement>('#menu-context-label');
+const avatar1=get<HTMLElement>('#hud-avatar-p1');
+const avatar2=get<HTMLElement>('#hud-avatar-p2');
+const layoutEditButton=get<HTMLButtonElement>('#btn-layout-edit');
+const touchLayout=new TouchLayoutEditor();
 
-const cpuButton = document.querySelector<HTMLButtonElement>('#btn-cpu');
-const versusButton = document.querySelector<HTMLButtonElement>('#btn-versus');
-const debugButton = document.querySelector<HTMLButtonElement>('#btn-debug');
-const restartButton = document.querySelector<HTMLButtonElement>('#btn-restart');
-const changeFightersButton = document.querySelector<HTMLButtonElement>('#btn-choose-characters');
-const fullscreenButton = document.querySelector<HTMLButtonElement>('#btn-fullscreen');
-const menuButton = document.querySelector<HTMLButtonElement>('#btn-menu');
-const resumeButton = document.querySelector<HTMLButtonElement>('#btn-resume');
-const overlay = document.querySelector<HTMLElement>('#pause-overlay');
-const frame = document.querySelector<HTMLElement>('#game-frame');
-const layoutEditButton = document.querySelector<HTMLButtonElement>('#btn-layout-edit');
-const layoutDoneButton = document.querySelector<HTMLButtonElement>('#btn-layout-done');
-const avatar1 = document.querySelector<HTMLElement>('#hud-avatar-p1');
-const avatar2 = document.querySelector<HTMLElement>('#hud-avatar-p2');
-const touchLayout = new TouchLayoutEditor();
+let screen: Screen='home';
+let menuOrigin: 'home' | 'battle'='battle';
+let characterOrigin: 'home' | 'menu'='home';
+let stageOrigin: 'new' | 'menu'='new';
+let activePair: Pair | null=null;
+let pendingPair: Pair | null=null;
+let activeStage: StageId='city';
+let logicalWidth=960;
+let gamepadStartHeld=false;
 
-let currentLogicalWidth = 960;
+const characterSelector=new CharacterSelector(onCharacterChosen, backFromCharacter);
+const stageSelector=new StageSelector(onStageChosen, backFromStage);
+
+function isSamePair(a: Pair, b: Pair): boolean {
+  return a.first===b.first && a.second===b.second && a.mode===b.mode;
+}
+function updateAvatars(p1: FighterId,p2: FighterId): void {
+  avatar1.innerHTML=portraitSvg(p1);
+  avatar1.style.setProperty('--avatar-color',getCharacter(p1).color);
+  avatar2.innerHTML=portraitSvg(p2);
+  avatar2.style.setProperty('--avatar-color',getCharacter(p2).color);
+}
 function resizeArena(): void {
-  if (!frame) return;
-  const rect = frame.getBoundingClientRect();
-  if (rect.width < 1 || rect.height < 1) return;
-  const width = Math.max(960, Math.round(540 * rect.width / rect.height));
-  if (width !== currentLogicalWidth) {
-    game.scale.resize(width, 540);
-    currentLogicalWidth = width;
+  const rect=frame.getBoundingClientRect();
+  if(rect.width<1||rect.height<1) return;
+  const width=Math.max(960,Math.round(540*rect.width/rect.height));
+  if(width!==logicalWidth){
+    game.scale.resize(width,540);
+    logicalWidth=width;
     arena.resizeViewport(width);
   }
-  frame.style.setProperty('--hud-scale', String(rect.height / 540));
+  frame.style.setProperty('--hud-scale',String(rect.height/540));
   touchLayout.sync();
 }
-if (frame && typeof ResizeObserver !== 'undefined') {
-  new ResizeObserver(resizeArena).observe(frame);
-}
-window.addEventListener('resize', resizeArena);
+if(typeof ResizeObserver!=='undefined') new ResizeObserver(resizeArena).observe(frame);
+window.addEventListener('resize',resizeArena);
 requestAnimationFrame(resizeArena);
 
-let menuOpen = false;
-let selecting = true; // No match begins without player 1 choosing a fighter.
-let initialSelection = true;
-let gamepadStartWasDown = false;
-
-function updateMode(): void {
-  cpuButton?.classList.toggle('selected', arena.getMode() === 'cpu');
-  versusButton?.classList.toggle('selected', arena.getMode() === 'versus');
+function setScreen(next: Screen): void {
+  screen=next;
+  home.hidden=next!=='home';
+  menuOverlay.hidden=next!=='menu';
+  if(next!=='layout') touchLayout.stop();
+  characterSelector.hide();
+  stageSelector.hide();
+  frame.classList.toggle('front-screen',
+    next==='home'||next==='characters'||next==='stages'||
+    (next==='menu'&&menuOrigin==='home'));
+  menuButton.hidden=next!=='battle';
+  menuButton.setAttribute('aria-expanded',String(next==='menu'));
 }
-function updateAvatars(p1: FighterId, p2: FighterId): void {
-  if (avatar1) {
-    avatar1.innerHTML = portraitSvg(p1);
-    avatar1.style.setProperty('--avatar-color', getCharacter(p1).color);
+function selectMenuTab(tab: MenuTab): void {
+  for(const button of document.querySelectorAll<HTMLButtonElement>('[data-menu-tab]')){
+    const chosen=button.dataset.menuTab===tab;
+    button.classList.toggle('selected',chosen);
+    button.setAttribute('aria-selected',String(chosen));
   }
-  if (avatar2) {
-    avatar2.innerHTML = portraitSvg(p2);
-    avatar2.style.setProperty('--avatar-color', getCharacter(p2).color);
-  }
-}
-
-function finishLayoutEditing(): void {
-  if (!touchLayout.isEditing) return;
-  touchLayout.stop();
-  if (menuOpen && overlay) {
-    overlay.hidden = false;
-    layoutEditButton?.focus({ preventScroll: true });
+  for(const pane of document.querySelectorAll<HTMLElement>('[data-menu-pane]')){
+    pane.hidden=pane.dataset.menuPane!==tab;
   }
 }
-
-function startMatch(p1: FighterId, p2: FighterId, mode: MatchMode): void {
-  // The selector itself guarantees p1 != p2 in PvP and CPU alike.
-  if (p1 === p2) return;
-  arena.setMatchup(p1, p2, mode);
-  updateAvatars(p1, p2);
-  updateMode();
+function goHome(): void {
   controls.clear();
-  selector.hide();
-  selecting = false;
-  initialSelection = false;
-  menuOpen = false;
-  if (overlay) overlay.hidden = true;
-  if (menuButton) {
-    menuButton.hidden = false;
-    menuButton.setAttribute('aria-expanded', 'false');
+  game.scene.pause('Arena');
+  pendingPair=null;
+  setScreen('home');
+  home.querySelector<HTMLButtonElement>('#btn-home-start')?.focus({preventScroll:true});
+}
+function showMenu(origin:'home'|'battle', tab:MenuTab='game'): void {
+  if(screen==='layout') touchLayout.stop();
+  menuOrigin=origin;
+  controls.clear();
+  game.scene.pause('Arena');
+  menuContext.textContent=origin==='home'?'Налаштування гри':'Бій зупинено';
+  resumeButton.textContent=origin==='home'?'← На головну':'▶ Продовжити';
+  for(const id of ['#btn-restart','#btn-choose-characters','#btn-choose-stage']){
+    get<HTMLButtonElement>(id).disabled=origin==='home';
   }
+  setScreen('menu');
+  selectMenuTab(tab);
+}
+function resumeBattle(): void {
+  if(!activePair) { goHome(); return; }
+  controls.clear();
+  setScreen('battle');
   game.scene.resume('Arena');
+  menuButton.focus({preventScroll:true});
 }
-
-function returnToMenu(): void {
-  if (initialSelection || !overlay) return;
-  selector.hide();
-  selecting = false;
-  menuOpen = true;
-  overlay.hidden = false;
-  if (menuButton) {
-    menuButton.hidden = false;
-    menuButton.setAttribute('aria-expanded', 'true');
+function leaveMenu(): void {
+  if(menuOrigin==='home') goHome();
+  else resumeBattle();
+}
+function showCharacters(origin:'home'|'menu'): void {
+  characterOrigin=origin;
+  controls.clear();
+  game.scene.pause('Arena');
+  setScreen('characters');
+  const previous=origin==='menu'&&activePair
+    ? {first:activePair.first,second:activePair.second} : undefined;
+  characterSelector.show(activePair?.mode??'cpu',origin==='menu',previous);
+}
+function onCharacterChosen(first:FighterId,second:FighterId,mode:MatchMode): void {
+  const next={first,second,mode};
+  if(characterOrigin==='menu') {
+    if(activePair&&isSamePair(activePair,next)){
+      showMenu('battle');
+      return; // Same characters: leave the existing match untouched.
+    }
+    // Changing fighters restarts the fight but preserves its arena.
+    startBattle(next,activeStage);
+  } else {
+    pendingPair=next;
+    showStageSelect('new');
   }
-  game.scene.pause('Arena');
-  resumeButton?.focus({ preventScroll: true });
 }
-
-const selector = new CharacterSelector(startMatch, returnToMenu);
-
-function showCharacterSelect(mode: MatchMode, allowBack: boolean): void {
-  finishLayoutEditing();
+function backFromCharacter(): void {
+  if(characterOrigin==='menu') showMenu('battle');
+  else goHome();
+}
+function showStageSelect(origin:'new'|'menu'): void {
+  stageOrigin=origin;
   controls.clear();
   game.scene.pause('Arena');
-  selecting = true;
-  menuOpen = false;
-  if (overlay) overlay.hidden = true;
-  if (menuButton) {
-    menuButton.setAttribute('aria-expanded', 'false');
-    menuButton.hidden = true;
+  setScreen('stages');
+  stageSelector.show(origin==='menu'?activeStage:null);
+}
+function onStageChosen(id:StageId): void {
+  getStage(id);
+  if(stageOrigin==='menu') {
+    if(id===activeStage){
+      showMenu('battle'); // The same arena leaves the round intact.
+      return;
+    }
+    activeStage=id;
+    arena.setArena(id);
+    arena.resetRound(); // Same characters, fresh round on the new stage.
+    resumeBattle();
+  } else if(pendingPair){
+    startBattle(pendingPair,id);
+    pendingPair=null;
   }
-  selector.show(mode, allowBack);
 }
-function openMenu(): void {
-  if (menuOpen || selecting || !overlay) return;
-  menuOpen = true;
+function backFromStage(): void {
+  if(stageOrigin==='menu') showMenu('battle');
+  else showCharacters('home');
+}
+function startBattle(pair:Pair,id:StageId): void {
+  activeStage=id;
+  activePair={...pair};
+  arena.setArena(id);
+  arena.setMatchup(pair.first,pair.second,pair.mode);
+  updateAvatars(pair.first,pair.second);
+  resumeBattle();
+}
+function restart(): void {
+  if(!activePair||menuOrigin==='home') return;
+  arena.resetRound(); // Keeps the current characters and arena.
+  resumeBattle();
+}
+function editLayout(): void {
+  if(screen!=='menu') return;
   controls.clear();
-  overlay.hidden = false;
-  menuButton?.setAttribute('aria-expanded', 'true');
   game.scene.pause('Arena');
-  resumeButton?.focus({ preventScroll: true });
-}
-function openLayoutEditing(): void {
-  if (!menuOpen || !overlay || touchLayout.isEditing) return;
-  controls.clear();
-  overlay.hidden = true;
+  setScreen('layout');
   touchLayout.start();
 }
-function closeMenu(): void {
-  if (!menuOpen || !overlay) return;
-  finishLayoutEditing();
-  controls.clear();
-  menuOpen = false;
-  overlay.hidden = true;
-  menuButton?.setAttribute('aria-expanded', 'false');
-  game.scene.resume('Arena');
-  menuButton?.focus({ preventScroll: true });
-}
-function toggleMenu(): void {
-  if (selecting) {
-    if (!initialSelection && selector.canGoBack) selector.goBack();
-    return;
-  }
-  if (touchLayout.isEditing) { finishLayoutEditing(); return; }
-  if (menuOpen) closeMenu();
-  else openMenu();
+function finishLayout(): void {
+  if(screen!=='layout') return;
+  touchLayout.stop();
+  showMenu(menuOrigin,'controls');
+  layoutEditButton.focus({preventScroll:true});
 }
 function toggleDebug(): void {
   arena.setDebug(!arena.getDebug());
-  if (debugButton) debugButton.textContent = '▣ Хітбокси: ' + (arena.getDebug() ? 'увімк.' : 'викл.');
+  debugButton.textContent='▣ Хітбокси: '+(arena.getDebug()?'увімк.':'викл.');
 }
-function restartRound(): void {
-  if (selecting) return;
-  arena.resetRound(); // Keep the same two characters on a round restart.
-  closeMenu();
-}
-
-menuButton?.addEventListener('click', openMenu);
-resumeButton?.addEventListener('click', closeMenu);
-layoutEditButton?.addEventListener('click', openLayoutEditing);
-layoutDoneButton?.addEventListener('click', finishLayoutEditing);
-cpuButton?.addEventListener('click', () => showCharacterSelect('cpu', true));
-versusButton?.addEventListener('click', () => showCharacterSelect('versus', true));
-changeFightersButton?.addEventListener('click',
-  () => showCharacterSelect(arena.getMode(), true));
-debugButton?.addEventListener('click', toggleDebug);
-restartButton?.addEventListener('click', restartRound);
-fullscreenButton?.addEventListener('click', async () => {
-  if (!frame) return;
+async function toggleFullscreen(): Promise<void> {
   try {
-    if (document.fullscreenElement) await document.exitFullscreen();
+    if(document.fullscreenElement) await document.exitFullscreen();
     else await frame.requestFullscreen();
     resizeArena();
   } catch {
-    if (status) status.textContent = 'Повноекранний режим недоступний у цьому браузері.';
+    status.textContent='Повноекранний режим недоступний у цьому браузері.';
   }
+}
+function togglePause(): void {
+  if(screen==='battle') showMenu('battle');
+  else if(screen==='menu') leaveMenu();
+  else if(screen==='layout') finishLayout();
+  else if(screen==='characters') backFromCharacter();
+  else if(screen==='stages') backFromStage();
+}
+
+// Home screen: no combat starts until the player chooses a fighter AND stage.
+get<HTMLButtonElement>('#btn-home-start').addEventListener('click',()=>showCharacters('home'));
+get<HTMLButtonElement>('#btn-home-settings').addEventListener('click',()=>showMenu('home','controls'));
+homeFullscreen.addEventListener('click',()=>{void toggleFullscreen();});
+
+// First pause tab has the five actions specified by the game design.
+menuButton.addEventListener('click',()=>showMenu('battle'));
+resumeButton.addEventListener('click',leaveMenu);
+restartButton.addEventListener('click',restart);
+get<HTMLButtonElement>('#btn-choose-characters').addEventListener('click',()=>{
+  if(activePair) showCharacters('menu');
 });
-document.addEventListener('fullscreenchange', () => {
+get<HTMLButtonElement>('#btn-choose-stage').addEventListener('click',()=>{
+  if(activePair) showStageSelect('menu');
+});
+get<HTMLButtonElement>('#btn-exit').addEventListener('click',goHome);
+
+layoutEditButton.addEventListener('click',editLayout);
+get<HTMLButtonElement>('#btn-layout-done').addEventListener('click',finishLayout);
+debugButton.addEventListener('click',toggleDebug);
+fullscreenButton.addEventListener('click',()=>{void toggleFullscreen();});
+for(const button of document.querySelectorAll<HTMLButtonElement>('[data-menu-tab]')){
+  button.addEventListener('click',()=>selectMenuTab(button.dataset.menuTab as MenuTab));
+}
+document.addEventListener('fullscreenchange',()=>{
   requestAnimationFrame(resizeArena);
-  if (fullscreenButton) {
-    fullscreenButton.textContent = document.fullscreenElement ? '⛶ Згорнути екран' : '⛶ На весь екран';
-  }
+  const label=document.fullscreenElement?'⛶ Згорнути екран':'⛶ На весь екран';
+  fullscreenButton.textContent=label;
+  homeFullscreen.textContent=label;
 });
 
-window.addEventListener('keydown', event => {
-  if (event.repeat || event.ctrlKey || event.altKey || event.metaKey) return;
-  if (event.code === 'Escape' || event.code === 'KeyP') {
+// Escape/P and Start pause ONLY the active fight; in menus they return back.
+window.addEventListener('keydown',event=>{
+  if(event.repeat||event.ctrlKey||event.altKey||event.metaKey)return;
+  if(event.code==='Escape'||event.code==='KeyP'){
     event.preventDefault();
-    toggleMenu();
+    togglePause();
     return;
   }
-  // Selecting a character disables gameplay shortcuts.
-  if (menuOpen || selecting) return;
-  switch (event.code) {
-    case 'KeyR': restartRound(); break;
-    case 'Digit1': showCharacterSelect('cpu', true); break;
-    case 'Digit2': showCharacterSelect('versus', true); break;
+  if(screen!=='battle')return;
+  switch(event.code){
+    case 'KeyR':restart();break;
+    case 'Digit1':showCharacters('menu');break;
+    case 'Digit2':showStageSelect('menu');break;
   }
 });
-
 function pollGamepadMenu(): void {
-  const pads = navigator.getGamepads?.() ?? [];
-  const startIsDown = Array.from(pads).some(pad => Boolean(pad?.buttons[9]?.pressed));
-  if (startIsDown && !gamepadStartWasDown && !selecting) toggleMenu();
-  gamepadStartWasDown = startIsDown;
+  const pads=navigator.getGamepads?.()??[];
+  const down=Array.from(pads).some(p=>Boolean(p?.buttons[9]?.pressed));
+  if(down&&!gamepadStartHeld&&(screen==='battle'||screen==='menu')) togglePause();
+  gamepadStartHeld=down;
   requestAnimationFrame(pollGamepadMenu);
 }
 requestAnimationFrame(pollGamepadMenu);
-
-window.addEventListener('gamepadconnected', event => {
-  if (status && event instanceof GamepadEvent) {
-    status.textContent = 'Геймпад підключено: ' + event.gamepad.id;
-  }
+window.addEventListener('gamepadconnected',event=>{
+  if(event instanceof GamepadEvent) status.textContent='Геймпад: '+event.gamepad.id;
 });
-window.addEventListener('blur', () => {
-  if (!menuOpen && !selecting) openMenu();
+window.addEventListener('blur',()=>{
+  if(screen==='battle')showMenu('battle');
 });
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden && !menuOpen && !selecting) openMenu();
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden&&screen==='battle')showMenu('battle');
 });
 
-// Initial state: selector is visible, but no round, timer or AI is running.
-menuButton?.setAttribute('hidden', '');
-selector.show('cpu', false);
-updateMode();
+// Initial splash screen has no AI, no round timer and no character selection.
+goHome();
 resizeArena();

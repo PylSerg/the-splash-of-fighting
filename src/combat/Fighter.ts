@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { InputState } from '../input/Controls';
 
-export type FighterId = 'evi' | 'nara';
+export type FighterId = 'evi' | 'nara' | 'lyra';
 export type AttackName = 'light' | 'heavy' | 'kick' | 'special';
 export interface AttackSpec {
   /** Wind-up/swing completes at this time; collision is tested exactly once then. */
@@ -81,9 +81,10 @@ export class Fighter {
     this.x = initialX;
     this.face = face;
     const evi = id === 'evi';
-    const skin = evi ? 0xe1a77f : 0xdba3a0;
-    const cloth = evi ? 0xf7f2eb : 0x282337;
-    const edge = evi ? 0xdab875 : 0x8d5c95;
+    const lyra = id === 'lyra';
+    const skin = evi ? 0xe1a77f : lyra ? 0xf1bf9e : 0xdba3a0;
+    const cloth = evi ? 0xf7f2eb : lyra ? 0x283953 : 0x282337;
+    const edge = evi ? 0xdab875 : lyra ? 0xeeb66b : 0x8d5c95;
 
     this.rig = scene.add.container(initialX, GROUND_Y);
     // Keep the shadow in world coordinates while the fighter rotates and tumbles.
@@ -103,6 +104,13 @@ export class Fighter {
     if (evi) {
       this.cape.fillStyle(0xe5e0f0, .72).fillTriangle(-12,-92,-68,-8,16,-34);
       this.cape.lineStyle(2,0xc7a8c8,.9).lineBetween(-12,-92,-68,-8).lineBetween(-68,-8,16,-34);
+    } else if (lyra) {
+      // Lyra: distinctive ember-orange split cape over navy and gold armor.
+      this.cape.fillStyle(0xf4a04f,.87);
+      this.cape.fillTriangle(-16,-109,-91,-22,4,-45);
+      this.cape.fillStyle(0xf7d180,.73);
+      this.cape.fillTriangle(-18,-102,-63,-11,12,-35);
+      this.cape.lineStyle(3,0xf6e0af,.74).lineBetween(-90,-22,4,-45);
     } else {
       this.cape.fillStyle(0x2ac9cf,.86);
       this.cape.fillEllipse(-60,-110,125,38);
@@ -111,7 +119,7 @@ export class Fighter {
     }
     const drawLeg = (leg: Phaser.GameObjects.Graphics) => {
       leg.fillStyle(cloth).fillRoundedRect(-11,0,22,54,7);
-      leg.fillStyle(evi?0xf7f0e4:0x191727).fillRoundedRect(-13,40,25,13,5);
+      leg.fillStyle(evi?0xf7f0e4:lyra?0xdb8d4d:0x191727).fillRoundedRect(-13,40,25,13,5);
       leg.lineStyle(2,edge).strokeRoundedRect(-11,0,22,54,7);
       if(evi) leg.lineStyle(3,0xe7b881).lineBetween(-7,42,8,48);
     };
@@ -125,10 +133,20 @@ export class Fighter {
     this.backArm.setPosition(-20,-99);
     this.body.fillStyle(cloth).fillRoundedRect(-24,-105,49,63,12);
     this.body.lineStyle(3,edge).strokeRoundedRect(-24,-105,49,63,12);
-    this.body.fillStyle(evi?0xfef9f1:0x5d506d).fillEllipse(0,-89,32,24);
-    this.body.fillStyle(evi?0xdab775:0xa6e6ae).fillRect(-15,-60,30,5);
+    this.body.fillStyle(evi?0xfef9f1:lyra?0x6c8db7:0x5d506d).fillEllipse(0,-89,32,24);
+    this.body.fillStyle(evi?0xdab775:lyra?0xffb859:0xa6e6ae).fillRect(-15,-60,30,5);
+    if (lyra) {
+      this.body.fillStyle(0xf2a15b).fillTriangle(-12,-92,0,-108,12,-92);
+      this.body.lineStyle(3,0xffd39a).strokeCircle(0,-80,8);
+    }
 
-    if (!evi) {
+    if (lyra) {
+      // Twin-edged amber fan blade, visually distinct from Nara's cleaver.
+      this.weapon.fillStyle(0xffd093,.9).fillTriangle(7,-7,81,-33,72,12);
+      this.weapon.fillStyle(0xff8b4d,.83).fillTriangle(22,-3,73,-35,54,6);
+      this.weapon.lineStyle(3,0xffeed3).lineBetween(9,-6,81,-33);
+      this.weapon.fillStyle(0x62465c).fillRoundedRect(-4,-5,34,9,4);
+    } else if (!evi) {
       this.weapon.fillStyle(0x4d3b42).fillRect(-5,-6,89,10);
       this.weapon.fillStyle(0xc0cbd4).fillRoundedRect(61,-33,93,45,8);
       this.weapon.fillStyle(0x8997a5).fillRect(65,-27,86,4);
@@ -141,13 +159,19 @@ export class Fighter {
     this.weapon.setPosition(21,-69);
     this.frontArm.fillStyle(skin).fillRoundedRect(-7,0,15,49,7);
     this.frontArm.fillStyle(cloth).fillRoundedRect(-10,0,19,17,4);
-    this.frontArm.fillStyle(evi?0xeac69b:0x201d2f).fillCircle(0,48,8);
+    this.frontArm.fillStyle(evi?0xeac69b:lyra?0xffd08a:0x201d2f).fillCircle(0,48,8);
     this.frontArm.setPosition(21,-99);
 
-    this.hair.fillStyle(evi?0xe6c38f:0x6fe8e2);
+    this.hair.fillStyle(evi?0xe6c38f:lyra?0xfa9c61:0x6fe8e2);
     if (evi) {
       this.hair.fillEllipse(-3,-132,47,44);
       this.hair.fillStyle(0xf7dba8).fillEllipse(-16,-122,15,43);
+    } else if (lyra) {
+      // Flame-shaped copper ponytail that stays readable at game scale.
+      this.hair.fillEllipse(-3,-146,52,46);
+      this.hair.fillStyle(0xffcb79).fillEllipse(-11,-158,39,30);
+      this.hair.fillStyle(0xe26646).fillTriangle(-20,-146,-81,-109,-25,-117);
+      this.hair.fillTriangle(-16,-140,-73,-98,-16,-117);
     } else {
       this.hair.fillEllipse(-22,-154,44,70);
       this.hair.fillEllipse(1,-168,65,58);
@@ -156,7 +180,7 @@ export class Fighter {
 
     this.head.fillStyle(skin).fillEllipse(0,-125,37,43);
     this.head.fillStyle(0x181727).fillEllipse(10,-128,6,5);
-    this.head.fillStyle(evi?0x74c2d4:0xaaff78).fillEllipse(11,-128,3,3);
+    this.head.fillStyle(evi?0x74c2d4:lyra?0xfccf7c:0xaaff78).fillEllipse(11,-128,3,3);
     if (evi) {
       this.head.lineStyle(2,0x283344).strokeRoundedRect(-16,-136,30,17,5);
       this.head.lineStyle(2,0x283344).lineBetween(14,-128,21,-133);

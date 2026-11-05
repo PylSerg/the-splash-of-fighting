@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { Controls, emptyInput, type InputState } from '../input/Controls';
 import { Fighter, GROUND_Y, STAGE_MIN_X, STAGE_MAX_X, setStageViewportWidth, type FighterId } from '../combat/Fighter';
 import { getCharacter } from '../characters/Roster';
+import { getStage, type StageId } from '../stages/Stages';
 
 type GameMode = 'cpu' | 'versus';
 interface Grapple {
@@ -36,6 +37,9 @@ export class ArenaScene extends Phaser.Scene {
   private player1!: Fighter;
   private player2!: Fighter;
   private hasMatch = false;
+  private stageId: StageId = 'city';
+  private stageBackground?: Phaser.GameObjects.Graphics;
+  private stageSign?: Phaser.GameObjects.Text;
   private prev1 = ZERO();
   private prev2 = ZERO();
   private mode: GameMode = 'cpu';
@@ -101,8 +105,25 @@ export class ArenaScene extends Phaser.Scene {
     this.paintDebug();
   }
 
+  getStageId(): StageId { return this.stageId; }
+
+  setArena(id: StageId): void {
+    if (this.stageId === id) return;
+    getStage(id);
+    this.stageId = id;
+    if (this.stageBackground) this.drawStage();
+    this.onStatus('Арена: ' + getStage(id).name);
+  }
+
   private drawStage(): void {
+    this.stageBackground?.destroy();
+    this.stageSign?.destroy();
     const g=this.add.graphics().setDepth(-10);
+    this.stageBackground=g;
+    if (this.stageId === 'lagoon') {
+      this.drawLagoon(g);
+      return;
+    }
     // Overscan: expose extra buildings / platform on wide devices.
     const leftEdge = -1600, sceneWidth = 4160;
     for(let y=0;y<540;y+=7){
@@ -145,7 +166,7 @@ export class ArenaScene extends Phaser.Scene {
       g.lineStyle(5,0x53beca,.8).strokeRoundedRect(x-11,208,22,174,8);
       g.fillStyle(0xe9b1d2).fillEllipse(x,197,50,17);
     }
-    this.add.text(480,325,'SPLASH  ★  CITY',{
+    this.stageSign=this.add.text(480,325,'SPLASH  ★  CITY',{
       fontFamily:'Rajdhani, sans-serif',fontSize:'32px',fontStyle:'bold',color:'#ec9fc9',
       stroke:'#332447',strokeThickness:5,
     }).setOrigin(.5).setDepth(-5);
@@ -155,6 +176,11 @@ export class ArenaScene extends Phaser.Scene {
    * Construct each roster choice in its correct player slot, independent
    * of character identity. Only valid, unique pairs may enter a round.
    */
+  getMatchup(): { first: FighterId; second: FighterId; mode: GameMode } | null {
+    if (!this.hasMatch) return null;
+    return { first: this.player1.id, second: this.player2.id, mode: this.mode };
+  }
+
   setMatchup(first: FighterId, second: FighterId, mode: GameMode): void {
     if (first === second) throw new Error('A mirror match is not allowed.');
     this.player1?.destroy();
@@ -169,6 +195,90 @@ export class ArenaScene extends Phaser.Scene {
     this.onStatus(mode==='cpu'
       ? getCharacter(first).name+' проти '+getCharacter(second).name+' (CPU)!'
       : getCharacter(first).name+' проти '+getCharacter(second).name+' (PvP)!');
+  }
+
+  /** Original hand-drawn moonlit coast, extending beyond 16:9 devices. */
+  private drawLagoon(g: Phaser.GameObjects.Graphics): void {
+    const left=-1600, wide=4160;
+    // Deep indigo sky with warm twilight near the horizon.
+    for(let y=0;y<540;y+=6) {
+      const t=y/540;
+      const r=Math.floor(8+t*28);
+      const gr=Math.floor(13+t*34);
+      const b=Math.floor(44+t*37);
+      g.fillStyle((r<<16)|(gr<<8)|b).fillRect(left,y,wide,6);
+    }
+    // Stars spread over the full extra-wide world.
+    for(let i=-75;i<126;i++){
+      const x=i*26 + (i*i*19 % 21);
+      const y=24+((i*i*31+421)%245);
+      const rad=i%9===0?2.1:1.1;
+      g.fillStyle(i%7===0?0xffdfb3:0xc7e9ff,.37+(i%4)*.13).fillCircle(x,y,rad);
+    }
+    g.fillStyle(0x8ddfe6,.10).fillCircle(489,138,106);
+    g.fillStyle(0xe2e0e7,.10).fillCircle(489,138,80);
+    g.fillStyle(0xf9edce,.97).fillCircle(489,138,60);
+    g.fillStyle(0xffffff,.23).fillCircle(470,117,8);
+    g.fillStyle(0xf1dabc,.33).fillCircle(510,163,15);
+
+    // Multiple bands of distant islands with increasing atmospheric opacity.
+    for(let i=-14;i<25;i++){
+      const x=i*178-75;
+      const peak=257+(i*41%38);
+      g.fillStyle(i%2?0x263c60:0x2a476b,.8);
+      g.fillTriangle(x,339,x+95,peak,x+226,339);
+      g.fillStyle(0x334e68,.9).fillTriangle(x+68,340,x+148,peak+17,x+280,341);
+    }
+    // The lagoon: horizontal shimmer and moonlit ripples.
+    g.fillStyle(0x183e5c).fillRect(left,333,wide,112);
+    for(let y=337;y<445;y+=9) {
+      const w=50+((y*13)%140);
+      for(let i=-20;i<35;i++) {
+        const x=i*136+(i*i*7%73)-22;
+        g.fillStyle(i%3===0?0x8ed7d3:0x6bb2cb,.16 + ((y/9)%3)*.065);
+        g.fillRoundedRect(x,y,w,2,1);
+      }
+    }
+    for(let j=0;j<7;j++){
+      const y=347+j*15;
+      const w=16+j*26;
+      g.fillStyle(0xf0efd3,.18-j*.015).fillRoundedRect(489-w/2,y,w,3,1);
+    }
+    // Shoreline ground and subtle wet sand.
+    g.fillStyle(0x26394d).fillRect(left,GROUND_Y,wide,97);
+    g.fillStyle(0xbcae91,.75).fillRect(left,GROUND_Y,wide,5);
+    g.lineStyle(3,0xa1dbd7,.55).lineBetween(left,GROUND_Y,left+wide,GROUND_Y);
+    for(let y=GROUND_Y+16;y<540;y+=19){
+      g.lineStyle(1,y%3===0?0x718c99:0x617b90,.28).lineBetween(left,y,left+wide,y);
+    }
+    for(let i=-37;i<66;i++){
+      g.lineStyle(1,0x85948e,.16)
+        .lineBetween(i*71-110,540,i*46+92,GROUND_Y+7);
+    }
+
+    // Glow mushrooms and coastal lanterns framing the fighting area.
+    for(const x of [105,866]) {
+      g.fillStyle(0x121e36).fillRoundedRect(x-7,342,14,103,6);
+      g.fillStyle(0xfec793,.11).fillCircle(x,337,40);
+      g.fillStyle(0xfed5a2,.87).fillEllipse(x,327,27,24);
+      g.fillStyle(0x6a8aa1,.85).fillRoundedRect(x-11,331,22,8,2);
+      g.lineStyle(2,0xbcc6bc,.6).lineBetween(x,344,x,356);
+    }
+    // Rocky silhouettes at the distant edges.
+    for(const x of [-280,1150]) {
+      g.fillStyle(0x152f43,.84).fillTriangle(x,418,x+80,271,x+191,418);
+      g.fillStyle(0x183c4b,.78).fillTriangle(x+75,425,x+158,313,x+270,425);
+      g.lineStyle(3,0x587e78,.34).lineBetween(x+15,418,x+80,271);
+    }
+    // Colorful shells near the combat floor.
+    for(const x of [215,774,-220,1170]){
+      g.fillStyle(0xe7bea7,.47).fillEllipse(x,GROUND_Y-3,22,8);
+      g.fillStyle(0x7db7ba,.46).fillTriangle(x-7,GROUND_Y-3,x,GROUND_Y-15,x+7,GROUND_Y-3);
+    }
+    this.stageSign=this.add.text(480,313,'MOONLIGHT  ☾  LAGOON',{
+      fontFamily:'Rajdhani, sans-serif',fontSize:'28px',fontStyle:'bold',
+      color:'#bfe8ed',stroke:'#1b3b52',strokeThickness:5,
+    }).setOrigin(.5).setDepth(-5);
   }
 
   setMode(mode: GameMode): void {

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
   <meta name="theme-color" content="#0c1022"/>
   <meta name="description" content="The Splash of Fighting: browser arcade fighting game."/>
-  <title>The Splash of Fighting · Evi VS Nara</title>
+  <title>The Splash of Fighting · Arcade Fighter</title>
 </head>
 <body>
 <main class="site">
@@ -38,33 +38,32 @@
         aria-controls="pause-overlay" aria-label="Відкрити меню та поставити гру на паузу">
         <span aria-hidden="true">☰</span> Меню
       </button>
-      <section id="pause-overlay" class="pause-overlay" role="dialog" aria-modal="true"
-        aria-labelledby="pause-title" hidden>
+      <section id="pause-overlay" class="pause-overlay" role="dialog"
+        aria-modal="true" aria-labelledby="pause-title" hidden>
         <div class="pause-panel">
           <header class="pause-heading">
             <div>
-              <div class="pause-eyebrow">THE SPLASH OF FIGHTING <span>• ALPHA 0.8.0</span></div>
+              <div class="pause-eyebrow">THE SPLASH OF FIGHTING <span>• ALPHA 0.9.0</span></div>
               <h1 id="pause-title">ПАУЗА <span>Ⅱ</span></h1>
-              <p>Бій зупинено. Можна змінити налаштування.</p>
             </div>
-            <button id="btn-resume" type="button" class="pause-resume">▶ Продовжити</button>
+            <span id="menu-context-label" class="pause-context-label">Налаштування бою</span>
           </header>
-          <div class="pause-grid">
-            <section class="pause-section" aria-label="Режим бою">
-              <h2>Режим гри</h2>
-              <div class="pause-choices">
-                <button id="btn-cpu" class="pill selected" type="button">⚡ Проти CPU</button>
-                <button id="btn-versus" class="pill" type="button">🎮 Два гравці</button>
-              </div>
-            </section>
-            <section class="pause-section" aria-label="Інструменти">
-              <h2>Налаштування</h2>
-              <div class="pause-choices">
-                <button id="btn-debug" class="pill" type="button">▣ Хітбокси: викл.</button>
-                <button id="btn-fullscreen" class="pill" type="button">⛶ На весь екран</button>
-              </div>
-            </section>
-          </div>
+          <nav class="pause-tabs" aria-label="Розділи меню">
+            <button type="button" class="pause-tab selected" data-menu-tab="game" aria-selected="true">🥊 Бій</button>
+            <button type="button" class="pause-tab" data-menu-tab="controls" aria-selected="false">🎛 Керування</button>
+            <button type="button" class="pause-tab" data-menu-tab="display" aria-selected="false">🖥 Графіка</button>
+            <button type="button" class="pause-tab" data-menu-tab="help" aria-selected="false">❔ Довідка</button>
+          </nav>
+          <section class="pause-pane" data-menu-pane="game">
+            <div class="pause-game-actions">
+              <button id="btn-resume" type="button" class="pill primary">▶ Продовжити</button>
+              <button id="btn-restart" type="button" class="pill">↻ Рестарт</button>
+              <button id="btn-choose-characters" type="button" class="pill">🧑‍🤝‍🧑 Змінити персонажа</button>
+              <button id="btn-choose-stage" type="button" class="pill">🌄 Змінити арену</button>
+              <button id="btn-exit" type="button" class="pill">⌂ Вийти</button>
+            </div>
+          </section>
+          <section class="pause-pane" data-menu-pane="controls" hidden>
           <details class="pause-touch-settings">
             <summary>🎛️ Сенсорне керування: масштаб і розташування</summary>
             <div class="touch-setting-grid">
@@ -81,12 +80,16 @@
             </div>
             <p>Положення та масштаб зберігаються на цьому пристрої. Увесь ромб пересувається разом.</p>
           </details>
-          <div class="pause-actions">
-            <button id="btn-choose-characters" class="pill" type="button">🧑‍🤝‍🧑 Змінити бійців</button>
-            <button id="btn-restart" class="pill primary" type="button">↻ Новий раунд</button>
-            <details class="pause-help">
-              <summary>⌨ Керування та комбінації</summary>
-              <div class="pause-help-content">
+
+          </section>
+          <section class="pause-pane" data-menu-pane="display" hidden>
+            <div class="pause-choices pause-display-choices">
+              <button id="btn-debug" type="button" class="pill">▣ Хітбокси: викл.</button>
+              <button id="btn-fullscreen" type="button" class="pill">⛶ На весь екран</button>
+            </div>
+          </section>
+          <section class="pause-pane" data-menu-pane="help" hidden>
+            <div class="pause-help-content">
                 <p><b>Телефон:</b> лівий джойстик керує рухом, стрибком і присіданням. Справа: X швидкий удар, Y сильний, B нога, A блок.</p>
                 <p><b>Комбінації:</b> B+Y спецприйом, X+A захват. Можна натискати двома пальцями або ковзати одним між кнопками.</p>
                 <p><b>Геймпад:</b> ABXY, R1 спецприйом, L1 захват, стік угору для стрибка. Start відкриває меню.</p>
@@ -96,8 +99,7 @@
                 <p><b>Нокаут:</b> переможений падає й залишається лежати до нового раунду.</p>
                 <p><b>Меню:</b> Escape, P або Start на геймпаді. R новий раунд, 1/2 зміна режиму. Хітбокси вмикаються в меню.</p>
               </div>
-            </details>
-          </div>
+          </section>
           <p id="game-status" class="pause-status" aria-live="polite">Готуємо арену…</p>
         </div>
       </section>
@@ -110,12 +112,38 @@
           </div>
         </div>
       </div>
+      <section id="home-screen" class="home-screen" role="dialog"
+        aria-modal="true" aria-labelledby="home-title">
+        <div class="home-logo">
+          <div class="home-kicker">✦ ARCADE FIGHTING ✦</div>
+          <h1 id="home-title"><span>THE SPLASH</span><small>OF FIGHTING</small></h1>
+          <div class="home-version">ALPHA 0.9.0 · EVI × NARA × LYRA</div>
+        </div>
+        <div class="home-buttons">
+          <button id="btn-home-start" class="home-primary" type="button">🥊 Почати</button>
+          <button id="btn-home-settings" type="button">⚙ Налаштування</button>
+          <button id="btn-home-fullscreen" type="button">⛶ На весь екран</button>
+        </div>
+      </section>
+      <section id="arena-select" class="stage-select" role="dialog" aria-modal="true"
+        aria-labelledby="stage-select-title" hidden>
+        <div class="stage-panel">
+          <div class="select-eyebrow">THE SPLASH OF FIGHTING · ВИБІР АРЕНИ</div>
+          <h1 id="stage-select-title">ОБЕРИ АРЕНУ <span>✦</span></h1>
+          <p id="stage-select-help">Обери місце, де відбудеться поєдинок.</p>
+          <div id="stage-roster" class="stage-roster" aria-label="Доступні арени"></div>
+          <div class="stage-actions">
+            <button id="btn-stage-back" type="button" class="pill">← Назад</button>
+            <button id="btn-stage-confirm" type="button" class="pill primary" disabled>🥊 На арену!</button>
+          </div>
+        </div>
+      </section>
       <section id="character-select" class="character-select" role="dialog" aria-modal="true"
         aria-labelledby="select-title">
         <div class="select-panel">
           <header class="select-heading">
             <div>
-              <div class="select-eyebrow">THE SPLASH OF FIGHTING · ALPHA 0.8.0</div>
+              <div class="select-eyebrow">THE SPLASH OF FIGHTING · ALPHA 0.9.0</div>
               <h1 id="select-title">ОБЕРИ БІЙЦЯ <span>✦</span></h1>
               <p id="select-instructions">Гравець 1: обери свого бійця.</p>
             </div>
