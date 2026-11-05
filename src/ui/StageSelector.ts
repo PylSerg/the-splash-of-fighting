@@ -13,7 +13,7 @@ export class StageSelector {
   private currentDescription: HTMLElement;
   private counter: HTMLElement;
   private index = 0;
-  private drag: { id: number; x: number; y: number } | null = null;
+  private drag: { id: number; x: number; y: number; target: StageId | null } | null = null;
   private suppressClickUntil = 0;
 
   constructor(
@@ -59,25 +59,33 @@ export class StageSelector {
       });
       this.roster.append(button);
     });
-    get<HTMLButtonElement>('#btn-stage-prev').addEventListener('click',()=>this.navigate(-1));
-    get<HTMLButtonElement>('#btn-stage-next').addEventListener('click',()=>this.navigate(1));
     this.confirmButton.addEventListener('click',()=>this.confirm());
     this.backButton.addEventListener('click',()=>this.goBack());
 
     this.carousel.addEventListener('pointerdown',event=>{
       if(!this.isOpen || !event.isPrimary) return;
-      this.drag={id:event.pointerId,x:event.clientX,y:event.clientY};
+      const target=(event.target as Element).closest<HTMLButtonElement>('.stage-slide');
+      this.drag={
+        id:event.pointerId,x:event.clientX,y:event.clientY,
+        target:target?.dataset.stage as StageId | undefined ?? null,
+      };
       if(event.pointerType==='touch')this.carousel.setPointerCapture(event.pointerId);
     });
     this.carousel.addEventListener('pointerup',event=>{
       if(!this.drag || this.drag.id!==event.pointerId) return;
       const dx=event.clientX-this.drag.x;
       const dy=event.clientY-this.drag.y;
+      const tapped=this.drag.target;
       this.drag=null;
       if(Math.abs(dx)>42 && Math.abs(dx)>Math.abs(dy)*1.15){
         this.suppressClickUntil=performance.now()+350;
         this.navigate(dx<0?1:-1);
         event.preventDefault();
+      } else if(event.pointerType==='touch' && tapped){
+        this.suppressClickUntil=performance.now()+350;
+        const index=STAGES.findIndex(stage=>stage.id===tapped);
+        if(index===this.index) this.confirm();
+        else if(index>=0){ this.index=index; this.paint(); }
       }
     });
     this.carousel.addEventListener('pointercancel',()=>{this.drag=null;});

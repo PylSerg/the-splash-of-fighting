@@ -43,7 +43,7 @@
         <div class="pause-panel">
           <header class="pause-heading">
             <div>
-              <div class="pause-eyebrow">THE SPLASH OF FIGHTING <span>• ALPHA 1.0.0</span></div>
+              <div class="pause-eyebrow">THE SPLASH OF FIGHTING <span>• ALPHA 1.1.0</span></div>
               <h1 id="pause-title">ПАУЗА <span>Ⅱ</span></h1>
             </div>
             <div class="pause-heading-actions">
@@ -133,7 +133,7 @@
         <div class="home-logo">
           <div class="home-kicker">✦ ARCADE FIGHTING ✦</div>
           <h1 id="home-title"><span>THE SPLASH</span><small>OF FIGHTING</small></h1>
-          <div class="home-version">ALPHA 1.0.0 · EVI × NARA × LYRA</div>
+          <div class="home-version">ALPHA 1.1.0 · EVI × NARA × LYRA</div>
         </div>
         <div class="home-buttons">
           <button id="btn-home-start" class="home-primary" type="button">🥊 Почати</button>
@@ -154,13 +154,9 @@
           <div id="stage-counter" class="cinematic-counter" aria-live="polite">1 / 2</div>
         </header>
         <div id="arena-carousel" class="stage-carousel-viewport" tabindex="0"
-          aria-label="Карусель арен. Стрілки для перемикання, Enter для вибору.">
+          aria-label="Карусель арен. Свайп для перемикання, Enter для вибору.">
           <div class="stage-floor-glow" aria-hidden="true"></div>
           <div id="stage-roster" class="stage-carousel-track"></div>
-          <button id="btn-stage-prev" class="carousel-arrow carousel-arrow-prev" type="button"
-            aria-label="Попередня арена">❮</button>
-          <button id="btn-stage-next" class="carousel-arrow carousel-arrow-next" type="button"
-            aria-label="Наступна арена">❯</button>
         </div>
         <footer class="cinematic-bottom stage-bottom">
           <div class="cinematic-current">
@@ -174,44 +170,61 @@
           </div>
         </footer>
       </section>
-      <section id="character-select" class="character-select cinematic-select" role="dialog"
-        aria-modal="true" aria-labelledby="select-title" hidden>
+      <section id="character-select" class="character-select cinematic-select dual-character-select"
+        role="dialog" aria-modal="true" aria-labelledby="select-title" hidden>
         <div class="cinematic-light" aria-hidden="true"></div>
-        <header class="cinematic-top">
+        <header class="cinematic-top dual-select-top">
           <button id="btn-select-back" class="cinematic-back" type="button">← Назад</button>
           <div class="cinematic-heading">
-            <div class="cinematic-kicker">THE SPLASH OF FIGHTING · CHARACTER SELECT</div>
-            <h1 id="select-title">ОБЕРИ БІЙЦЯ <span>✦</span></h1>
-            <p id="select-instructions">ГРАВЕЦЬ 1 · Обери свого персонажа</p>
+            <div class="cinematic-kicker">THE SPLASH OF FIGHTING · DUAL CHARACTER SELECT</div>
+            <h1 id="select-title">ОБЕРИ БІЙЦІВ <span>✦</span></h1>
+            <p id="select-instructions">Обидва гравці обирають персонажів незалежно.</p>
           </div>
           <div class="cinematic-top-right">
             <div class="select-mode-row" aria-label="Режим поєдинку">
               <button id="btn-select-cpu" class="pill selected" type="button">⚡ CPU</button>
               <button id="btn-select-versus" class="pill" type="button">🎮 PvP</button>
             </div>
-            <div id="select-counter" class="cinematic-counter">1 / 3</div>
           </div>
         </header>
-        <div id="select-carousel" class="fighter-carousel-viewport" tabindex="0"
-          aria-label="Карусель бійців. Гортай свайпом, стрілками або джойстиком геймпада.">
-          <div class="fighter-selection-floor" aria-hidden="true"></div>
-          <div id="select-roster" class="fighter-carousel-track"></div>
-          <button id="btn-fighter-prev" class="carousel-arrow carousel-arrow-prev" type="button"
-            aria-label="Попередній персонаж">❮</button>
-          <button id="btn-fighter-next" class="carousel-arrow carousel-arrow-next" type="button"
-            aria-label="Наступний персонаж">❯</button>
+        <div id="select-carousel" class="dual-fighter-viewport" aria-label="Дві незалежні каруселі персонажів">
+          <section class="fighter-pick-zone pick-one" data-player="0" aria-label="Вибір першого гравця">
+            <div class="fighter-pick-heading"><span class="fighter-pick-label">P1 · ГРАВЕЦЬ 1</span>
+              <span id="select-counter-p1" class="fighter-pick-count">2 доступні</span></div>
+            <div id="select-zone-p1" class="fighter-pick-touch" tabindex="0"
+              aria-label="Персонажі гравця 1. Свайп або A та D.">
+              <div class="fighter-selection-floor" aria-hidden="true"></div>
+              <div id="select-roster-p1" class="fighter-carousel-track"></div>
+            </div>
+            <div class="fighter-pick-caption">
+              <strong id="select-name-p1" aria-live="polite">ЕВІ</strong>
+              <span id="select-title-p1">Стиль і швидкість</span>
+              <button id="btn-select-ready-p1" class="pick-ready" type="button" hidden>✓ Готово P1</button>
+            </div>
+          </section>
+          <div class="versus-separator" aria-hidden="true"><span>VS</span></div>
+          <section class="fighter-pick-zone pick-two" data-player="1" aria-label="Вибір другого гравця або CPU">
+            <div class="fighter-pick-heading"><span id="select-side-two-label" class="fighter-pick-label">⚡ СУПЕРНИК CPU</span>
+              <span id="select-counter-p2" class="fighter-pick-count">2 доступні</span></div>
+            <div id="select-zone-p2" class="fighter-pick-touch" tabindex="0"
+              aria-label="Персонажі суперника. Свайп або стрілки вліво/вправо.">
+              <div class="fighter-selection-floor" aria-hidden="true"></div>
+              <div id="select-roster-p2" class="fighter-carousel-track"></div>
+            </div>
+            <div class="fighter-pick-caption">
+              <strong id="select-name-p2" aria-live="polite">НАРА</strong>
+              <span id="select-title-p2">Сила і натиск</span>
+              <button id="btn-select-ready-p2" class="pick-ready" type="button" hidden>✓ Готово P2</button>
+              <button id="btn-select-random" class="pick-random" type="button">🎲 Рандомний</button>
+            </div>
+          </section>
         </div>
-        <footer class="cinematic-bottom">
-          <div class="cinematic-current">
-            <div class="cinematic-mini-label">ОБРАНИЙ ПЕРСОНАЖ</div>
-            <strong id="select-active-name" class="cinematic-name" aria-live="polite">ЕВІ</strong>
-            <span id="select-active-title" class="cinematic-subtitle">Стиль і швидкість</span>
-            <span id="select-lineup" class="cinematic-lineup">P1 + випадковий CPU</span>
-          </div>
-          <div class="cinematic-actions">
-            <span class="cinematic-tip">⇆ Свайп · ← → · D-pad</span>
+        <footer class="dual-select-bottom">
+          <div id="select-lineup" class="dual-select-status" aria-live="polite">P1: ЕВІ · CPU: НАРА</div>
+          <span class="dual-select-tip">P1: A/D · P2: ← → · свайп у своїй зоні</span>
+          <div class="dual-select-actions">
             <button id="btn-select-reset" class="cinematic-reset" type="button">↺ Скинути</button>
-            <button id="btn-select-fight" class="cinematic-confirm" type="button">✓ Обрати бійця</button>
+            <button id="btn-select-fight" class="cinematic-confirm" type="button">✓ Далі: арена</button>
           </div>
         </footer>
       </section>

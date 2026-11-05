@@ -69,6 +69,12 @@ let selectionDirectionHeld=0;
 let selectionDirectionTime=0;
 let selectionAHeld=false;
 let selectionBHeld=false;
+// Each player's independent carousel input must have separate repeat timers,
+// otherwise moving both gamepads simultaneously suppresses one controller.
+const playerDirectionHeld:[number,number]=[0,0];
+const playerDirectionTime:[number,number]=[0,0];
+const playerAHeld:[boolean,boolean]=[false,false];
+let selectionStartHeld=false;
 let pendingConfirmation: DisruptiveAction | null=null;
 let confirmationReturnFocus: HTMLElement | null=null;
 
@@ -195,12 +201,15 @@ function showCharacters(origin:'home'|'menu'): void {
   game.scene.pause('Arena');
   setScreen('characters');
   const previous=origin==='menu'&&activePair
-    ? {first:activePair.first,second:activePair.second} : undefined;
+    ? {first:activePair.first,second:activePair.second}
+    : origin==='home' && pendingPair
+      ? {first:pendingPair.first,second:pendingPair.second} : undefined;
   // "Назад" is available both on the initial selection and mid-match.
   // The destination differs: title screen vs paused fight menu.
   get<HTMLButtonElement>('#btn-select-back').textContent=
     origin==='home'?'← На головну':'← До меню';
-  characterSelector.show(activePair?.mode??'cpu',true,previous);
+  characterSelector.show(origin==='home' && pendingPair
+    ? pendingPair.mode : activePair?.mode??'cpu',true,previous);
 }
 function onCharacterChosen(first:FighterId,second:FighterId,mode:MatchMode): void {
   const next={first,second,mode};
@@ -396,24 +405,37 @@ window.addEventListener('keydown',event=>{
     togglePause();
     return;
   }
-  // Fullscreen selection carousel: arrows spin the carousel; Enter/Space
-  // confirms whichever character or stage is centered. Focused navigation
-  // buttons keep their normal native keyboard semantics.
-  if(screen==='characters'||screen==='stages'){
-    const isCharacter=screen==='characters';
+  // Character selection is split into TWO independent touch/control zones.
+  // Keyboard P1: A/D; keyboard P2: arrows. Both can change simultaneously.
+  if(screen==='characters'){
+    const p1:Record<string,-1|1>={KeyA:-1,KeyD:1};
+    const p2:Record<string,-1|1>={ArrowLeft:-1,ArrowRight:1};
+    const direction1=p1[event.code];
+    const direction2=p2[event.code];
+    if(direction1){event.preventDefault();characterSelector.navigate(0,direction1);}
+    if(direction2){event.preventDefault();characterSelector.navigate(1,direction2);}
+    const active=document.activeElement;
+    const zone1=get<HTMLElement>('#select-zone-p1');
+    const zone2=get<HTMLElement>('#select-zone-p2');
+    if(event.code==='KeyF'){
+      event.preventDefault();characterSelector.confirmPlayer(0);
+    } else if(event.code==='KeyK'){
+      event.preventDefault();characterSelector.confirmPlayer(1);
+    } else if(event.code==='Space' && (active===zone1 || active===zone2)){
+      event.preventDefault();characterSelector.confirmPlayer(active===zone1?0:1);
+    } else if(event.code==='Enter' && (active===zone1||active===zone2||active===document.body)){
+      event.preventDefault();characterSelector.confirmCurrent();
+    }
+    return;
+  }
+  if(screen==='stages'){
     if(event.code==='ArrowLeft'||event.code==='ArrowRight'){
       event.preventDefault();
-      const direction=event.code==='ArrowLeft'?-1:1;
-      if(isCharacter)characterSelector.navigate(direction);
-      else stageSelector.navigate(direction);
-    } else if(event.code==='Enter'||event.code==='Space'){
-      const active=document.activeElement;
-      const viewport=isCharacter
-        ? get<HTMLElement>('#select-carousel') : get<HTMLElement>('#arena-carousel');
-      if(active===viewport||active===document.body){
-        event.preventDefault();
-        if(isCharacter)characterSelector.confirmCurrent();
-        else stageSelector.confirm();
+      stageSelector.navigate(event.code==='ArrowLeft'?-1:1);
+    }else if(event.code==='Enter'||event.code==='Space'){
+      const viewport=get<HTMLElement>('#arena-carousel');
+      if(document.activeElement===viewport||document.activeElement===document.body){
+        event.preventDefault();stageSelector.confirm();
       }
     }
     return;
@@ -426,46 +448,80 @@ window.addEventListener('keydown',event=>{
   }
 });
 function pollGamepadMenu(): void {
-  const pads=Array.from(navigator.getGamepads?.()??[]).filter(
-    (pad):pad is Gamepad=>Boolean(pad && pad.connected));
-  const down=pads.some(p=>Boolean(p.buttons[9]?.pressed));
-  if(down&&!gamepadStartHeld&&(screen==='battle'||screen==='menu')) togglePause();
-  gamepadStartHeld=down;
+  const raw=navigator.getGamepads?.()??[];
+  const pads=Array.from(raw);
+  const connected=pads.filter((pad):pad is Gamepad=>Boolean(pad&&pad.connected));
+  const start=connected.some(p=>Boolean(p.buttons[9]?.pressed));
+  if(start&&!gamepadStartHeld&&(screen==='battle'||screen==='menu'))togglePause();
+  gamepadStartHeld=start;
 
-  if(screen==='characters'||screen==='stages'){
-    // Standard gamepads: D-pad 14/15 and left stick axis 0.
-    // Key repeat is deliberately slower than combat input.
-    const direction=pads.reduce((result,pad)=>{
-      if(result!==0)return result;
-      if(pad.buttons[14]?.pressed||((pad.axes[0]??0)<-.55))return -1;
-      if(pad.buttons[15]?.pressed||((pad.axes[0]??0)>.55))return 1;
-      return 0;
-    },0);
-    const now=performance.now();
-    if(direction && (direction!==selectionDirectionHeld ||
-        now-selectionDirectionTime>260)){
-      if(screen==='characters')characterSelector.navigate(direction as -1|1);
-      else stageSelector.navigate(direction as -1|1);
-      selectionDirectionTime=now;
+  const direction=(pad:Gamepad|undefined,axis=0):number=>{
+    if(!pad)return 0;
+    if(axis===0){
+      if(pad.buttons[14]?.pressed)return -1;
+      if(pad.buttons[15]?.pressed)return 1;
     }
-    selectionDirectionHeld=direction;
-
-    const confirmDown=pads.some(p=>Boolean(p.buttons[0]?.pressed));
-    const backDown=pads.some(p=>Boolean(p.buttons[1]?.pressed));
-    if(confirmDown&&!selectionAHeld){
-      if(screen==='characters')characterSelector.confirmCurrent();
-      else if(screen==='stages')stageSelector.confirm();
+    const value=pad.axes[axis]??0;
+    return value<-.55?-1:value>.55?1:0;
+  };
+  const now=performance.now();
+  if(screen==='characters'){
+    // Gamepad 1 controls P1 and gamepad 2 controls P2 at the same time.
+    // On a single controller, the right analog stick can steer the CPU/P2
+    // carousel while the D-pad / left stick steers P1.
+    const pad1=pads[0]??undefined;
+    const pad2=pads[1]??undefined;
+    const directions=[
+      direction(pad1??undefined),
+      pad2?direction(pad2):direction(pad1??undefined,2),
+    ];
+    for(const p of [0,1] as const){
+      const dir=directions[p];
+      if(dir&&(dir!==playerDirectionHeld[p]||now-playerDirectionTime[p]>290)){
+        characterSelector.navigate(p,dir as -1|1);
+        playerDirectionTime[p]=now;
+      }
+      playerDirectionHeld[p]=dir;
     }
-    if(backDown&&!selectionBHeld){
-      if(screen==='characters')characterSelector.goBack();
-      else if(screen==='stages')stageSelector.goBack();
+    for(const p of [0,1] as const){
+      const pad=pads[p]??undefined;
+      const confirm=Boolean(pad?.buttons[0]?.pressed);
+      if(confirm&&!playerAHeld[p]){
+        characterSelector.confirmPlayer(p);
+      }
+      playerAHeld[p]=confirm;
     }
-    selectionAHeld=confirmDown;
-    selectionBHeld=backDown;
-  } else {
+    const back=connected.some(p=>Boolean(p.buttons[1]?.pressed));
+    if(back&&!selectionBHeld)characterSelector.goBack();
+    selectionBHeld=back;
+    // Start proceeds when both PvP players have pressed Ready, or immediately
+    // in CPU mode. This uses the same validation as the on-screen button.
+    if(start&&!selectionStartHeld)characterSelector.confirmCurrent();
+    selectionStartHeld=start;
     selectionDirectionHeld=0;
     selectionAHeld=false;
-    selectionBHeld=false;
+  } else if(screen==='stages'){
+    const dir=connected.reduce((value,pad)=>value||direction(pad),0);
+    if(dir&&(dir!==selectionDirectionHeld||now-selectionDirectionTime>280)){
+      stageSelector.navigate(dir as -1|1);
+      selectionDirectionTime=now;
+    }
+    selectionDirectionHeld=dir;
+    const confirm=connected.some(p=>Boolean(p.buttons[0]?.pressed));
+    if(confirm&&!selectionAHeld)stageSelector.confirm();
+    selectionAHeld=confirm;
+    const back=connected.some(p=>Boolean(p.buttons[1]?.pressed));
+    if(back&&!selectionBHeld)stageSelector.goBack();
+    selectionBHeld=back;
+    playerDirectionHeld[0]=0;playerDirectionHeld[1]=0;
+    playerAHeld[0]=false;playerAHeld[1]=false;
+    selectionStartHeld=false;
+  } else {
+    selectionDirectionHeld=0;
+    selectionAHeld=false;selectionBHeld=false;
+    playerDirectionHeld[0]=0;playerDirectionHeld[1]=0;
+    playerAHeld[0]=false;playerAHeld[1]=false;
+    selectionStartHeld=false;
   }
   requestAnimationFrame(pollGamepadMenu);
 }

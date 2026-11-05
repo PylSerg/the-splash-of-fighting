@@ -21,6 +21,18 @@ npm run build
 npm run preview
 ```
 
+## Alpha 1.1.0 · Simultaneous split-screen fighter selection
+
+The full-screen character selection now follows the original two-fighter sketch:
+**two equal side-by-side panels**, showing player 1 and their opponent at the same time. Each has its own full-body character carousel with bright center and smaller dimmed characters behind, reusing the same procedural SVG artwork and CSS transforms. Each half captures its own touch pointer, enabling **simultaneous swipes from two different fingers** with no event collision.
+
+- In **local PvP**, player 1 and player 2 choose **in parallel**, each by swiping their own side of the display. The currently highlighted fighter is reserved immediately; the other carousel dynamically excludes it as soon as either player changes selection, so two players cannot select the same character, even briefly. Players individually press **Готово** to lock their picks (and may unlock to choose again). Once both are ready, **Далі: арена** becomes available.
+- In **CPU mode**, the left carousel chooses the player fighter and the right one manually chooses the opponent. The right side additionally provides **🎲 Рандомний** to draw uniformly from all currently legal opponents (the player character is excluded). The next-step action starts with the displayed pair.
+- **On-screen carousel arrows are removed** from character selection and arena selection. Both retain touch swiping, side-item taps, keyboard and gamepad support.
+- **Keyboard:** player 1 uses A/D, player 2 uses Left/Right. F marks P1 ready, K marks P2 ready. Enter proceeds once ready. Esc goes back. Arena selection continues using Left/Right + Enter.
+- **Gamepads:** controller 1's D-pad/left stick controls P1, controller 2's controls P2 independently; A on each marks that player's choice as ready, Start advances once ready, B goes back. With one pad, its right stick can navigate the right carousel while its D-pad/left stick handles the left.
+- **Safety remains:** changing fighters from a paused match preserves the current arena. Returning without changing the pair preserves the paused round. Stage selection and the custom loss-of-progress confirmation remain intact.
+
 ## Alpha 1.0.0 · Fullscreen animated character and arena carousel
 
 The two cramped selection windows are replaced with **true fullscreen arcade selection scenes**. All three fighters are displayed as **full-body procedural SVGs**, matching their current in-game color schemes and gear, instead of small headshot cards. The centered fighter appears at full brightness and size, while the previous/next fighters remain **behind at 76% scale, dimmed by a CSS filter**. Changing the selection smoothly animates the exact same three SVG elements across the screen, without loading additional duplicated images.

@@ -3,35 +3,40 @@ import { CHARACTERS, getCharacter } from '../characters/Roster';
 import { characterFigureSvg } from '../characters/Figures';
 
 export type MatchMode = 'cpu' | 'versus';
+type Player = 0 | 1;
+type SwipeStart = { id: number; x: number; y: number; target: FighterId | null };
 
 /**
- * A single, full-viewport animated carousel: each fighter has ONE full-body
- * SVG element which is moved/scaled/dimmed instead of duplicate image assets.
+ * Two independent fullscreen carousel halves.
+ *
+ * A focused character is reserved immediately. The OTHER side's list is
+ * recomputed on every change, making mirror selections impossible even while
+ * two touch pointers (one in each zone) move at the same time.
  */
 export class CharacterSelector {
   private root: HTMLElement;
-  private carousel: HTMLElement;
-  private roster: HTMLElement;
+  private areas: [HTMLElement, HTMLElement];
+  private rosters: [HTMLElement, HTMLElement];
+  private names: [HTMLElement, HTMLElement];
+  private titles: [HTMLElement, HTMLElement];
+  private counts: [HTMLElement, HTMLElement];
+  private readyButtons: [HTMLButtonElement, HTMLButtonElement];
+  private randomButton: HTMLButtonElement;
+  private secondLabel: HTMLElement;
   private instructions: HTMLElement;
   private lineup: HTMLElement;
-  private currentName: HTMLElement;
-  private currentTitle: HTMLElement;
-  private counter: HTMLElement;
   private startButton: HTMLButtonElement;
   private backButton: HTMLButtonElement;
   private cpuButton: HTMLButtonElement;
   private versusButton: HTMLButtonElement;
   private resetButton: HTMLButtonElement;
   private mode: MatchMode = 'cpu';
-  private p1: FighterId | null = null;
-  private phase: 1 | 2 = 1;
-  private index = 0;
-  private allowBack = true;
-  private backLabel = '← Назад';
-  private previousCpuPair: { first: FighterId; second: FighterId } | null = null;
+  private picks: [FighterId, FighterId];
+  private ready: [boolean, boolean] = [false, false];
   private previousPair: { first: FighterId; second: FighterId } | null = null;
-  private touch: { id: number; x: number; y: number } | null = null;
-  private ignoreClickUntil = 0;
+  private allowBack = true;
+  private swipe: [SwipeStart | null, SwipeStart | null] = [null, null];
+  private suppressClicks: [number, number] = [0, 0];
 
   constructor(
     private readonly onStart: (p1: FighterId, p2: FighterId, mode: MatchMode) => void,
@@ -39,81 +44,98 @@ export class CharacterSelector {
   ) {
     const get = <T extends HTMLElement>(selector: string): T => {
       const el = document.querySelector<T>(selector);
-      if (!el) throw new Error('Character carousel is missing ' + selector);
+      if (!el) throw new Error('Dual character select missing: ' + selector);
       return el;
     };
     this.root = get('#character-select');
-    this.carousel = get('#select-carousel');
-    this.roster = get('#select-roster');
+    this.areas = [get('#select-zone-p1'), get('#select-zone-p2')];
+    this.rosters = [get('#select-roster-p1'), get('#select-roster-p2')];
+    this.names = [get('#select-name-p1'), get('#select-name-p2')];
+    this.titles = [get('#select-title-p1'), get('#select-title-p2')];
+    this.counts = [get('#select-counter-p1'), get('#select-counter-p2')];
+    this.readyButtons = [get('#btn-select-ready-p1'), get('#btn-select-ready-p2')];
+    this.randomButton = get('#btn-select-random');
+    this.secondLabel = get('#select-side-two-label');
     this.instructions = get('#select-instructions');
     this.lineup = get('#select-lineup');
-    this.currentName = get('#select-active-name');
-    this.currentTitle = get('#select-active-title');
-    this.counter = get('#select-counter');
     this.startButton = get('#btn-select-fight');
     this.backButton = get('#btn-select-back');
     this.cpuButton = get('#btn-select-cpu');
     this.versusButton = get('#btn-select-versus');
     this.resetButton = get('#btn-select-reset');
 
-    CHARACTERS.forEach(character => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'fighter-slide';
-      button.dataset.character = character.id;
-      button.style.setProperty('--fighter-accent', character.color);
-      button.style.setProperty('--fighter-glow', character.glow);
-      button.setAttribute('aria-label', 'Персонаж ' + character.name);
-      button.innerHTML = `<span class="fighter-glow" aria-hidden="true"></span>
-        <span class="fighter-figure">${characterFigureSvg(character.id)}</span>
-        <span class="fighter-ground" aria-hidden="true"></span>
-        <span class="fighter-taken" aria-hidden="true">ВЖЕ ОБРАНО P1</span>`;
-      button.addEventListener('click', () => {
-        if (performance.now() < this.ignoreClickUntil) return;
-        const target = CHARACTERS.findIndex(item => item.id === character.id);
-        if (target !== this.index) {
-          this.index = target;
-          this.paint();
-        } else {
-          this.confirmCurrent();
+    const first = CHARACTERS[0]?.id;
+    const second = CHARACTERS[1]?.id;
+    if (!first || !second) throw new Error('A battle requires two fighters.');
+    this.picks = [first, second];
+
+    for (const p of [0, 1] as const) {
+      const area = this.areas[p];
+      for (const character of CHARACTERS) {
+        // Each side renders its OWN selection from reusable character artwork.
+        // It never needs duplicated light/dark image files for side previews.
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'fighter-slide';
+        button.dataset.character = character.id;
+        button.style.setProperty('--fighter-accent', character.color);
+        button.style.setProperty('--fighter-glow', character.glow);
+        button.setAttribute('aria-label', 'Персонаж ' + character.name);
+        button.innerHTML = `<span class="fighter-glow" aria-hidden="true"></span>
+          <span class="fighter-figure">${characterFigureSvg(character.id)}</span>
+          <span class="fighter-ground" aria-hidden="true"></span>`;
+        button.addEventListener('click', () => {
+          if (performance.now() < this.suppressClicks[p]) return;
+          if (this.picks[p] === character.id) this.confirmPlayer(p);
+          else this.select(p, character.id);
+        });
+        this.rosters[p].append(button);
+      }
+
+      // Each half has its own pointer identity, intentionally no isPrimary
+      // check. Two fingers can swipe BOTH player carousels simultaneously.
+      area.addEventListener('pointerdown', event => {
+        if (!this.isOpen || this.swipe[p]) return;
+        const target = (event.target as Element).closest<HTMLButtonElement>('.fighter-slide');
+        this.swipe[p] = {
+          id: event.pointerId, x: event.clientX, y: event.clientY,
+          target: target?.dataset.character as FighterId | undefined ?? null,
+        };
+        if (event.pointerType === 'touch') area.setPointerCapture(event.pointerId);
+      });
+      area.addEventListener('pointerup', event => {
+        const start = this.swipe[p];
+        if (!start || start.id !== event.pointerId) return;
+        this.swipe[p] = null;
+        const dx = event.clientX - start.x;
+        const dy = event.clientY - start.y;
+        if (Math.abs(dx) >= 36 && Math.abs(dx) > Math.abs(dy) * 1.13) {
+          this.suppressClicks[p] = performance.now() + 350;
+          this.navigate(p, dx < 0 ? 1 : -1);
+          event.preventDefault();
+        } else if (event.pointerType === 'touch' && start.target) {
+          this.suppressClicks[p] = performance.now() + 350;
+          if (this.picks[p] === start.target) this.confirmPlayer(p);
+          else this.select(p, start.target);
         }
       });
-      this.roster.append(button);
-    });
-
-    get<HTMLButtonElement>('#btn-fighter-prev').addEventListener('click', () => this.navigate(-1));
-    get<HTMLButtonElement>('#btn-fighter-next').addEventListener('click', () => this.navigate(1));
+      area.addEventListener('pointercancel', event => {
+        if (this.swipe[p]?.id === event.pointerId) this.swipe[p] = null;
+      });
+      area.addEventListener('click', event => {
+        if (performance.now() < this.suppressClicks[p]) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }, true);
+      this.readyButtons[p].addEventListener('click', () => this.confirmPlayer(p));
+    }
     this.cpuButton.addEventListener('click', () => this.switchMode('cpu'));
     this.versusButton.addEventListener('click', () => this.switchMode('versus'));
+    this.randomButton.addEventListener('click', () => this.randomizeOpponent());
     this.resetButton.addEventListener('click', () => this.reset());
     this.backButton.addEventListener('click', () => this.goBack());
     this.startButton.addEventListener('click', () => this.confirmCurrent());
-
-    this.carousel.addEventListener('pointerdown', event => {
-      if (!this.isOpen || !event.isPrimary) return;
-      this.touch = { id: event.pointerId, x: event.clientX, y: event.clientY };
-      if (event.pointerType === 'touch') {
-        this.carousel.setPointerCapture(event.pointerId);
-      }
-    });
-    this.carousel.addEventListener('pointerup', event => {
-      if (!this.touch || this.touch.id !== event.pointerId) return;
-      const dx = event.clientX - this.touch.x;
-      const dy = event.clientY - this.touch.y;
-      this.touch = null;
-      if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.15) {
-        this.ignoreClickUntil = performance.now() + 350;
-        this.navigate(dx < 0 ? 1 : -1);
-        event.preventDefault();
-      }
-    });
-    this.carousel.addEventListener('pointercancel', () => { this.touch = null; });
-    this.carousel.addEventListener('click', event => {
-      if (performance.now() < this.ignoreClickUntil) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
-    }, true);
     this.paint();
   }
 
@@ -123,91 +145,92 @@ export class CharacterSelector {
     previous?: { first: FighterId; second: FighterId },
   ): void {
     this.mode = mode;
-    this.p1 = null;
-    this.phase = 1;
     this.previousPair = previous ?? null;
-    this.previousCpuPair = previous && mode === 'cpu' ? previous : null;
-    this.index = Math.max(0, CHARACTERS.findIndex(c => c.id === previous?.first));
+    const valid = previous && previous.first !== previous.second &&
+      CHARACTERS.some(c => c.id === previous.first) &&
+      CHARACTERS.some(c => c.id === previous.second);
+    this.picks = valid
+      ? [previous.first, previous.second]
+      : [CHARACTERS[0].id, CHARACTERS[1].id];
+    this.ready = [false, false];
     this.allowBack = allowBack;
-    this.backLabel = this.backButton.textContent || '← Назад';
+    this.swipe = [null, null];
+    this.suppressClicks = [0, 0];
     this.root.hidden = false;
-    this.touch = null;
-    this.ignoreClickUntil = 0;
     this.paint();
-    this.carousel.focus({ preventScroll: true });
+    this.areas[0].focus({ preventScroll: true });
   }
 
   hide(): void {
     this.root.hidden = true;
-    this.touch = null;
+    this.swipe = [null, null];
   }
   get isOpen(): boolean { return !this.root.hidden; }
   get canGoBack(): boolean { return this.allowBack; }
+  goBack(): void { if (this.isOpen && this.allowBack) this.onBack(); }
 
-  navigate(direction: -1 | 1): void {
-    if (!this.isOpen || CHARACTERS.length <= 1) return;
-    this.index = (this.index + CHARACTERS.length + direction) % CHARACTERS.length;
+  /** The list is always derived from the opponent's current reservation. */
+  private available(player: Player): FighterId[] {
+    return CHARACTERS.filter(c => c.id !== this.picks[player === 0 ? 1 : 0])
+      .map(c => c.id);
+  }
+
+  navigate(player: Player, direction: -1 | 1): void {
+    if (!this.isOpen || (this.mode === 'versus' && this.ready[player])) return;
+    const choices = this.available(player);
+    if (choices.length < 2) return;
+    const current = choices.indexOf(this.picks[player]);
+    const index = (current + choices.length + direction) % choices.length;
+    this.select(player, choices[index]);
+  }
+
+  /** Both choices are exclusive already before either player presses Ready. */
+  private select(player: Player, id: FighterId): void {
+    if (!this.isOpen || (this.mode === 'versus' && this.ready[player])) return;
+    if (!this.available(player).includes(id) || this.picks[player] === id) return;
+    this.picks[player] = id;
+    this.ready[player] = false;
+    this.paint(); // Recalculate BOTH lists immediately, not just this half.
+  }
+
+  confirmPlayer(player: Player): void {
+    if (!this.isOpen) return;
+    if (this.mode === 'versus') {
+      this.ready[player] = !this.ready[player];
+      this.paint();
+    } else if (player === 0 || player === 1) {
+      this.confirmCurrent();
+    }
+  }
+
+  /** CPU selection can be swiped manually or rerolled with one touch. */
+  randomizeOpponent(): void {
+    if (!this.isOpen || this.mode !== 'cpu') return;
+    const candidates = this.available(1);
+    if (!candidates.length) return;
+    // Uniform random draw from every legal opponent (including the current).
+    this.picks[1] = candidates[Math.floor(Math.random() * candidates.length)];
     this.paint();
   }
 
   confirmCurrent(): void {
     if (!this.isOpen) return;
-    const id = CHARACTERS[this.index]?.id;
-    if (!id) return;
-    if (this.phase === 1) {
-      if (this.mode === 'cpu') {
-        const candidates = CHARACTERS.filter(c => c.id !== id);
-        if (!candidates.length) return;
-        const samePick = this.previousCpuPair?.first === id;
-        const previousOpponent = this.previousCpuPair?.second;
-        const second = samePick && previousOpponent &&
-          candidates.some(c => c.id === previousOpponent)
-          ? previousOpponent
-          : candidates[Math.floor(Math.random() * candidates.length)].id;
-        this.onStart(id, second, this.mode);
-      } else {
-        if (CHARACTERS.length < 2) return;
-        this.p1 = id;
-        this.phase = 2;
-        const desired = this.previousPair?.first === id
-          ? this.previousPair.second : null;
-        const next = CHARACTERS.findIndex(c => c.id === desired);
-        this.index = next >= 0 && desired !== id
-          ? next : (this.index + 1) % CHARACTERS.length;
-        this.paint();
-      }
-    } else {
-      if (!this.p1 || this.p1 === id) return;
-      this.onStart(this.p1, id, this.mode);
-    }
-  }
-
-  goBack(): void {
-    if (!this.isOpen) return;
-    if (this.phase === 2) {
-      const prior = this.p1;
-      this.phase = 1;
-      this.p1 = null;
-      const found = CHARACTERS.findIndex(c => c.id === prior);
-      this.index = found < 0 ? 0 : found;
-      this.paint();
-      return;
-    }
-    if (this.allowBack) this.onBack();
+    if (this.mode === 'versus' && (!this.ready[0] || !this.ready[1])) return;
+    const [first, second] = this.picks;
+    if (first === second) return;
+    this.onStart(first, second, this.mode);
   }
 
   private switchMode(mode: MatchMode): void {
     if (this.mode === mode) return;
     this.mode = mode;
-    this.phase = 1;
-    this.p1 = null;
-    this.previousCpuPair = mode === 'cpu' ? this.previousPair : null;
+    this.ready = [false, false];
     this.paint();
   }
 
   private reset(): void {
-    this.phase = 1;
-    this.p1 = null;
+    this.ready = [false, false];
+    this.picks = [CHARACTERS[0].id, CHARACTERS[1].id];
     this.paint();
   }
 
@@ -217,43 +240,53 @@ export class CharacterSelector {
     this.versusButton.classList.toggle('selected', versus);
     this.cpuButton.setAttribute('aria-pressed', String(!versus));
     this.versusButton.setAttribute('aria-pressed', String(versus));
-
     this.backButton.hidden = !this.allowBack;
-    this.backButton.textContent = this.phase === 2 ? '← До гравця 1' : this.backLabel;
-    this.instructions.textContent = this.phase === 2
-      ? 'ГРАВЕЦЬ 2 · Обери іншого бійця'
-      : versus
-        ? 'ГРАВЕЦЬ 1 · Обери свого бійця'
-        : 'ОБЕРИ БІЙЦЯ · Суперник CPU визначиться випадково';
-    const current = CHARACTERS[this.index];
-    if (current) {
-      this.currentName.textContent = current.name;
-      this.currentTitle.textContent = current.title;
-    }
-    this.counter.textContent = (this.index + 1) + ' / ' + CHARACTERS.length;
-    this.lineup.textContent = this.phase === 2 && this.p1
-      ? 'P1: ' + getCharacter(this.p1).name + '   •   P2: ?'
-      : versus ? 'P1 → P2 · по черзі' : 'P1 + випадковий CPU';
+    this.secondLabel.textContent = versus ? 'P2 · ГРАВЕЦЬ 2' : '⚡ СУПЕРНИК CPU';
+    this.instructions.textContent = versus
+      ? 'ДВА ГРАВЦІ · Незалежні свайпи · Підтвердіть свій вибір'
+      : 'ТИ ПРОТИ CPU · Обери обох бійців або натисни «Рандомний»';
 
-    for (const item of this.roster.querySelectorAll<HTMLButtonElement>('.fighter-slide')) {
-      const i = CHARACTERS.findIndex(c => c.id === item.dataset.character);
-      const relative = (i - this.index + CHARACTERS.length) % CHARACTERS.length;
-      const slot = relative === 0 ? 'center' : relative === 1 ? 'right'
-        : relative === CHARACTERS.length - 1 ? 'left' : 'hidden';
-      item.dataset.slot = slot;
-      item.classList.toggle('fighter-locked', this.phase === 2 && item.dataset.character === this.p1);
-      item.tabIndex = -1;
-      item.setAttribute('aria-hidden', String(slot === 'hidden'));
-      item.setAttribute('aria-pressed', String(slot === 'center'));
+    this.randomButton.hidden = versus;
+    for (const p of [0, 1] as const) {
+      const character = getCharacter(this.picks[p]);
+      const choices = this.available(p);
+      this.names[p].textContent = character.name;
+      this.titles[p].textContent = character.title;
+      this.counts[p].textContent = choices.length + ' доступні';
+      this.areas[p].style.setProperty('--active-color', character.color);
+      this.areas[p].style.setProperty('--active-glow', character.glow);
+      this.readyButtons[p].hidden = !versus;
+      this.readyButtons[p].classList.toggle('is-ready', this.ready[p]);
+      this.readyButtons[p].textContent = this.ready[p]
+        ? '✓ P' + (p + 1) + ' готовий · змінити'
+        : '✓ Готово P' + (p + 1);
+
+      for (const item of this.rosters[p].querySelectorAll<HTMLButtonElement>('.fighter-slide')) {
+        const id = item.dataset.character as FighterId;
+        const currentIndex = choices.indexOf(this.picks[p]);
+        const i = choices.indexOf(id);
+        let slot = 'hidden';
+        if (i >= 0) {
+          if (id === this.picks[p]) slot = 'center';
+          else if (choices.length === 2) slot = p === 0 ? 'left' : 'right';
+          else {
+            const relative = (i - currentIndex + choices.length) % choices.length;
+            slot = relative === 1 ? 'right' : relative === choices.length - 1
+              ? 'left' : 'hidden';
+          }
+        }
+        item.dataset.slot = slot;
+        item.disabled = i < 0 || (versus && this.ready[p]);
+        item.tabIndex = -1;
+        item.setAttribute('aria-hidden', String(slot === 'hidden'));
+        item.setAttribute('aria-pressed', String(slot === 'center'));
+      }
     }
 
-    const invalid = this.phase === 2 && current?.id === this.p1;
-    this.startButton.disabled = !current || Boolean(invalid);
-    this.startButton.textContent = this.phase === 2
-      ? '✓ Обрати для P2'
-      : versus ? '✓ Обрати для P1' : '✓ Обрати бійця';
-    this.resetButton.disabled = this.phase === 1 && this.p1 === null;
-    this.root.style.setProperty('--active-color', current?.color ?? '#e1a1ce');
-    this.root.style.setProperty('--active-glow', current?.glow ?? '#b9d0fc');
+    const [a,b] = this.picks;
+    this.lineup.textContent = 'P1: ' + getCharacter(a).name + '  ⚔  ' +
+      (versus ? 'P2: ' : 'CPU: ') + getCharacter(b).name;
+    this.startButton.disabled = a === b || (versus && !this.ready.every(Boolean));
+    this.startButton.textContent = versus ? '🥊 Далі: арена' : '✓ Далі: арена';
   }
 }
