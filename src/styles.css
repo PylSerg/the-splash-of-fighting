@@ -639,3 +639,33 @@ body { min-height:0; }
 .pause-tabs.settings-only {
   grid-template-columns:repeat(3,minmax(0,1fr));
 }
+
+/* Alpha 0.9.3: an always-visible exit in every settings/pause tab. */
+.pause-heading-actions {
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:clamp(6px,1.5vmin,13px);
+  flex-shrink:0;
+}
+.pause-close {
+  display:inline-grid;
+  place-items:center;
+  flex:0 0 auto;
+  width:clamp(42px,8.5vmin,52px);
+  height:clamp(42px,8.5vmin,52px);
+  padding:0;
+  border:1.5px solid #d9b6de;
+  border-radius:12px;
+  color:#fff8ff;
+  background:linear-gradient(135deg,#60486f,#352a56);
+  box-shadow:0 4px 18px #0008,inset 0 1px #ffffff38;
+  font:700 clamp(23px,4vmin,29px)/1 Rajdhani,system-ui,sans-serif;
+  touch-action:manipulation;
+}
+.pause-close:hover {background:linear-gradient(135deg,#8a537a,#5b346e);}
+.pause-close:active {transform:scale(.95);}
+@media(max-width:600px),(max-height:410px) {
+  .pause-heading-actions .pause-context-label {display:none;}
+  .pause-close {width:43px;height:43px;font-size:24px;}
+}

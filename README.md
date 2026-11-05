@@ -21,6 +21,10 @@ npm run build
 npm run preview
 ```
 
+## Alpha 0.9.3 · Universal menu close button
+
+A prominent, touch-friendly **✕** in the top-right of the settings/pause panel closes it **from any tab**: when opened from the title screen, it returns to the title; when opened during battle, it resumes the paused match immediately. This avoids having to open the **Бій** tab just to continue playing. Existing Escape/P/Start shortcuts and character-select back navigation remain unchanged.
+
 ## Alpha 0.9.2 · Correct settings tabs and character-select navigation
 
 - Opening **Налаштування** from the title screen shows **Керування**, **Графіка** and **Довідка**, with no **Бій** tab. These three tabs expand to fill the width. Opening the pause menu during a match restores all four tabs and its five battle actions.

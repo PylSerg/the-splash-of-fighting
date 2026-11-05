@@ -38,6 +38,7 @@ const menuButton=get<HTMLButtonElement>('#btn-menu');
 const menuOverlay=get<HTMLElement>('#pause-overlay');
 const home=get<HTMLElement>('#home-screen');
 const resumeButton=get<HTMLButtonElement>('#btn-resume');
+const closeMenuButton=get<HTMLButtonElement>('#btn-close-menu');
 const restartButton=get<HTMLButtonElement>('#btn-restart');
 const debugButton=get<HTMLButtonElement>('#btn-debug');
 const fullscreenButton=get<HTMLButtonElement>('#btn-fullscreen');
@@ -264,6 +265,7 @@ homeFullscreen.addEventListener('click',()=>{void toggleFullscreen();});
 // First pause tab has the five actions specified by the game design.
 menuButton.addEventListener('click',()=>showMenu('battle'));
 resumeButton.addEventListener('click',leaveMenu);
+closeMenuButton.addEventListener('click',leaveMenu);
 restartButton.addEventListener('click',restart);
 get<HTMLButtonElement>('#btn-choose-characters').addEventListener('click',()=>{
   if(activePair) showCharacters('menu');
