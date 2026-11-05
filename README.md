@@ -21,6 +21,13 @@ npm run build
 npm run preview
 ```
 
+## Alpha 0.9.1 · Landscape title-screen layout and larger menu controls
+
+- The main screen no longer uses a three-row grid that could push the game title off the top of short landscape displays. Title, subtitle and primary buttons now form one centered, height-aware column.
+- The decorative background glow is clipped inside the screen; page-level horizontal and vertical scrollbars are disabled. The entire game frame stays fixed to the visible viewport in landscape.
+- The three home-screen buttons now have larger, explicit spacing and comfortable minimum touch heights.
+- Paused-game tab buttons, all five actions on the **Бій** tab, display options and control-settings actions have substantially larger tap areas. On exceptionally small viewports only the **pause panel's content** may scroll, never the title screen or full webpage.
+
 ## Alpha 0.9.0 · Title screen, three fighters, two arenas and tabbed pause menu
 
 A complete game flow is now available:
