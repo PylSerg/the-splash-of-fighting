@@ -202,7 +202,20 @@ export class ArenaScene extends Phaser.Scene {
       if(this.readyTime===0)this.centerLabel.setVisible(false);
       return;
     }
-    if(this.roundOver)return;
+    if(this.roundOver) {
+      // Let the defeated fighter finish falling AFTER the winner is announced
+      // (time-out loss); everybody else remains frozen.
+      this.advanceFallenFighters(dt);
+      return;
+    }
+    // Once someone has 0 HP, freeze the remaining fight and let the KO fall
+    // finish before displaying the winner. There can be no extra attacks.
+    if(this.evi.knockedOut || this.nara.knockedOut) {
+      this.advanceFallenFighters(dt);
+      if((!this.evi.knockedOut || this.evi.knockoutSettled) &&
+         (!this.nara.knockedOut || this.nara.knockoutSettled)) this.finishRound();
+      return;
+    }
     this.roundTime=Math.max(0,this.roundTime-dt);
     const input1=this.controls.read(0);
     const input2=this.mode==='cpu'?this.cpuInput(dt):this.controls.read(1);
@@ -230,11 +243,17 @@ export class ArenaScene extends Phaser.Scene {
       this.resolveStrike(this.nara,this.evi);
     }
 
-    // Allow a KO caused by a throw to finish its landing animation first.
-    const anyKnockedOut=this.evi.knockedOut||this.nara.knockedOut;
-    if ((anyKnockedOut && !this.evi.knockedDown && !this.nara.knockedDown) || this.roundTime<=0) {
-      this.finishRound();
-    }
+    // If HP reaches zero now, the next fixed step will animate the fall.
+    // A timeout can end the round immediately, with the defeated fighter
+    // continuing its knockdown in the round-over branch.
+    if (this.roundTime<=0) this.finishRound();
+  }
+
+  private advanceFallenFighters(dt: number): void {
+    const inert=emptyInput();
+    if(this.evi.knockedDown) this.evi.step(dt,inert,inert,this.nara.x);
+    if(this.nara.knockedDown) this.nara.step(dt,inert,inert,this.evi.x);
+    this.paintHud();
   }
 
   private canBeginGrab(attacker: Fighter, defender: Fighter): boolean {
@@ -398,13 +417,18 @@ export class ArenaScene extends Phaser.Scene {
 
   private resolveStrike(attacker: Fighter, target: Fighter): void {
     const strike=attacker.getActiveStrike();
-    if(!strike||target.knockedOut||target.knockedDown)return;
+    if(!strike)return;
     const box=attacker.strikeBox();
-    if(!box||!overlap(box,target.bodyBox()))return;
+    // Consume the one impact frame even if the attack misses. Otherwise a
+    // whiff could "hit late" during follow-through and become unavoidable.
     strike.connected=true;
+    if(target.knockedOut||target.knockedDown||!box||!overlap(box,target.bodyBox()))return;
     const hit=target.receiveHit(strike.spec,attacker.face,strike.name);
     attacker.rewardHit(strike.spec);
     this.spawnSparks(target.x,GROUND_Y+target.yOffset-85,hit.blocked);
+    if(hit.interrupted) {
+      this.combatNotice('INTERRUPT!',target.x,GROUND_Y+target.yOffset-173,0xffd898);
+    }
     if(!hit.blocked)this.cameras.main.shake(75,.003);
     this.onStatus(hit.blocked
       ? (hit.damage>0 ? 'Блок! Y пробив '+hit.damage.toLocaleString('uk-UA')+' HP (25% шкоди).' : 'Блок! Ушкодження поглинуто.')
@@ -428,11 +452,19 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private finishRound(): void {
+    if (this.roundOver) return;
     this.roundOver=true;
     const winner=this.evi.hp===this.nara.hp?'DRAW!'
       :this.evi.hp>this.nara.hp?'EVI WINS!':'NARA WINS!';
+    if (winner !== 'DRAW!') {
+      const loser=this.evi.hp<this.nara.hp?this.evi:this.nara;
+      const victor=loser===this.evi?this.nara:this.evi;
+      // On time-out, the loser can still have HP and be standing. The
+      // victory screen must also leave this fighter lying on the ground.
+      if (!loser.knockedDown) loser.startDefeatFall(victor.face);
+    }
     this.centerLabel.setText(winner).setColor('#ffe5a4').setVisible(true);
-    this.onStatus(winner+' Натисни «Новий раунд» або R для повтору.');
+    this.onStatus(winner+' Натисни «Новий раунд» у меню або R для повтору.');
   }
 
   private paintHud(): void {

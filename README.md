@@ -21,6 +21,17 @@ npm run build
 npm run preview
 ```
 
+## Alpha 0.7.0 · Impact frames, counterattacks, permanent KO falls
+
+**Damage timing:** Each punch, kick and special has one true impact at the **end of its strike animation**, not at the first frame of the wind-up. The target must still overlap the strike hitbox at that exact moment. Missing an attack consumes the impact (it cannot hit late during the follow-through). A 0.12 s non-damaging recovery follows.
+
+- **X light punch:** 0.27 s to impact; **B kick:** 0.40 s; **Y heavy punch:** 0.48 s; **B+Y / R1 special:** 0.82 s.
+- If an opponent's quick X connects before the heavy Y or special reaches its impact frame, hitstun **cancels the unfinished attack**, its damage never triggers, and **INTERRUPT!** appears over the fighter. The same rule works for both Evi and Nara.
+- Successful blocking still uses the established tactical stance constraints, and a guarded Y still deals 25% chip damage.
+- Defeat by depleted health starts a fall with an airborne tumble and ends in a **permanent prone KO pose**. Winner text appears once the loser actually lands.
+- Time-out also causes the fighter with less HP to fall and remain down while the winner result is shown. Ties remain a draw.
+- Existing throws retain the temporary 0.5 s prone + 0.5 s get-up behavior when nonlethal; lethal throws end in the same permanent KO pose.
+
 ## Alpha 0.6.0 · Edge-to-edge arena and custom mobile controls
 
 The arena now fills the **entire landscape screen**, even on extra-wide phones. Phaser renders a wider logical viewport around the unchanged central world rather than stretching fighter artwork or cropping the HP HUD. Ground, city skyline and combat bounds extend into the additional space; health/energy bars stay anchored at the outer edges. Fullscreen and orientation changes resize the view.

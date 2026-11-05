@@ -4,9 +4,8 @@ import type { InputState } from '../input/Controls';
 export type FighterId = 'evi' | 'nara';
 export type AttackName = 'light' | 'heavy' | 'kick' | 'special';
 export interface AttackSpec {
+  /** Wind-up/swing completes at this time; collision is tested exactly once then. */
   duration: number;
-  startup: number;
-  activeEnd: number;
   reach: number;
   damage: number;
   stun: number;
@@ -24,11 +23,13 @@ export function setStageViewportWidth(width: number): void {
   STAGE_MAX_X = 900 + extraHalf;
 }
 
+// A short non-damaging recovery after the impact frame prevents animation snaps.
+const ATTACK_RECOVERY = .12;
 export const ATTACKS: Record<AttackName, AttackSpec> = {
-  light: { duration: .27, startup: .065, activeEnd: .145, reach: 92, damage: 5, stun: .18, push: 110, gain: 7 },
-  heavy: { duration: .48, startup: .17, activeEnd: .26, reach: 116, damage: 11, stun: .32, push: 185, gain: 12 },
-  kick: { duration: .40, startup: .13, activeEnd: .23, reach: 135, damage: 9, stun: .27, push: 150, gain: 10 },
-  special: { duration: .82, startup: .24, activeEnd: .44, reach: 205, damage: 20, stun: .40, push: 290, gain: 0 },
+  light: { duration: .27, reach: 92, damage: 5, stun: .18, push: 110, gain: 7 },
+  heavy: { duration: .48, reach: 116, damage: 11, stun: .32, push: 185, gain: 12 },
+  kick: { duration: .40, reach: 135, damage: 9, stun: .27, push: 150, gain: 10 },
+  special: { duration: .82, reach: 205, damage: 20, stun: .40, push: 290, gain: 0 },
 };
 
 export class Fighter {
@@ -47,8 +48,10 @@ export class Fighter {
   // Two-stage throw animations are controlled by the arena's grapple state.
   grabPose: 'reach' | 'hold' | 'held' | 'throw' | null = null;
   grabRecovery = 0;
-  // Throw knockdown has a landing, 0.5 s prone and 0.5 s get-up phase.
-  knockdownPhase: 'flying' | 'prone' | 'rising' | null = null;
+  // Throws have 0.5 s prone + 0.5 s recovery. A defeated fighter
+  // instead lands in 'ko' and stays on the ground until a new round.
+  knockdownPhase: 'flying' | 'prone' | 'rising' | 'ko' | null = null;
+  private knockoutForever = false;
   private knockdownTimer = 0;
   private knockdownFlightAge = 0;
   hitFlash = 0;
@@ -173,6 +176,7 @@ export class Fighter {
   get airborne(): boolean { return this.yOffset < -.1; }
   get knockedOut(): boolean { return this.hp <= 0; }
   get knockedDown(): boolean { return this.knockdownPhase !== null; }
+  get knockoutSettled(): boolean { return this.knockedOut && this.knockdownPhase === 'ko'; }
 
   reset(x: number, face: 1 | -1): void {
     this.x=x; this.face=face; this.hp=100; this.energy=50;
@@ -182,6 +186,7 @@ export class Fighter {
     this.queuedSolo=null; this.queuedSpecial=0;
     this.grabPose=null; this.grabRecovery=0;
     this.knockdownPhase=null;this.knockdownTimer=0;this.knockdownFlightAge=0;
+    this.knockoutForever=false;
     this.rig.rotation=0;
     this.draw(0);
   }
@@ -217,7 +222,7 @@ export class Fighter {
 
     if (this.attack) {
       this.attack.elapsed += dt;
-      if (this.attack.elapsed >= this.attack.spec.duration) this.attack=null;
+      if (this.attack.elapsed >= this.attack.spec.duration + ATTACK_RECOVERY) this.attack=null;
     }
 
     // A only guards in safe stances: on the ground at rest, retreating,
@@ -311,8 +316,8 @@ export class Fighter {
       this.knockdownFlightAge+=dt;
       this.advanceGravity(dt);
       if (!this.airborne && this.vy===0) {
-        this.knockdownPhase='prone';
-        this.knockdownTimer=.5;
+        this.knockdownPhase=this.knockoutForever ? 'ko' : 'prone';
+        this.knockdownTimer=this.knockoutForever ? 0 : .5;
         // Stop sliding once the thrown fighter hits the ground.
         this.impactVelocity=0;
       }
@@ -364,6 +369,7 @@ export class Fighter {
     if(counterPunch) {
       this.hp=Math.max(0,this.hp-3);
       this.hitFlash=.18;
+      if(this.knockedOut) this.startKnockout(-this.face);
     }
   }
 
@@ -375,6 +381,7 @@ export class Fighter {
     this.queuedSpecial=0;
     this.hp=Math.max(0,this.hp-damage);
     this.energy=Math.min(100,this.energy+12);
+    this.knockoutForever=this.knockedOut;
     // Send the victim BEHIND the thrower, with much greater travel.
     // Facing is frozen throughout the tumble and restored on recovery.
     this.face=attackerFace;
@@ -395,7 +402,11 @@ export class Fighter {
 
   getActiveStrike(): ActiveAttack | null {
     const a=this.attack;
-    return a && !a.connected && a.elapsed>=a.spec.startup && a.elapsed<=a.spec.activeEnd?a:null;
+    // No damage during the wind-up. At completion, permit ONE collision test.
+    // A light X can cancel Y or special before this frame is reached.
+    return a && !a.connected &&
+      a.elapsed >= a.spec.duration &&
+      a.elapsed < a.spec.duration + ATTACK_RECOVERY ? a : null;
   }
 
   strikeBox(): {x:number;y:number;w:number;h:number} | null {
@@ -409,8 +420,10 @@ export class Fighter {
     return {x:this.x-25,y:GROUND_Y+this.yOffset-(this.crouching?73:145),w:50,h:this.crouching?72:142};
   }
 
-  receiveHit(spec: AttackSpec, attackerFace: 1|-1, attackName: AttackName): {damage:number;blocked:boolean} {
+  receiveHit(spec: AttackSpec, attackerFace: 1|-1, attackName: AttackName): {damage:number;blocked:boolean;interrupted:boolean} {
     const blocked=this.blocking;
+    const interrupted=!blocked && Boolean(this.attack && !this.attack.connected &&
+      this.attack.elapsed < this.attack.spec.duration);
     // Y heavy retains 25% chip damage against an otherwise successful guard.
     // Keep fractional HP: 11 HP heavy deals exactly 2.75 HP through block.
     const damage=blocked ? (attackName==='heavy' ? spec.damage*.25 : 0) : spec.damage;
@@ -429,8 +442,35 @@ export class Fighter {
       this.stunned=0;
       this.blockFlash=.18;
     }
+    if(this.knockedOut) this.startKnockout(attackerFace);
     this.x=Phaser.Math.Clamp(this.x,STAGE_MIN_X,STAGE_MAX_X);
-    return {damage,blocked};
+    return {damage,blocked,interrupted};
+  }
+
+  /** Mark a round loss with a visible fall that never automatically gets up. */
+  startDefeatFall(impulseFace: 1 | -1): void {
+    if (this.knockoutForever) return;
+    this.startKnockout(impulseFace);
+  }
+
+  private startKnockout(impulseFace: 1 | -1): void {
+    if (this.knockoutForever) return;
+    this.knockoutForever=true;
+    this.knockdownPhase='flying';
+    this.knockdownTimer=0;
+    this.knockdownFlightAge=0;
+    this.attack=null;
+    this.grabPose=null;
+    this.grabRecovery=0;
+    this.queuedSolo=null;
+    this.queuedSpecial=0;
+    this.blocking=false;
+    this.crouching=false;
+    this.stunned=0;
+    this.impactVelocity=impulseFace*430;
+    this.vy=-310;
+    this.yOffset=-1;
+    this.hitFlash=.23;
   }
 
   rewardHit(spec: AttackSpec): void {
@@ -456,8 +496,13 @@ export class Fighter {
     }
     if(this.attack) {
       const a=this.attack;
-      const ratio=a.elapsed/a.spec.duration;
-      const recoil=Math.sin(Math.PI*Math.min(1,ratio));
+      // Readable wind-up, final extension on the impact frame, and follow-through.
+      // Damage does not occur until the extension reaches its endpoint.
+      const ratio=Phaser.Math.Clamp(a.elapsed/a.spec.duration,0,1);
+      const swing=ratio < .54 ? -.28*(ratio/.54) : -.28+1.28*((ratio-.54)/.46);
+      const followThrough=Phaser.Math.Clamp(
+        1-Math.max(0,a.elapsed-a.spec.duration)/ATTACK_RECOVERY,0,1);
+      const recoil=swing*followThrough;
       if(a.name==='kick') this.rightLeg.rotation=-recoil*1.5;
       else this.frontArm.rotation=-recoil*(a.name==='heavy'?2.1:1.25);
       if(a.name==='special') {
@@ -493,7 +538,7 @@ export class Fighter {
     let fallAngle=0;
     if (this.knockdownPhase==='flying') {
       fallAngle=Math.min(1,this.knockdownFlightAge/.48)*Math.PI*.47;
-    } else if (this.knockdownPhase==='prone') {
+    } else if (this.knockdownPhase==='prone' || this.knockdownPhase==='ko') {
       fallAngle=Math.PI*.47;
     } else if (this.knockdownPhase==='rising') {
       const progress=1-this.knockdownTimer/.5;
