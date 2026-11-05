@@ -21,6 +21,19 @@ npm run build
 npm run preview
 ```
 
+## Alpha 0.4.0 · Two-stage grapples and throws
+
+**New grapple:** press **X+A** together (or swipe from X into A, or from A into X, on mobile). Optional keyboard shortcuts: **G** for player 1, **Numpad3** for player 2. The input is universal for the gamepad and touchscreen without adding another on-screen button.
+
+This is intentionally **slow and counterable**:
+
+1. **Reach / grab attempt** (0.32 seconds): start within 135 world pixels of a grounded opponent. They can move out of the 90-pixel catch radius, hold **A** to interrupt, or press **X** for a quick counter.
+2. **Hold / throw preparation** (0.62 seconds): both fighters are locked close together; defender may still press **A** to break free or **X** to interrupt with a quick counter. If neither reacts, the attacker throws for **16 HP**, plus knockback and a short airborne knockdown.
+
+A successful defensive X counter damages the attacker for 3 HP. Failed grabs leave the attacker open briefly. The CPU can attempt grabs and occasionally break free. The debug hitbox overlay also shows grab reach.
+
+Existing tactical guarding rules remain: valid blocking requires standing still, retreating or retreating while crouched; heavy Y still deals 25% chip damage on a successful guard. **Inside a grapple**, pressing A or X is a dedicated escape action.
+
 ## Alpha 0.3.2 · Tactical guard and heavy chip damage
 
 Hold **A** to guard only while **standing still on the ground**, **retreating backward**, or **holding backward + down to crouch**. Backward is relative to the opponent, including when the fighters switch sides. Guard does not work while approaching, jumping, crouching without backward, stunned, or committed to a special. Guarding can cancel an ordinary attack.
@@ -62,6 +75,7 @@ Turn the phone to **landscape**. The left thumb controls a floating **8-directio
 | Action | Player 1 | Player 2 (press 2 to enable local versus) | Gamepad |
 | --- | --- | --- | --- |
 | Move / jump / crouch | WASD | Arrow keys | D-pad or left stick |
+| Grab | G or J+H (X+A) | Numpad3 or Num1+Num5 | X+A (buttons 2+0) |
 | Light attack (X) | J | Numpad 1 | X (button 2) |
 | Heavy attack (Y) | K | Numpad 2 | Y (button 3) |
 | Kick (B) | L | Numpad 4 | B (button 1) |

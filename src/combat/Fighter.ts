@@ -38,6 +38,9 @@ export class Fighter {
   crouching = false;
   walking = false;
   attack: ActiveAttack | null = null;
+  // Two-stage throw animations are controlled by the arena's grapple state.
+  grabPose: 'reach' | 'hold' | 'held' | 'throw' | null = null;
+  grabRecovery = 0;
   hitFlash = 0;
   private blockFlash = 0;
   private impactVelocity = 0;
@@ -165,6 +168,7 @@ export class Fighter {
     this.crouching=false; this.walking=false; this.attack=null;
     this.hitFlash=0; this.blockFlash=0; this.impactVelocity=0; this.time=0;
     this.queuedSolo=null; this.queuedSpecial=0;
+    this.grabPose=null; this.grabRecovery=0;
     this.draw(0);
   }
 
@@ -180,6 +184,16 @@ export class Fighter {
 
     if (this.knockedOut) { this.draw(dt); return; }
     if (this.stunned>0) this.stunned=Math.max(0,this.stunned-dt);
+
+    // A failed grab and a completed throw both have a short recovery.
+    if (this.grabRecovery > 0) {
+      this.grabRecovery = Math.max(0, this.grabRecovery-dt);
+      if (this.grabRecovery===0) this.grabPose=null;
+      this.blocking=false;this.walking=false;
+      this.advanceGravity(dt);
+      this.draw(dt);
+      return;
+    }
 
     if (this.attack) {
       this.attack.elapsed += dt;
@@ -262,12 +276,59 @@ export class Fighter {
     this.walking = move!==0 && !this.airborne;
     this.x += move*moveSpeed*dt;
     this.x = Phaser.Math.Clamp(this.x,STAGE_MIN_X,STAGE_MAX_X);
+    this.advanceGravity(dt);
+    this.draw(dt);
+  }
+
+  private advanceGravity(dt: number): void {
     if(this.airborne || this.vy!==0) {
       this.vy += 1180*dt;
       this.yOffset += this.vy*dt;
       if (this.yOffset>=0) {this.yOffset=0;this.vy=0;}
     }
+  }
+
+  /** Called while reaching or holding a target; regular attacks are suspended. */
+  stepGrapple(dt: number, opponentX: number): void {
+    this.time+=dt;
+    this.face=opponentX>=this.x?1:-1;
+    this.blocking=false;
+    this.crouching=false;
+    this.walking=false;
+    this.attack=null;
+    this.hitFlash=Math.max(0,this.hitFlash-dt);
+    this.blockFlash=Math.max(0,this.blockFlash-dt);
     this.draw(dt);
+  }
+
+  /** The defensive A or X command interrupts a grab before its throw phase. */
+  breakGrab(counterPunch: boolean): void {
+    this.grabPose=null;
+    this.attack=null;
+    this.queuedSolo=null;
+    this.queuedSpecial=0;
+    this.grabRecovery=counterPunch ? .46 : .34;
+    this.stunned=Math.max(this.stunned, counterPunch ? .25 : .12);
+    this.blocking=false;
+    if(counterPunch) {
+      this.hp=Math.max(0,this.hp-3);
+      this.hitFlash=.18;
+    }
+  }
+
+  receiveThrow(damage: number, attackerFace: 1 | -1): void {
+    this.grabPose=null;
+    this.attack=null;
+    this.blocking=false;
+    this.queuedSolo=null;
+    this.queuedSpecial=0;
+    this.hp=Math.max(0,this.hp-damage);
+    this.energy=Math.min(100,this.energy+12);
+    this.stunned=.70;
+    this.impactVelocity=attackerFace*320;
+    this.vy=-420;
+    this.yOffset=-1;
+    this.hitFlash=.18;
   }
 
   private begin(name: AttackName): void {
@@ -347,6 +408,19 @@ export class Fighter {
       } else if(a.name==='heavy') this.weapon.rotation=-recoil*1.5;
     }
     if(this.stunned>0) this.frontArm.rotation=-.5;
+    if (this.grabPose==='reach') {
+      this.frontArm.rotation=-1.30;this.backArm.rotation=-.60;
+      this.weapon.rotation=-.40;
+    } else if (this.grabPose==='hold') {
+      this.frontArm.rotation=-1.85;this.backArm.rotation=-1.25;
+      this.weapon.rotation=-1.10;
+    } else if (this.grabPose==='held') {
+      this.frontArm.rotation=.90;this.backArm.rotation=.40;
+      this.body.y=5;
+    } else if (this.grabPose==='throw') {
+      this.frontArm.rotation=-2.60;this.backArm.rotation=-2.10;
+      this.body.y=-9;
+    }
     this.rig.setPosition(this.x,GROUND_Y+this.yOffset);
     this.rig.setScale(this.face,1);
     this.rig.alpha=this.knockedOut ? .65 : 1;

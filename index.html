@@ -10,7 +10,7 @@
 <body>
 <main class="site">
   <header class="topbar">
-    <div class="brand"><span class="star">✦</span><span><strong>THE SPLASH</strong><small>OF FIGHTING · ALPHA 0.3.2</small></span></div>
+    <div class="brand"><span class="star">✦</span><span><strong>THE SPLASH</strong><small>OF FIGHTING · ALPHA 0.4.0</small></span></div>
     <div class="top-actions"><span class="online">● LOCAL ARCADE</span><button id="btn-fullscreen" title="На весь екран" aria-label="На весь екран">⛶</button></div>
   </header>
   <section class="game-shell" aria-label="Арена">
@@ -26,7 +26,7 @@
             <span class="joystick-thumb"><span class="joystick-thumb-inner"></span></span>
           </div>
         </div>
-        <div class="touch-attacks" role="group" aria-label="ABXY: X швидкий удар, Y сильний удар, B нога, A блок; B+Y двома пальцями або проведенням пальця між B та Y">
+        <div class="touch-attacks" role="group" aria-label="ABXY: X швидкий удар, Y сильний удар, B нога, A блок; B+Y спецприйом, X+A захват">
           <button type="button" data-control="heavy" class="attack heavy" aria-label="Y: сильний удар рукою">Y</button>
           <button type="button" data-control="light" class="attack light" aria-label="X: швидкий удар рукою">X</button>
           <button type="button" data-control="kick" class="attack kick" aria-label="B: удар ногою">B</button>
@@ -40,7 +40,7 @@
     <div class="toolbar-group"><button id="btn-cpu" class="pill selected">⚡ Проти CPU</button><button id="btn-versus" class="pill">🎮 Два гравці</button></div>
     <div class="toolbar-group"><button id="btn-debug" class="pill">▣ Хітбокси: викл.</button><button id="btn-restart" class="pill primary">↻ Новий раунд</button></div>
   </section>
-  <div class="details"><p id="game-status" aria-live="polite">Готуємо арену…</p><details><summary>⌨ Керування</summary><p><b>Гравець 1:</b> WASD рух, J (X) швидкий, K (Y) сильний, L (B) нога, H (A) блок, K+L або I спецприйом. Space також стрибок.</p><p><b>Гравець 2:</b> стрілки рух, Num1 (X), Num2 (Y), Num4 (B), Num5 (A), Num2+Num4 або Num6 спецприйом.</p><p><b>Геймпад:</b> стік / D-pad рух, A блок, B удар ногою, X легкий, Y сильний; B+Y або R1 спецприйом.</p><p><b>Телефон:</b> джойстик зліва (вгору для стрибка), справа ромб ABXY: X швидкий, Y сильний, B нога, A блок. Спецприйом: B+Y двома пальцями або проведи одним пальцем від B до Y (чи навпаки), потрібна енергія. <b>Блок:</b> A діє лише на місці або під час відступу, зокрема вниз + назад навприсядки. При русі вперед і стрибку блок не працює. Сильний Y завдає 25% шкоди крізь блок. <b>Інше:</b> R рестарт, H хітбокси, 1/2 режим.</p></details></div>
+  <div class="details"><p id="game-status" aria-live="polite">Готуємо арену…</p><details><summary>⌨ Керування</summary><p><b>Гравець 1:</b> WASD рух, J (X) швидкий, K (Y) сильний, L (B) нога, H (A) блок, J+H або G захват, K+L або I спецприйом. Space також стрибок.</p><p><b>Гравець 2:</b> стрілки рух, Num1 (X), Num2 (Y), Num4 (B), Num5 (A), Num1+Num5 або Num3 захват, Num2+Num4 або Num6 спецприйом.</p><p><b>Геймпад:</b> стік / D-pad рух, A блок, B удар ногою, X легкий, Y сильний; B+Y або R1 спецприйом, X+A захват.</p><p><b>Телефон:</b> джойстик зліва (вгору для стрибка), справа ромб ABXY: X швидкий, Y сильний, B нога, A блок. Спецприйом: B+Y двома пальцями або проведи одним пальцем від B до Y (чи навпаки), потрібна енергія. <b>Захват:</b> X+A (або проведи пальцем X↔A) біля суперника: спершу захват, потім кидок. Суперник може звільнитися A або X. Клавіатура: G / Num3. <b>Блок:</b> A діє лише на місці або під час відступу, зокрема вниз + назад навприсядки. При русі вперед і стрибку блок не працює. Сильний Y завдає 25% шкоди крізь блок. <b>Інше:</b> R рестарт, H хітбокси, 1/2 режим.</p></details></div>
   <footer>FIRST PLAYABLE · EVI × NARA · WORK IN PROGRESS</footer>
 </main>
 <script type="module" src="/src/main.ts"></script>

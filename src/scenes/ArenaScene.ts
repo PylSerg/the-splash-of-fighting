@@ -3,6 +3,18 @@ import { Controls, emptyInput, type InputState } from '../input/Controls';
 import { Fighter, GROUND_Y } from '../combat/Fighter';
 
 type GameMode = 'cpu' | 'versus';
+interface Grapple {
+  attacker: Fighter;
+  defender: Fighter;
+  phase: 'reach' | 'hold';
+  elapsed: number;
+}
+// Slow, readable two-stage throw: reach first, then a counterable hold.
+const GRAB_REACH_TIME = .32;
+const GRAB_HOLD_TIME = .62;
+const GRAB_MAX_START = 135;
+const GRAB_CATCH_RANGE = 90;
+const THROW_DAMAGE = 16;
 const STEP = 1/60;
 const ZERO = () => emptyInput();
 
@@ -37,6 +49,7 @@ export class ArenaScene extends Phaser.Scene {
   private aiCooldown = .85;
   private aiCount = 0;
   private frameCount = 0;
+  private grapple: Grapple | null = null;
 
   constructor(controls: Controls, onStatus: (message: string) => void) {
     super({ key: 'Arena' });
@@ -65,7 +78,7 @@ export class ArenaScene extends Phaser.Scene {
       fontFamily:'Rajdhani, sans-serif',fontSize:'15px',color:'#bb9dbb',fontStyle:'bold',
     }).setOrigin(.5).setDepth(10);
     this.paintHud();
-    this.onStatus('Готово! Еві проти Нари. Рух: WASD, удари: J/K/U/I.');
+    this.onStatus('Готово! ABXY · захват X+A (G), вихід із захвату A або X.');
   }
 
   private drawStage(): void {
@@ -141,6 +154,7 @@ export class ArenaScene extends Phaser.Scene {
     this.nara.reset(710,-1);
     this.prev1=ZERO();this.prev2=ZERO();
     this.readyTime=1.5;this.roundTime=99;this.roundOver=false;
+    this.grapple=null;
     this.aiCooldown=.85;this.aiCount=0;this.frameCount=0;this.accumulator=0;
     this.centerLabel.setText('READY?').setColor('#fff0c0').setVisible(true);
     this.paintHud();
@@ -175,21 +189,150 @@ export class ArenaScene extends Phaser.Scene {
     const just1=justPressed(input1,this.prev1);
     const just2=justPressed(input2,this.prev2);
     this.prev1=input1;this.prev2=input2;
-    this.evi.step(dt,input1,just1,this.nara.x);
-    this.nara.step(dt,input2,just2,this.evi.x);
-    this.preventOverlap();
-    this.resolveStrike(this.evi,this.nara);
-    this.resolveStrike(this.nara,this.evi);
+
+    if (!this.grapple) {
+      const p1CanGrab = just1.grab && this.canBeginGrab(this.evi,this.nara);
+      const p2CanGrab = just2.grab && this.canBeginGrab(this.nara,this.evi);
+      if (p1CanGrab && p2CanGrab) {
+        // Simultaneous grabs clash; neither fighter gets a free throw.
+        this.evi.grabRecovery=.24;this.nara.grabRecovery=.24;
+        this.combatNotice('CLASH!',480,230,0xf7cf9b);
+      } else if (p1CanGrab) this.beginGrab(this.evi,this.nara);
+      else if (p2CanGrab) this.beginGrab(this.nara,this.evi);
+    }
+    if (this.grapple) {
+      this.progressGrab(dt,input1,input2,just1,just2);
+    } else {
+      this.evi.step(dt,input1,just1,this.nara.x);
+      this.nara.step(dt,input2,just2,this.evi.x);
+      this.preventOverlap();
+      this.resolveStrike(this.evi,this.nara);
+      this.resolveStrike(this.nara,this.evi);
+    }
 
     if(this.evi.knockedOut||this.nara.knockedOut||this.roundTime<=0){
       this.finishRound();
     }
   }
 
+  private canBeginGrab(attacker: Fighter, defender: Fighter): boolean {
+    return !attacker.knockedOut && !defender.knockedOut &&
+      attacker.stunned<=0 && defender.stunned<=0 &&
+      !attacker.airborne && !defender.airborne &&
+      attacker.grabRecovery<=0 &&
+      attacker.attack?.name!=='special' &&
+      Math.abs(attacker.x-defender.x)<=GRAB_MAX_START;
+  }
+
+  private beginGrab(attacker: Fighter, defender: Fighter): void {
+    // The short windup is visible and still allows the defender to react.
+    attacker.attack=null;
+    attacker.grabPose='reach';
+    this.grapple={attacker,defender,phase:'reach',elapsed:0};
+    this.onStatus((attacker.id==='evi'?'Еві':'Нара')+
+      ' тягнеться до суперника! A (блок) або X (швидкий удар) зривають захват.');
+    this.combatNotice('GRAB!', (attacker.x+defender.x)/2,290,0xd4b3f5);
+  }
+
+  private stopGrab(counter: boolean): void {
+    const grapple=this.grapple;
+    if (!grapple) return;
+    grapple.attacker.breakGrab(counter);
+    grapple.defender.grabPose=null;
+    this.grapple=null;
+    this.combatNotice(counter?'COUNTER!':'BREAK!',(grapple.attacker.x+grapple.defender.x)/2,260,
+      counter?0xffd1a4:0x9cf3eb);
+    this.onStatus(counter
+      ? 'Захват перервано швидким ударом X! Атакувальний втрачає 3 HP.'
+      : 'Захват перервано блоком A!');
+  }
+
+  private progressGrab(
+    dt: number, input1: InputState, input2: InputState,
+    just1: InputState, just2: InputState
+  ): void {
+    const g=this.grapple;
+    if (!g) return;
+    const defenderInput=g.defender===this.evi?input1:input2;
+    const defenderJust=g.defender===this.evi?just1:just2;
+    const wasFastAttacking=g.defender.attack?.name==='light';
+    if (defenderInput.block || defenderJust.light || wasFastAttacking) {
+      this.stopGrab(defenderJust.light || wasFastAttacking);
+      return;
+    }
+
+    g.elapsed+=dt;
+    if(g.phase==='reach') {
+      const defenderInputNow=defenderInput;
+      const defenderJustNow=defenderJust;
+      g.attacker.stepGrapple(dt,g.defender.x);
+      g.defender.step(dt,defenderInputNow,defenderJustNow,g.attacker.x);
+      // Other regular attacks can hit a reaching opponent before capture.
+      this.resolveStrike(g.defender,g.attacker);
+      if (g.attacker.stunned>0 || g.attacker.knockedOut) {
+        this.stopGrab(false);
+        return;
+      }
+      if(g.elapsed>=GRAB_REACH_TIME) {
+        if(Math.abs(g.attacker.x-g.defender.x)>GRAB_CATCH_RANGE ||
+           g.defender.airborne || g.defender.knockedOut) {
+          g.attacker.breakGrab(false);
+          this.grapple=null;
+          this.onStatus('Захват не вдався: суперник відійшов від рук.');
+          return;
+        }
+        g.phase='hold';
+        g.elapsed=0;
+        g.attacker.grabPose='hold';
+        g.defender.grabPose='held';
+        this.onStatus('ЗАХВАТ! Є час вирватися: тримай A або натисни X.');
+        this.combatNotice('CAUGHT!',(g.attacker.x+g.defender.x)/2,255,0xffd4ad);
+      }
+      return;
+    }
+
+    // During the hold both fighters are fixed at close range.
+    // This provides a visible escape window instead of an instant throw.
+    g.defender.x=Phaser.Math.Clamp(g.attacker.x+g.attacker.face*47,64,896);
+    g.attacker.stepGrapple(dt,g.defender.x);
+    g.defender.stepGrapple(dt,g.attacker.x);
+    if(g.elapsed>=GRAB_HOLD_TIME) {
+      const face=g.attacker.face;
+      g.defender.receiveThrow(THROW_DAMAGE,face);
+      g.attacker.grabPose='throw';
+      g.attacker.grabRecovery=.40;
+      g.defender.grabPose=null;
+      g.attacker.energy=Math.min(100,g.attacker.energy+12);
+      this.spawnSparks(g.defender.x,GROUND_Y-110,false);
+      this.cameras.main.shake(120,.006);
+      this.combatNotice('THROW!',g.defender.x,240,0xffd29b);
+      this.onStatus((g.attacker.id==='evi'?'Еві':'Нара')+
+        ' виконує кидок! -'+THROW_DAMAGE+' HP.');
+      this.grapple=null;
+    }
+  }
+
+  private combatNotice(text: string,x: number,y: number,color: number): void {
+    const label=this.add.text(x,y,text,{
+      fontFamily:'Rajdhani, Arial, sans-serif',fontSize:'43px',fontStyle:'bold',
+      color:'#ffffff',stroke:'#27233a',strokeThickness:7,
+    }).setOrigin(.5).setTint(color).setDepth(18);
+    this.tweens.add({
+      targets:label,y:y-38,alpha:0,duration:630,ease:'Quad.easeOut',
+      onComplete:()=>label.destroy(),
+    });
+  }
+
   private cpuInput(dt: number): InputState {
     const input=emptyInput();
     const distance=Math.abs(this.evi.x-this.nara.x);
     const forward=this.evi.x>this.nara.x?'right':'left';
+    if(this.grapple?.defender===this.nara) {
+      // The CPU sometimes reacts in time, but not on every attempt.
+      if (this.grapple.phase==='hold' && this.grapple.elapsed>.22 &&
+          this.aiCount%3!==0) input.block=true;
+      return input;
+    }
     if(this.nara.stunned>0||this.nara.knockedOut)return input;
     if(distance>130)input[forward]=true;
     else if(distance<75 && this.aiCount%5===0)input.block=true;
@@ -205,7 +348,8 @@ export class ArenaScene extends Phaser.Scene {
     if(this.aiCooldown<=0){
       this.aiCount++;
       this.aiCooldown=.52+((this.aiCount*17)%9)*.09;
-      if(distance<210 && this.nara.energy>=40 && this.aiCount%5===0)input.special=true;
+      if(distance<115 && this.aiCount%6===3) input.grab=true;
+      else if(distance<210 && this.nara.energy>=40 && this.aiCount%5===0)input.special=true;
       else if(distance<141) {
         const choice=this.aiCount%3;
         if(choice===0)input.light=true;
@@ -295,6 +439,11 @@ export class ArenaScene extends Phaser.Scene {
     if(!this.debugDraw)return;
     this.debugDraw.clear();
     if(!this.debug)return;
+    if(this.grapple?.phase==='reach') {
+      const a=this.grapple.attacker;
+      this.debugDraw.lineStyle(2,0xf7ca89,.8)
+        .strokeCircle(a.x,GROUND_Y-73,GRAB_CATCH_RANGE);
+    }
     for(const fighter of [this.evi,this.nara]){
       const rect=fighter.bodyBox();
       this.debugDraw.lineStyle(2,0x56f3a4,.9).strokeRect(rect.x,rect.y,rect.w,rect.h);

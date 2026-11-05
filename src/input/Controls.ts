@@ -1,23 +1,23 @@
-export type Action = 'left' | 'right' | 'up' | 'down' | 'jump' | 'light' | 'heavy' | 'kick' | 'block' | 'special';
+export type Action = 'left' | 'right' | 'up' | 'down' | 'jump' | 'light' | 'heavy' | 'kick' | 'block' | 'grab' | 'special';
 export type InputState = Record<Action, boolean>;
 type Direction = 'left' | 'right' | 'up' | 'down';
 
-const ACTIONS: Action[] = ['left', 'right', 'up', 'down', 'jump', 'light', 'heavy', 'kick', 'block', 'special'];
+const ACTIONS: Action[] = ['left', 'right', 'up', 'down', 'jump', 'light', 'heavy', 'kick', 'block', 'grab', 'special'];
 const DIRECTIONS: Direction[] = ['left', 'right', 'up', 'down'];
 
 export const emptyInput = (): InputState => ({
   left: false, right: false, up: false, down: false, jump: false,
-  light: false, heavy: false, kick: false, block: false, special: false,
+  light: false, heavy: false, kick: false, block: false, grab: false, special: false,
 });
 
 const KEYMAPS: Record<Action, string>[] = [
   {
     left: 'KeyA', right: 'KeyD', up: 'KeyW', down: 'KeyS', jump: 'Space',
-    light: 'KeyJ', heavy: 'KeyK', kick: 'KeyL', block: 'KeyH', special: 'KeyI',
+    light: 'KeyJ', heavy: 'KeyK', kick: 'KeyL', block: 'KeyH', grab: 'KeyG', special: 'KeyI',
   },
   {
     left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown', jump: 'Numpad0',
-    light: 'Numpad1', heavy: 'Numpad2', kick: 'Numpad4', block: 'Numpad5', special: 'Numpad6',
+    light: 'Numpad1', heavy: 'Numpad2', kick: 'Numpad4', block: 'Numpad5', grab: 'Numpad3', special: 'Numpad6',
   },
 ];
 
@@ -39,6 +39,7 @@ function gamepadInput(pad: Gamepad | null): InputState {
   state.light = held(2);
   state.heavy = held(3);
   state.special = held(5) || (state.kick && state.heavy);
+  state.grab = state.light && state.block; // X+A: grapple
   state.jump = held(4); // Optional LB/L1 jump; stick up remains the primary jump control.
   return state;
 }
@@ -57,6 +58,9 @@ export class Controls {
   private comboSwipePointers = new Set<number>();
   // Preserve fast swipes long enough for the next 60Hz simulation sample.
   private comboSwipePulseUntil = 0;
+  // X<->A swipe uses an independent pointer and a brief input pulse.
+  private grabSwipePointers = new Set<number>();
+  private grabSwipePulseUntil = 0;
 
   private joystickPointer: number | null = null;
   // Directional state is owned by the joystick pointer, never by attack pointers.
@@ -188,22 +192,30 @@ export class Controls {
       // This does not interfere with a second finger or with the joystick.
       button.addEventListener('pointermove', event => {
         if (this.touches.get(event.pointerId) !== action) return;
-        const other = action === 'kick' ? 'heavy' : action === 'heavy' ? 'kick' : null;
-        if (!other || this.comboSwipePointers.has(event.pointerId)) return;
+        const other = action === 'kick' ? 'heavy' :
+          action === 'heavy' ? 'kick' :
+          action === 'light' ? 'block' :
+          action === 'block' ? 'light' : null;
+        if (!other) return;
+        const isSpecial = action === 'kick' || action === 'heavy';
+        const pointers = isSpecial ? this.comboSwipePointers : this.grabSwipePointers;
+        if (pointers.has(event.pointerId)) return;
         const partner = this.buttons.get(other);
         if (!partner) return;
         const rect = partner.getBoundingClientRect();
         const tolerance = 9;
         if (event.clientX >= rect.left - tolerance && event.clientX <= rect.right + tolerance &&
             event.clientY >= rect.top - tolerance && event.clientY <= rect.bottom + tolerance) {
-          this.comboSwipePointers.add(event.pointerId);
-          this.comboSwipePulseUntil = performance.now() + 220;
+          pointers.add(event.pointerId);
+          if (isSpecial) this.comboSwipePulseUntil = performance.now() + 220;
+          else this.grabSwipePulseUntil = performance.now() + 220;
           this.updateVisuals();
         }
       });
       const release = (event: PointerEvent) => {
         this.touches.delete(event.pointerId);
         this.comboSwipePointers.delete(event.pointerId);
+        this.grabSwipePointers.delete(event.pointerId);
         this.updateVisuals();
       };
       button.addEventListener('pointerup', release);
@@ -218,8 +230,11 @@ export class Controls {
     for (const [action, button] of this.buttons) {
       button.classList.toggle('pressed', pressed.has(action));
     }
-    document.querySelector('.touch-attacks')?.classList.toggle('combo-active',
+    const diamond = document.querySelector('.touch-attacks');
+    diamond?.classList.toggle('combo-active',
       (pressed.has('kick') && pressed.has('heavy')) || this.comboSwipePointers.size > 0);
+    diamond?.classList.toggle('grab-active',
+      (pressed.has('light') && pressed.has('block')) || this.grabSwipePointers.size > 0);
   }
 
   clear(): void {
@@ -227,6 +242,8 @@ export class Controls {
     this.touches.clear();
     this.comboSwipePointers.clear();
     this.comboSwipePulseUntil=0;
+    this.grabSwipePointers.clear();
+    this.grabSwipePulseUntil=0;
     this.releaseJoystick();
     this.updateVisuals();
   }
@@ -258,8 +275,13 @@ export class Controls {
     // Touchscreen: a single thumb swipe B<->Y produces the same special
     // signal as the two-finger chord. No additional visible button is needed.
     state.special ||= state.kick && state.heavy;
-    if (player === 0 && (this.comboSwipePointers.size > 0 ||
-        performance.now() < this.comboSwipePulseUntil)) state.special = true;
+    state.grab ||= state.light && state.block;
+    if (player === 0) {
+      if (this.comboSwipePointers.size > 0 ||
+          performance.now() < this.comboSwipePulseUntil) state.special = true;
+      if (this.grabSwipePointers.size > 0 ||
+          performance.now() < this.grabSwipePulseUntil) state.grab = true;
+    }
     return state;
   }
 }
