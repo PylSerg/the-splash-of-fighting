@@ -43,7 +43,7 @@ export class Fighter {
   private time = 0;
 
   readonly rig: Phaser.GameObjects.Container;
-  private shadow: Phaser.GameObjects.Arc;
+  private shadow: Phaser.GameObjects.Ellipse;
   private cape: Phaser.GameObjects.Graphics;
   private leftLeg: Phaser.GameObjects.Graphics;
   private rightLeg: Phaser.GameObjects.Graphics;
