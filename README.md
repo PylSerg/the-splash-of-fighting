@@ -21,6 +21,10 @@ npm run build
 npm run preview
 ```
 
+## Alpha 1.1.1 · Mirrored PvP ready buttons
+
+The **✓ Готово P1** control is now anchored near the **left outside edge** of the P1 selection half, as indicated by the mobile screenshot; **✓ Готово P2** stays near the **right outside edge** of P2's half. The buttons no longer cover the center-aligned character names or subtitles. Small-screen CSS explicitly preserves the outer-edge placement and reserves room for the buttons.
+
 ## Alpha 1.1.0 · Simultaneous split-screen fighter selection
 
 The full-screen character selection now follows the original two-fighter sketch:

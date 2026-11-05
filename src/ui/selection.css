@@ -553,3 +553,35 @@
   .dual-select-actions .cinematic-confirm,
   .dual-select-actions .cinematic-reset{font-size:13px;padding:6px 8px}
 }
+
+/* Alpha 1.1.1: PvP ready buttons belong to their player's OUTER edge.
+ * P1 previously sat next to the central VS divider and covered the name.
+ * Keep the P2 control mirrored on the opposite side. */
+.dual-fighter-viewport .pick-one .fighter-pick-caption .pick-ready {
+  position:absolute;
+  left:clamp(12px,2.2vw,34px);
+  right:auto;
+  bottom:0;
+}
+.dual-fighter-viewport .pick-two .fighter-pick-caption .pick-ready {
+  position:absolute;
+  left:auto;
+  right:clamp(12px,2.2vw,34px);
+  bottom:0;
+}
+@media(max-width:600px){
+  /* Override the old static small-screen button positioning. */
+  .dual-fighter-viewport .fighter-pick-caption {
+    padding-bottom:clamp(27px,5.6dvh,36px);
+  }
+  .dual-fighter-viewport .pick-one .fighter-pick-caption .pick-ready {
+    left:4px;
+    right:auto;
+    bottom:0;
+  }
+  .dual-fighter-viewport .pick-two .fighter-pick-caption .pick-ready {
+    left:auto;
+    right:4px;
+    bottom:0;
+  }
+}
