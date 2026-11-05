@@ -122,6 +122,8 @@ function showMenu(origin:'home'|'battle', tab:MenuTab='game'): void {
   controls.clear();
   game.scene.pause('Arena');
   menuContext.textContent=origin==='home'?'Налаштування гри':'Бій зупинено';
+  get<HTMLElement>('#pause-title').innerHTML=origin==='home'
+    ? 'НАЛАШТУВАННЯ <span>⚙</span>' : 'ПАУЗА <span>Ⅱ</span>';
   resumeButton.textContent=origin==='home'?'← На головну':'▶ Продовжити';
   for(const id of ['#btn-restart','#btn-choose-characters','#btn-choose-stage']){
     get<HTMLButtonElement>(id).disabled=origin==='home';
@@ -197,13 +199,14 @@ function backFromStage(): void {
 function startBattle(pair:Pair,id:StageId): void {
   activeStage=id;
   activePair={...pair};
+  menuOrigin='battle';
   arena.setArena(id);
   arena.setMatchup(pair.first,pair.second,pair.mode);
   updateAvatars(pair.first,pair.second);
   resumeBattle();
 }
 function restart(): void {
-  if(!activePair||menuOrigin==='home') return;
+  if(!activePair || screen==='home') return;
   arena.resetRound(); // Keeps the current characters and arena.
   resumeBattle();
 }
