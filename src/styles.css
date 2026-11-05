@@ -283,3 +283,94 @@ button:focus-visible,summary:focus-visible{outline:3px solid #7bd3f9;outline-off
 @media(max-width:580px){
   .touch-setting-grid{grid-template-columns:1fr}
 }
+
+/* Alpha 0.8.0: portraits anchor to the logical 540px-high combat HUD. */
+.hud-portraits{position:absolute;inset:0;z-index:3;pointer-events:none}
+.hud-avatar{
+  position:absolute;top:calc(16px * var(--hud-scale,1));
+  width:calc(77px * var(--hud-scale,1));height:calc(77px * var(--hud-scale,1));
+  overflow:hidden;border-radius:calc(13px * var(--hud-scale,1));
+  border:calc(2px * var(--hud-scale,1)) solid var(--avatar-color,#eab0de);
+  background:#1c2343;
+  box-shadow:0 0 0 2px #1a213bda,0 2px 16px color-mix(in srgb,var(--avatar-color,#eab0de) 45%, transparent);
+}
+.hud-avatar-left{left:calc(16px * var(--hud-scale,1))}
+.hud-avatar-right{right:calc(16px * var(--hud-scale,1))}
+.hud-avatar svg{display:block;width:100%;height:100%}
+
+/* Full-screen roster; combat does not tick until a pair is confirmed. */
+.character-select{
+  position:absolute;inset:0;z-index:20;display:grid;place-items:center;
+  padding:clamp(7px,1.75vmin,19px);
+  background:radial-gradient(ellipse 75% 110% at 50% 40%,#50326eeb 0%,#1d2446f3 59%,#0d142ff7 100%);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+}
+.select-panel{
+  width:min(770px,100%);max-height:100%;overflow:auto;
+  border:1px solid #adadd36e;border-radius:20px;
+  padding:clamp(12px,2.3vmin,22px);
+  background:linear-gradient(135deg,#30335adf,#1a203cfa 60%,#2b2248e8);
+  box-shadow:0 18px 65px #04071ac2,inset 0 1px #ffffff29;
+  scrollbar-width:thin;scrollbar-color:#9d86bf #25254e;
+}
+.select-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.select-eyebrow{font:700 11px Rajdhani,sans-serif;color:#b4f0db;letter-spacing:1.4px}
+.select-heading h1{
+  margin:3px 0;font:700 clamp(27px,5.2vmin,46px)/1 Rajdhani,system-ui,sans-serif;
+  letter-spacing:.7px;color:#ffe0f2
+}
+.select-heading h1 span{color:#9fefd9}
+.select-heading p{margin:4px 0 7px;font-size:13px;color:#d5dcf4}
+.select-mode-row{display:flex;gap:8px;flex-wrap:wrap;margin:5px 0 12px}
+.select-mode-row .pill{font-size:13px;padding:7px 16px}
+.select-roster{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(225px,1fr));
+  gap:12px;margin-bottom:11px;
+}
+.character-card{
+  min-width:0;display:flex;align-items:center;text-align:left;gap:12px;
+  padding:10px;border-radius:17px;
+  border:2px solid color-mix(in srgb,var(--character-accent) 60%,#7279a3);
+  color:#fff;background:linear-gradient(135deg,#4540669c,#192842b8);
+  box-shadow:0 6px 24px #090c28ad,inset 0 1px #ffffff14;
+  transition:background .15s,transform .15s,border-color .15s,box-shadow .15s;
+}
+.character-card:not(:disabled):active{transform:scale(.98)}
+.character-card:not(:disabled):hover{background:#4a3f6bbd;box-shadow:0 0 25px color-mix(in srgb,var(--character-accent) 24%,transparent)}
+.character-card:disabled{cursor:not-allowed;opacity:.57}
+.character-card.chosen-p1,.character-card.chosen-p2{
+  border-color:#fff9e8;box-shadow:0 0 0 2px color-mix(in srgb,var(--character-accent) 70%,transparent),0 0 28px color-mix(in srgb,var(--character-accent) 30%,transparent)
+}
+.character-card.chosen-p2{border-color:#9dfff1}
+.character-card-portrait{display:block;flex:0 0 auto;width:clamp(66px,12vmin,109px);height:clamp(66px,12vmin,109px);border-radius:12px;overflow:hidden}
+.character-card-portrait svg{display:block;width:100%;height:100%}
+.character-card-info{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
+.character-card-info strong{font:700 clamp(21px,4vmin,32px) Rajdhani,sans-serif;color:#fff5ff}
+.character-card-info small{font:600 11px Inter,sans-serif;color:#cbd5f1}
+.character-card-marker{
+  align-self:flex-start;font:700 15px Rajdhani,sans-serif;
+  color:var(--character-accent);white-space:nowrap
+}
+.select-footer{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:9px;border-top:1px solid #8c96bd55;padding-top:9px}
+.select-lineup{font:700 15px Rajdhani,sans-serif;color:#f5def8;letter-spacing:.3px}
+.select-buttons{display:flex;gap:6px;flex-wrap:wrap}
+.select-buttons .pill{padding:9px 11px}
+.pill:disabled{opacity:.45;cursor:not-allowed;filter:grayscale(.5)}
+@media(max-height:470px){
+ .select-panel{padding:9px 15px;border-radius:12px}
+ .select-heading h1{font-size:29px;margin:1px 0}
+ .select-heading p{font-size:11px;margin:2px 0 4px}
+ .select-eyebrow{font-size:9px}
+ .select-mode-row{margin:4px 0 7px}
+ .select-roster{gap:8px;margin-bottom:7px}
+ .character-card{padding:6px 9px;gap:8px;border-radius:11px}
+ .character-card-portrait{width:clamp(58px,12vmin,79px);height:clamp(58px,12vmin,79px)}
+ .character-card-info strong{font-size:22px}
+ .character-card-info small{font-size:10px}
+ .select-footer{padding-top:6px}
+ .select-buttons .pill{padding:6px 9px}
+}
+@media(max-width:570px){
+ .select-roster{grid-template-columns:1fr}
+ .select-heading h1{font-size:25px}
+}

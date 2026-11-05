@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { Controls, emptyInput, type InputState } from '../input/Controls';
-import { Fighter, GROUND_Y, STAGE_MIN_X, STAGE_MAX_X, setStageViewportWidth } from '../combat/Fighter';
+import { Fighter, GROUND_Y, STAGE_MIN_X, STAGE_MAX_X, setStageViewportWidth, type FighterId } from '../combat/Fighter';
+import { getCharacter } from '../characters/Roster';
 
 type GameMode = 'cpu' | 'versus';
 interface Grapple {
@@ -32,8 +33,9 @@ function overlap(a: {x:number;y:number;w:number;h:number}, b: {x:number;y:number
 export class ArenaScene extends Phaser.Scene {
   private controls: Controls;
   private onStatus: (message: string) => void;
-  private evi!: Fighter;
-  private nara!: Fighter;
+  private player1!: Fighter;
+  private player2!: Fighter;
+  private hasMatch = false;
   private prev1 = ZERO();
   private prev2 = ZERO();
   private mode: GameMode = 'cpu';
@@ -62,13 +64,13 @@ export class ArenaScene extends Phaser.Scene {
 
   create(): void {
     this.drawStage();
-    this.evi = new Fighter(this,'evi',250,1);
-    this.nara = new Fighter(this,'nara',710,-1);
+    this.player1 = new Fighter(this,'evi',250,1);
+    this.player2 = new Fighter(this,'nara',710,-1);
     this.debugDraw = this.add.graphics().setDepth(12);
     this.hud = this.add.graphics().setDepth(20);
     const labelStyle = {fontFamily:'Rajdhani, Arial, sans-serif',fontSize:'27px',color:'#f7f4ff',fontStyle:'bold',stroke:'#12132d',strokeThickness:4};
-    this.leftName = this.add.text(39,11,'EVI',labelStyle).setDepth(21);
-    this.rightName = this.add.text(918,11,'NARA',labelStyle).setOrigin(1,0).setDepth(21);
+    this.leftName = this.add.text(112,11,'ЕВІ',labelStyle).setDepth(21);
+    this.rightName = this.add.text(848,11,'НАРА',labelStyle).setOrigin(1,0).setDepth(21);
     this.timeLabel = this.add.text(480,25,'99',{
       fontFamily:'Rajdhani, Arial, sans-serif',fontSize:'42px',color:'#ffe7a6',fontStyle:'bold',
       stroke:'#251e3a',strokeThickness:5,
@@ -93,8 +95,8 @@ export class ArenaScene extends Phaser.Scene {
     setStageViewportWidth(screenWidth);
     this.cameras.main.setViewport(0,0,screenWidth,540);
     this.cameras.main.setScroll(-this.extraHalf,0);
-    if (this.leftName) this.leftName.x = 39 - this.extraHalf;
-    if (this.rightName) this.rightName.x = 918 + this.extraHalf;
+    if (this.leftName) this.leftName.x = 112 - this.extraHalf;
+    if (this.rightName) this.rightName.x = 848 + this.extraHalf;
     this.paintHud();
     this.paintDebug();
   }
@@ -149,14 +151,30 @@ export class ArenaScene extends Phaser.Scene {
     }).setOrigin(.5).setDepth(-5);
   }
 
-  setMode(mode: GameMode): void {
+  /**
+   * Construct each roster choice in its correct player slot, independent
+   * of character identity. Only valid, unique pairs may enter a round.
+   */
+  setMatchup(first: FighterId, second: FighterId, mode: GameMode): void {
+    if (first === second) throw new Error('A mirror match is not allowed.');
+    this.player1?.destroy();
+    this.player2?.destroy();
+    this.player1=new Fighter(this,first,250,1);
+    this.player2=new Fighter(this,second,710,-1);
     this.mode=mode;
+    this.hasMatch=true;
+    this.leftName.setText(getCharacter(first).name);
+    this.rightName.setText(getCharacter(second).name);
     this.resetRound();
     this.onStatus(mode==='cpu'
-      ? 'Режим: гра проти Нари (CPU).'
-      : 'Режим: 2 гравці. Другий гравець: стрілки та Num1/2/4/5.');
+      ? getCharacter(first).name+' проти '+getCharacter(second).name+' (CPU)!'
+      : getCharacter(first).name+' проти '+getCharacter(second).name+' (PvP)!');
   }
 
+  setMode(mode: GameMode): void {
+    this.mode=mode;
+    if (this.hasMatch) this.resetRound();
+  }
   getMode(): GameMode { return this.mode; }
 
   setDebug(next: boolean): void {
@@ -168,10 +186,10 @@ export class ArenaScene extends Phaser.Scene {
   getDebug(): boolean { return this.debug; }
 
   resetRound(): void {
-    if(!this.evi||!this.nara)return;
+    if(!this.player1||!this.player2)return;
     this.controls.clear();
-    this.evi.reset(250,1);
-    this.nara.reset(710,-1);
+    this.player1.reset(250,1);
+    this.player2.reset(710,-1);
     this.prev1=ZERO();this.prev2=ZERO();
     this.readyTime=1.5;this.roundTime=99;this.roundOver=false;
     this.grapple=null;
@@ -181,7 +199,8 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
-    if(!this.evi||!this.nara)return;
+    // The initial character selector must not advance simulation or AI.
+    if(!this.hasMatch||!this.player1||!this.player2)return;
     // Fixed 60Hz simulation: frame windows do not depend on the display refresh rate.
     this.accumulator+=Math.min(delta/1000,.10);
     let frames=0;
@@ -210,10 +229,10 @@ export class ArenaScene extends Phaser.Scene {
     }
     // Once someone has 0 HP, freeze the remaining fight and let the KO fall
     // finish before displaying the winner. There can be no extra attacks.
-    if(this.evi.knockedOut || this.nara.knockedOut) {
+    if(this.player1.knockedOut || this.player2.knockedOut) {
       this.advanceFallenFighters(dt);
-      if((!this.evi.knockedOut || this.evi.knockoutSettled) &&
-         (!this.nara.knockedOut || this.nara.knockoutSettled)) this.finishRound();
+      if((!this.player1.knockedOut || this.player1.knockoutSettled) &&
+         (!this.player2.knockedOut || this.player2.knockoutSettled)) this.finishRound();
       return;
     }
     this.roundTime=Math.max(0,this.roundTime-dt);
@@ -224,23 +243,23 @@ export class ArenaScene extends Phaser.Scene {
     this.prev1=input1;this.prev2=input2;
 
     if (!this.grapple) {
-      const p1CanGrab = just1.grab && this.canBeginGrab(this.evi,this.nara);
-      const p2CanGrab = just2.grab && this.canBeginGrab(this.nara,this.evi);
+      const p1CanGrab = just1.grab && this.canBeginGrab(this.player1,this.player2);
+      const p2CanGrab = just2.grab && this.canBeginGrab(this.player2,this.player1);
       if (p1CanGrab && p2CanGrab) {
         // Simultaneous grabs clash; neither fighter gets a free throw.
-        this.evi.grabRecovery=.24;this.nara.grabRecovery=.24;
+        this.player1.grabRecovery=.24;this.player2.grabRecovery=.24;
         this.combatNotice('CLASH!',480,230,0xf7cf9b);
-      } else if (p1CanGrab) this.beginGrab(this.evi,this.nara);
-      else if (p2CanGrab) this.beginGrab(this.nara,this.evi);
+      } else if (p1CanGrab) this.beginGrab(this.player1,this.player2);
+      else if (p2CanGrab) this.beginGrab(this.player2,this.player1);
     }
     if (this.grapple) {
       this.progressGrab(dt,input1,input2,just1,just2);
     } else {
-      this.evi.step(dt,input1,just1,this.nara.x);
-      this.nara.step(dt,input2,just2,this.evi.x);
+      this.player1.step(dt,input1,just1,this.player2.x);
+      this.player2.step(dt,input2,just2,this.player1.x);
       this.preventOverlap();
-      this.resolveStrike(this.evi,this.nara);
-      this.resolveStrike(this.nara,this.evi);
+      this.resolveStrike(this.player1,this.player2);
+      this.resolveStrike(this.player2,this.player1);
     }
 
     // If HP reaches zero now, the next fixed step will animate the fall.
@@ -251,8 +270,8 @@ export class ArenaScene extends Phaser.Scene {
 
   private advanceFallenFighters(dt: number): void {
     const inert=emptyInput();
-    if(this.evi.knockedDown) this.evi.step(dt,inert,inert,this.nara.x);
-    if(this.nara.knockedDown) this.nara.step(dt,inert,inert,this.evi.x);
+    if(this.player1.knockedDown) this.player1.step(dt,inert,inert,this.player2.x);
+    if(this.player2.knockedDown) this.player2.step(dt,inert,inert,this.player1.x);
     this.paintHud();
   }
 
@@ -271,7 +290,7 @@ export class ArenaScene extends Phaser.Scene {
     attacker.attack=null;
     attacker.grabPose='reach';
     this.grapple={attacker,defender,phase:'reach',elapsed:0};
-    this.onStatus((attacker.id==='evi'?'Еві':'Нара')+
+    this.onStatus(getCharacter(attacker.id).name+
       ' тягнеться до суперника! A (блок) або X (швидкий удар) зривають захват.');
     this.combatNotice('GRAB!', (attacker.x+defender.x)/2,290,0xd4b3f5);
   }
@@ -295,8 +314,8 @@ export class ArenaScene extends Phaser.Scene {
   ): void {
     const g=this.grapple;
     if (!g) return;
-    const defenderInput=g.defender===this.evi?input1:input2;
-    const defenderJust=g.defender===this.evi?just1:just2;
+    const defenderInput=g.defender===this.player1?input1:input2;
+    const defenderJust=g.defender===this.player1?just1:just2;
     const wasFastAttacking=g.defender.attack?.name==='light';
     if (defenderInput.block || defenderJust.light || wasFastAttacking) {
       this.stopGrab(defenderJust.light || wasFastAttacking);
@@ -348,8 +367,10 @@ export class ArenaScene extends Phaser.Scene {
       this.spawnSparks(g.defender.x,GROUND_Y-110,false);
       this.cameras.main.shake(120,.006);
       this.combatNotice('THROW!',g.defender.x,240,0xffd29b);
-      this.onStatus((g.attacker.id==='evi'?'Еві':'Нара')+
-        ' перекидає суперника за спину! -'+THROW_DAMAGE+' HP. Падіння, 0,5 с лежачи й 0,5 с підйому.');
+      this.onStatus(getCharacter(g.attacker.id).name+
+        ' перекидає суперника за спину! -'+THROW_DAMAGE+' HP.'+
+        (g.defender.knockedOut ? ' Нокаут: суперник не підводиться!' :
+        ' Падіння, 0,5 с лежачи й 0,5 с підйому.'));
       this.grapple=null;
     }
   }
@@ -367,31 +388,31 @@ export class ArenaScene extends Phaser.Scene {
 
   private cpuInput(dt: number): InputState {
     const input=emptyInput();
-    const distance=Math.abs(this.evi.x-this.nara.x);
-    const forward=this.evi.x>this.nara.x?'right':'left';
-    if(this.grapple?.defender===this.nara) {
+    const distance=Math.abs(this.player1.x-this.player2.x);
+    const forward=this.player1.x>this.player2.x?'right':'left';
+    if(this.grapple?.defender===this.player2) {
       // The CPU sometimes reacts in time, but not on every attempt.
       if (this.grapple.phase==='hold' && this.grapple.elapsed>.22 &&
           this.aiCount%3!==0) input.block=true;
       return input;
     }
-    if(this.nara.stunned>0||this.nara.knockedOut||this.nara.knockedDown)return input;
+    if(this.player2.stunned>0||this.player2.knockedOut||this.player2.knockedDown)return input;
     if(distance>130)input[forward]=true;
     else if(distance<75 && this.aiCount%5===0)input.block=true;
-    if(distance<160 && this.evi.attack && this.aiCount%4===0) input.block=true;
+    if(distance<160 && this.player1.attack && this.aiCount%4===0) input.block=true;
     // The CPU has the same guard restrictions: halt its approach or
     // retreat when blocking rather than guarding while moving forward.
     if (input.block) {
       input[forward]=false;
       const backward=forward==='left'?'right':'left';
-      if (distance<135 && this.evi.attack) input[backward]=true;
+      if (distance<135 && this.player1.attack) input[backward]=true;
     }
     this.aiCooldown-=dt;
     if(this.aiCooldown<=0){
       this.aiCount++;
       this.aiCooldown=.52+((this.aiCount*17)%9)*.09;
       if(distance<115 && this.aiCount%6===3) input.grab=true;
-      else if(distance<210 && this.nara.energy>=40 && this.aiCount%5===0)input.special=true;
+      else if(distance<210 && this.player2.energy>=40 && this.aiCount%5===0)input.special=true;
       else if(distance<141) {
         const choice=this.aiCount%3;
         if(choice===0)input.light=true;
@@ -406,13 +427,13 @@ export class ArenaScene extends Phaser.Scene {
     // A thrown fighter must be able to pass THROUGH the thrower to land
     // behind them. Ordinary overlap resolution would push the victim back
     // to the original side on every frame, cancelling the reversed throw.
-    if (this.evi.knockedDown || this.nara.knockedDown) return;
-    const dx=this.nara.x-this.evi.x;
+    if (this.player1.knockedDown || this.player2.knockedDown) return;
+    const dx=this.player2.x-this.player1.x;
     if(Math.abs(dx)>=51)return;
     const sign=dx>=0?1:-1;
-    const middle=(this.evi.x+this.nara.x)/2;
-    this.evi.x=Phaser.Math.Clamp(middle-sign*26,STAGE_MIN_X+2,STAGE_MAX_X-2);
-    this.nara.x=Phaser.Math.Clamp(middle+sign*26,STAGE_MIN_X+2,STAGE_MAX_X-2);
+    const middle=(this.player1.x+this.player2.x)/2;
+    this.player1.x=Phaser.Math.Clamp(middle-sign*26,STAGE_MIN_X+2,STAGE_MAX_X-2);
+    this.player2.x=Phaser.Math.Clamp(middle+sign*26,STAGE_MIN_X+2,STAGE_MAX_X-2);
   }
 
   private resolveStrike(attacker: Fighter, target: Fighter): void {
@@ -432,9 +453,8 @@ export class ArenaScene extends Phaser.Scene {
     if(!hit.blocked)this.cameras.main.shake(75,.003);
     this.onStatus(hit.blocked
       ? (hit.damage>0 ? 'Блок! Y пробив '+hit.damage.toLocaleString('uk-UA')+' HP (25% шкоди).' : 'Блок! Ушкодження поглинуто.')
-      : attacker.id==='evi'
-        ?'Еві влучила! -'+hit.damage+' HP Нари.'
-        :'Нара влучила! -'+hit.damage+' HP Еві.');
+      :getCharacter(attacker.id).name+' влучає! -'+hit.damage+
+        ' HP '+getCharacter(target.id).name+'.');
   }
 
   private spawnSparks(x:number,y:number,blocked:boolean): void {
@@ -454,11 +474,12 @@ export class ArenaScene extends Phaser.Scene {
   private finishRound(): void {
     if (this.roundOver) return;
     this.roundOver=true;
-    const winner=this.evi.hp===this.nara.hp?'DRAW!'
-      :this.evi.hp>this.nara.hp?'EVI WINS!':'NARA WINS!';
+    const winner=this.player1.hp===this.player2.hp?'DRAW!'
+      :this.player1.hp>this.player2.hp?getCharacter(this.player1.id).name+' WINS!'
+        :getCharacter(this.player2.id).name+' WINS!';
     if (winner !== 'DRAW!') {
-      const loser=this.evi.hp<this.nara.hp?this.evi:this.nara;
-      const victor=loser===this.evi?this.nara:this.evi;
+      const loser=this.player1.hp<this.player2.hp?this.player1:this.player2;
+      const victor=loser===this.player1?this.player2:this.player1;
       // On time-out, the loser can still have HP and be standing. The
       // victory screen must also leave this fighter lying on the ground.
       if (!loser.knockedDown) loser.startDefeatFall(victor.face);
@@ -470,15 +491,20 @@ export class ArenaScene extends Phaser.Scene {
   private paintHud(): void {
     if(!this.hud)return;
     this.hud.clear();
-    this.drawHealth(39-this.extraHalf,55,this.evi.hp,0xe78fb9,false);
-    this.drawHealth(571+this.extraHalf,55,this.nara.hp,0x69d6d2,true);
-    this.drawEnergy(39-this.extraHalf,82,this.evi.energy,0xa18afa);
-    this.drawEnergy(571+this.extraHalf,82,this.nara.energy,0xa18afa);
+    // Leave room for the portraits at both outer edges.
+    const left=112-this.extraHalf;
+    const right=548+this.extraHalf;
+    this.drawHealth(left,55,this.player1.hp,
+      this.player1.id==='evi'?0xe78fb9:0x69d6d2,false);
+    this.drawHealth(right,55,this.player2.hp,
+      this.player2.id==='evi'?0xe78fb9:0x69d6d2,true);
+    this.drawEnergy(left,82,this.player1.energy,0xa18afa);
+    this.drawEnergy(right,82,this.player2.energy,0xa18afa);
     this.timeLabel.setText(String(Math.ceil(this.roundTime)));
   }
 
   private drawHealth(x:number,y:number,hp:number,color:number,right:boolean): void {
-    const w=350,h=19;
+    const w=300,h=19;
     this.hud.fillStyle(0x111326,.94).fillRoundedRect(x-4,y-4,w+8,h+8,6);
     this.hud.fillStyle(0x4d314f).fillRect(x,y,w,h);
     const fill=Math.max(0,w*hp/100);
@@ -487,7 +513,7 @@ export class ArenaScene extends Phaser.Scene {
     this.hud.lineStyle(2,0xc7abc1,.7).strokeRoundedRect(x-4,y-4,w+8,h+8,6);
   }
   private drawEnergy(x:number,y:number,power:number,color:number): void {
-    const w=350;
+    const w=300;
     this.hud.fillStyle(0x14162a).fillRect(x,y,w,8);
     this.hud.fillStyle(color).fillRect(x,y,w*Math.min(100,power)/100,8);
     this.hud.fillStyle(0xd6cbff).fillRect(x+w*.4-1,y,2,8);
@@ -503,7 +529,7 @@ export class ArenaScene extends Phaser.Scene {
       this.debugDraw.lineStyle(2,0xf7ca89,.8)
         .strokeCircle(a.x,GROUND_Y-73,GRAB_CATCH_RANGE);
     }
-    for(const fighter of [this.evi,this.nara]){
+    for(const fighter of [this.player1,this.player2]){
       const rect=fighter.bodyBox();
       this.debugDraw.lineStyle(2,0x56f3a4,.9).strokeRect(rect.x,rect.y,rect.w,rect.h);
       const strike=fighter.strikeBox();

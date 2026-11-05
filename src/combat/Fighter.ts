@@ -173,6 +173,12 @@ export class Fighter {
     this.draw(0);
   }
 
+  /** Clean up both the model and its independent world-space shadow. */
+  destroy(): void {
+    this.rig.destroy();
+    this.shadow.destroy();
+  }
+
   get airborne(): boolean { return this.yOffset < -.1; }
   get knockedOut(): boolean { return this.hp <= 0; }
   get knockedDown(): boolean { return this.knockdownPhase !== null; }
@@ -306,6 +312,14 @@ export class Fighter {
   }
 
   private advanceKnockdown(dt: number): void {
+    // A throw that removes the final HP is permanent, including edge cases
+    // where its defeat state is detected after the launch.
+    if (this.knockedOut) this.knockoutForever=true;
+    if (this.knockoutForever &&
+        (this.knockdownPhase==='prone' || this.knockdownPhase==='rising')) {
+      this.knockdownPhase='ko';
+      this.knockdownTimer=0;
+    }
     this.blocking=false;
     this.crouching=false;
     this.walking=false;
@@ -381,7 +395,7 @@ export class Fighter {
     this.queuedSpecial=0;
     this.hp=Math.max(0,this.hp-damage);
     this.energy=Math.min(100,this.energy+12);
-    this.knockoutForever=this.knockedOut;
+    this.knockoutForever=this.knockoutForever || this.knockedOut;
     // Send the victim BEHIND the thrower, with much greater travel.
     // Facing is frozen throughout the tumble and restored on recovery.
     this.face=attackerFace;

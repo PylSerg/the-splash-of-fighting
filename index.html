@@ -12,6 +12,10 @@
   <section class="game-shell" aria-label="Арена">
     <div id="game-frame">
       <div id="game-canvas"></div>
+      <div class="hud-portraits" aria-hidden="true">
+        <div id="hud-avatar-p1" class="hud-avatar hud-avatar-left"></div>
+        <div id="hud-avatar-p2" class="hud-avatar hud-avatar-right"></div>
+      </div>
       <div class="touch-controls" aria-label="Сенсорне керування">
         <div id="virtual-joystick" class="virtual-joystick" role="group" aria-label="Віртуальний джойстик руху: 8 напрямків">
           <div class="joystick-base" aria-hidden="true">
@@ -39,7 +43,7 @@
         <div class="pause-panel">
           <header class="pause-heading">
             <div>
-              <div class="pause-eyebrow">THE SPLASH OF FIGHTING <span>• ALPHA 0.7.0</span></div>
+              <div class="pause-eyebrow">THE SPLASH OF FIGHTING <span>• ALPHA 0.8.0</span></div>
               <h1 id="pause-title">ПАУЗА <span>Ⅱ</span></h1>
               <p>Бій зупинено. Можна змінити налаштування.</p>
             </div>
@@ -78,6 +82,7 @@
             <p>Положення та масштаб зберігаються на цьому пристрої. Увесь ромб пересувається разом.</p>
           </details>
           <div class="pause-actions">
+            <button id="btn-choose-characters" class="pill" type="button">🧑‍🤝‍🧑 Змінити бійців</button>
             <button id="btn-restart" class="pill primary" type="button">↻ Новий раунд</button>
             <details class="pause-help">
               <summary>⌨ Керування та комбінації</summary>
@@ -105,6 +110,31 @@
           </div>
         </div>
       </div>
+      <section id="character-select" class="character-select" role="dialog" aria-modal="true"
+        aria-labelledby="select-title">
+        <div class="select-panel">
+          <header class="select-heading">
+            <div>
+              <div class="select-eyebrow">THE SPLASH OF FIGHTING · ALPHA 0.8.0</div>
+              <h1 id="select-title">ОБЕРИ БІЙЦЯ <span>✦</span></h1>
+              <p id="select-instructions">Гравець 1: обери свого бійця.</p>
+            </div>
+          </header>
+          <div class="select-mode-row" aria-label="Режим поєдинку">
+            <button id="btn-select-cpu" class="pill selected" type="button">⚡ Проти CPU</button>
+            <button id="btn-select-versus" class="pill" type="button">🎮 Два гравці</button>
+          </div>
+          <div id="select-roster" class="select-roster" aria-label="Доступні персонажі"></div>
+          <div class="select-footer">
+            <span id="select-lineup" class="select-lineup" aria-live="polite">P1: ??? VS 🎲 CPU</span>
+            <div class="select-buttons">
+              <button id="btn-select-back" type="button" class="pill" hidden>← До меню</button>
+              <button id="btn-select-reset" type="button" class="pill">↺ Змінити вибір</button>
+              <button id="btn-select-fight" type="button" class="pill primary" disabled>⚡ Почати бій</button>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   </section>
 </main>

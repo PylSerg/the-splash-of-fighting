@@ -21,6 +21,17 @@ npm run build
 npm run preview
 ```
 
+## Alpha 0.8.0 · Fighter portraits and character select
+
+- **Character selection on launch:** no match timer or CPU logic runs until the player explicitly chooses a fighter and starts the match.
+- A small, data-driven character roster in `src/characters/Roster.ts` currently offers **Evi** and **Nara**, each with an original stylized portrait. New characters can be added to the roster as their gameplay visuals and `FighterId` implementations become available.
+- **CPU:** player 1 selects a fighter; the game picks a **uniform random** opponent from all remaining roster characters. The player's own character is excluded. With only two fighters available, the other is necessarily picked.
+- **Local PvP:** player 1 chooses first, then player 2 chooses from the remaining fighters. Mirror matches are disabled; the same character cannot fill both slots.
+- The chosen fighter may now occupy **either side** of the arena. Keyboard/gamepad/touch input follows the player slot, not the character's name. CPU always controls slot 2.
+- Rounded fighter avatars appear adjacent to **both health and energy bars**, with labels and health-bar accents matching the chosen roster identities.
+- From **☰ Меню**, use **Змінити бійців** to select a fresh pair; changing CPU/PvP mode also opens the selector. Restarting a round preserves the current matchup.
+- **Lethal throws are permanent KOs**: a thrown fighter who reaches 0 HP lands on the ground and never enters the prone/rising recovery loop until a new round. Nonlethal throws still use 0.5 s prone + 0.5 s rising.
+
 ## Alpha 0.7.0 · Impact frames, counterattacks, permanent KO falls
 
 **Damage timing:** Each punch, kick and special has one true impact at the **end of its strike animation**, not at the first frame of the wind-up. The target must still overlap the strike hitbox at that exact moment. Missing an attack consumes the impact (it cannot hit late during the follow-through). A 0.12 s non-damaging recovery follows.
