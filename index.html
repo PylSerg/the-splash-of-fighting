@@ -10,24 +10,27 @@
 <body>
 <main class="site">
   <header class="topbar">
-    <div class="brand"><span class="star">✦</span><span><strong>THE SPLASH</strong><small>OF FIGHTING · ALPHA 0.1</small></span></div>
+    <div class="brand"><span class="star">✦</span><span><strong>THE SPLASH</strong><small>OF FIGHTING · ALPHA 0.2</small></span></div>
     <div class="top-actions"><span class="online">● LOCAL ARCADE</span><button id="btn-fullscreen" title="На весь екран" aria-label="На весь екран">⛶</button></div>
   </header>
   <section class="game-shell" aria-label="Арена">
     <div id="game-frame">
       <div id="game-canvas"></div>
       <div class="touch-controls" aria-label="Сенсорне керування">
-        <div class="touch-pad">
-          <button data-control="up" class="pad up" aria-label="Стрибок">▲</button>
-          <button data-control="left" class="pad left" aria-label="Ліворуч">◀</button>
-          <button data-control="down" class="pad down" aria-label="Присісти">▼</button>
-          <button data-control="right" class="pad right" aria-label="Праворуч">▶</button>
+        <div id="virtual-joystick" class="virtual-joystick" role="group" aria-label="Віртуальний джойстик руху: 8 напрямків">
+          <div class="joystick-base" aria-hidden="true">
+            <span class="joystick-direction north">▲</span>
+            <span class="joystick-direction east">▶</span>
+            <span class="joystick-direction south">▼</span>
+            <span class="joystick-direction west">◀</span>
+            <span class="joystick-thumb"><span class="joystick-thumb-inner"></span></span>
+          </div>
         </div>
-        <div class="touch-attacks">
-          <button data-control="kick" class="attack kick" aria-label="Удар ногою">C</button>
-          <button data-control="heavy" class="attack heavy" aria-label="Сильний удар">B</button>
-          <button data-control="light" class="attack light" aria-label="Легкий удар">A</button>
-          <button data-control="special" class="attack special" aria-label="Спецприйом">SP</button>
+        <div class="touch-attacks" role="group" aria-label="Кнопки атаки ромбом">
+          <button type="button" data-control="heavy" class="attack heavy" aria-label="B: сильний удар">B</button>
+          <button type="button" data-control="light" class="attack light" aria-label="A: легкий удар">A</button>
+          <button type="button" data-control="kick" class="attack kick" aria-label="C: удар ногою">C</button>
+          <button type="button" data-control="special" class="attack special" aria-label="SP: спеціальний прийом">SP</button>
         </div>
       </div>
       <div class="portrait-warning">↻ Поверни телефон горизонтально, щоб грати</div>
@@ -37,7 +40,7 @@
     <div class="toolbar-group"><button id="btn-cpu" class="pill selected">⚡ Проти CPU</button><button id="btn-versus" class="pill">🎮 Два гравці</button></div>
     <div class="toolbar-group"><button id="btn-debug" class="pill">▣ Хітбокси: викл.</button><button id="btn-restart" class="pill primary">↻ Новий раунд</button></div>
   </section>
-  <div class="details"><p id="game-status" aria-live="polite">Готуємо арену…</p><details><summary>⌨ Керування</summary><p><b>Гравець 1:</b> WASD рух, J легкий, K сильний, U нога, I спеціальний.</p><p><b>Гравець 2:</b> стрілки рух, Num1 легкий, Num2 сильний, Num4 нога, Num5 спецприйом.</p><p><b>Геймпад:</b> стік або D-pad, X легкий, Y сильний, A нога, B спеціальний.</p><p><b>Інше:</b> захист триманням назад, R рестарт, H хітбокси, 1/2 режим.</p></details></div>
+  <div class="details"><p id="game-status" aria-live="polite">Готуємо арену…</p><details><summary>⌨ Керування</summary><p><b>Гравець 1:</b> WASD рух, J легкий, K сильний, U нога, I спеціальний.</p><p><b>Гравець 2:</b> стрілки рух, Num1 легкий, Num2 сильний, Num4 нога, Num5 спецприйом.</p><p><b>Геймпад:</b> стік або D-pad, X легкий, Y сильний, A нога, B спеціальний.</p><p><b>Телефон:</b> джойстик зліва, ромб атак справа. <b>Інше:</b> захист триманням назад, R рестарт, H хітбокси, 1/2 режим.</p></details></div>
   <footer>FIRST PLAYABLE · EVI × NARA · WORK IN PROGRESS</footer>
 </main>
 <script type="module" src="/src/main.ts"></script>

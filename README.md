@@ -21,6 +21,10 @@ npm run build
 npm run preview
 ```
 
+## Alpha 0.2 · Mobile controls
+
+Turn the phone to **landscape**. The left thumb controls a floating **8-direction joystick** with a dead zone; the right thumb uses four **circular buttons arranged in a diamond**: **A (left) light**, **B (top) heavy**, **C (right) kick**, **SP (bottom) special**. Supports simultaneous pointers on the joystick and attacks. The virtual stick centers when released. Fullscreen button is available on supported browsers.
+
 ## Controls
 
 | Action | Player 1 | Player 2 (press 2 to enable local versus) | Gamepad |
@@ -32,7 +36,7 @@ npm run preview
 | Special | I | Numpad 5 | B (button 1) |
 | Guard | Hold back | Hold back | Hold back |
 
-On touchscreens, hold several buttons simultaneously. Play in landscape orientation.
+On touchscreens, move the virtual joystick and tap circular attack buttons simultaneously. Play in landscape orientation.
 Press **1** for CPU opponent, **2** for local versus, **R** to restart, **H** for hitbox debug overlay.
 
 ## Features in the first milestone
