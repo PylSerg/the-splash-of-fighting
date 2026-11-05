@@ -1,23 +1,23 @@
-export type Action = 'left' | 'right' | 'up' | 'down' | 'jump' | 'light' | 'heavy' | 'kick' | 'special';
+export type Action = 'left' | 'right' | 'up' | 'down' | 'jump' | 'light' | 'heavy' | 'kick' | 'block' | 'special';
 export type InputState = Record<Action, boolean>;
 type Direction = 'left' | 'right' | 'up' | 'down';
 
-const ACTIONS: Action[] = ['left', 'right', 'up', 'down', 'jump', 'light', 'heavy', 'kick', 'special'];
+const ACTIONS: Action[] = ['left', 'right', 'up', 'down', 'jump', 'light', 'heavy', 'kick', 'block', 'special'];
 const DIRECTIONS: Direction[] = ['left', 'right', 'up', 'down'];
 
 export const emptyInput = (): InputState => ({
   left: false, right: false, up: false, down: false, jump: false,
-  light: false, heavy: false, kick: false, special: false,
+  light: false, heavy: false, kick: false, block: false, special: false,
 });
 
 const KEYMAPS: Record<Action, string>[] = [
   {
     left: 'KeyA', right: 'KeyD', up: 'KeyW', down: 'KeyS', jump: 'Space',
-    light: 'KeyJ', heavy: 'KeyK', kick: 'KeyU', special: 'KeyI',
+    light: 'KeyJ', heavy: 'KeyK', kick: 'KeyL', block: 'KeyH', special: 'KeyI',
   },
   {
     left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown', jump: 'Numpad0',
-    light: 'Numpad1', heavy: 'Numpad2', kick: 'Numpad4', special: 'Numpad5',
+    light: 'Numpad1', heavy: 'Numpad2', kick: 'Numpad4', block: 'Numpad5', special: 'Numpad6',
   },
 ];
 
@@ -32,12 +32,14 @@ function gamepadInput(pad: Gamepad | null): InputState {
   state.right = axisX > 0.33 || held(15);
   state.up = axisY < -0.55 || held(12);
   state.down = axisY > 0.55 || held(13);
-  // Standard mapping: X=light, Y=heavy, A=kick, B=special.
+  // Standard Xbox-style gamepad: A=block, B=kick, X=light, Y=heavy.
+  // B+Y is a chord; R1 / RB (button 5) is a direct special shortcut.
+  state.block = held(0);
+  state.kick = held(1);
   state.light = held(2);
   state.heavy = held(3);
-  state.kick = held(0);
-  state.special = held(1);
-  state.jump = held(5); // Optional: right shoulder button for jumping while moving.
+  state.special = held(5) || (state.kick && state.heavy);
+  state.jump = held(4); // Optional LB/L1 jump; stick up remains the primary jump control.
   return state;
 }
 
@@ -192,6 +194,7 @@ export class Controls {
     for (const [action, button] of this.buttons) {
       button.classList.toggle('pressed', pressed.has(action));
     }
+    document.querySelector('.touch-attacks')?.classList.toggle('combo-active', pressed.has('kick') && pressed.has('heavy'));
   }
 
   clear(): void {
@@ -218,11 +221,14 @@ export class Controls {
         state[direction] ||= this.joystickDirections[direction];
       }
     }
+    // Combine physical inputs before deriving B+Y, so one key can be on
+    // a gamepad and another on the touchscreen or keyboard.
     const pads = navigator.getGamepads?.() ?? [];
     const pad = gamepadInput(pads[player] ?? null);
     for (const action of ACTIONS) {
       state[action] ||= pad[action];
     }
+    state.special ||= state.kick && state.heavy;
     return state;
   }
 }

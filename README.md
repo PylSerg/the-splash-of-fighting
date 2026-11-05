@@ -21,6 +21,15 @@ npm run build
 npm run preview
 ```
 
+## Alpha 0.3.0 · ABXY combat controls
+
+- **X** (left): quick light punch, **Y** (top): slower heavy punch, **B** (right): kick, **A** (bottom): hold to block.
+- **B+Y** together (touch, keyboard or gamepad) triggers a special when the energy meter has at least 40 points; **R1 / RB** on a standard gamepad is an alternate direct shortcut.
+- A 75 ms chord-recognition window prioritizes B+Y over its component attacks. A brief special buffer also handles near-simultaneous presses.
+- A replaces automatic back-to-block. Hold A to guard; A plus down guards low. The left joystick remains independent of attack touches.
+- Keyboard P1: WASD, J/X-light, K/Y-heavy, L/B-kick, H/A-block, K+L or I/special; P2: arrows, Num1/Num2/Num4/Num5; Num2+Num4 or Num6 special.
+- Joystick up or up-diagonal remains jump. Space (P1) and Numpad0 (P2) are alternative jump keys; LB/L1 optional on standard gamepads.
+
 ## Alpha 0.2.3 · Reliable held-stick jumping
 
 Jump is now driven by the **current joystick direction every game tick**, not only the first frame of an upward deflection. If the player pushes diagonally up during hitstun or while airborne, the held direction triggers a jump as soon as the character is grounded and able to act. Keeping the joystick up repeats the jump after each landing; returning it to neutral stops jumping. This works with attacks held by another finger. The mobile UI still has only four attack buttons.
@@ -40,13 +49,13 @@ Turn the phone to **landscape**. The left thumb controls a floating **8-directio
 | Action | Player 1 | Player 2 (press 2 to enable local versus) | Gamepad |
 | --- | --- | --- | --- |
 | Move / jump / crouch | WASD | Arrow keys | D-pad or left stick |
-| Light attack | J | Numpad 1 | X (button 2) |
-| Heavy attack | K | Numpad 2 | Y (button 3) |
-| Kick | U | Numpad 4 | A (button 0) |
-| Special | I | Numpad 5 | B (button 1) |
-| Guard | Hold back | Hold back | Hold back |
+| Light attack (X) | J | Numpad 1 | X (button 2) |
+| Heavy attack (Y) | K | Numpad 2 | Y (button 3) |
+| Kick (B) | L | Numpad 4 | B (button 1) |
+| Guard (A) | Hold H | Hold Numpad 5 | Hold A (button 0) |
+| Special | K+L or I | Numpad 2+4 or Numpad 6 | B+Y or R1/RB (button 5) |
 
-On touchscreens, move the virtual joystick and tap circular attack buttons simultaneously. Play in landscape orientation.
+On touchscreens, move the virtual joystick and tap the **ABXY** diamond simultaneously. Press **B+Y** with two fingers for a special. Play in landscape orientation.
 Press **1** for CPU opponent, **2** for local versus, **R** to restart, **H** for hitbox debug overlay.
 
 ## Features in the first milestone

@@ -190,11 +190,10 @@ export class ArenaScene extends Phaser.Scene {
     const input=emptyInput();
     const distance=Math.abs(this.evi.x-this.nara.x);
     const forward=this.evi.x>this.nara.x?'right':'left';
-    const backward=forward==='right'?'left':'right';
     if(this.nara.stunned>0||this.nara.knockedOut)return input;
     if(distance>130)input[forward]=true;
-    else if(distance<75 && this.aiCount%5===0)input[backward]=true;
-    if(distance<160 && this.evi.attack && this.aiCount%4===0) input[backward]=true;
+    else if(distance<75 && this.aiCount%5===0)input.block=true;
+    if(distance<160 && this.evi.attack && this.aiCount%4===0) input.block=true;
     this.aiCooldown-=dt;
     if(this.aiCooldown<=0){
       this.aiCount++;

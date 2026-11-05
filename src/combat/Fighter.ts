@@ -40,6 +40,10 @@ export class Fighter {
   attack: ActiveAttack | null = null;
   hitFlash = 0;
   private impactVelocity = 0;
+  // A short chord window prevents B and Y being mistaken for separate
+  // kick/heavy attacks when the player presses them nearly together.
+  private queuedSolo: { name: 'kick' | 'heavy'; remaining: number } | null = null;
+  private queuedSpecial = 0;
   private time = 0;
 
   readonly rig: Phaser.GameObjects.Container;
@@ -156,6 +160,7 @@ export class Fighter {
     this.yOffset=0; this.vy=0; this.stunned=0; this.blocking=false;
     this.crouching=false; this.walking=false; this.attack=null;
     this.hitFlash=0; this.impactVelocity=0; this.time=0;
+    this.queuedSolo=null; this.queuedSpecial=0;
     this.draw(0);
   }
 
@@ -177,10 +182,11 @@ export class Fighter {
     }
 
     this.crouching = Boolean(input.down && !this.airborne && !this.attack && this.stunned<=0);
-    const backward = this.face===1?input.left:input.right;
-    this.blocking = backward && !this.airborne && !this.attack && this.stunned<=0 && !input.up;
+    // Blocking is now a deliberate hold on A, not "back" on the joystick.
+    // A + down gives a crouching guard. Guarding pauses locomotion.
+    this.blocking = Boolean(input.block && !this.airborne && !this.attack && this.stunned<=0);
     let move = Number(input.right)-Number(input.left);
-    if (this.crouching || this.stunned>0) move=0;
+    if (this.crouching || this.stunned>0 || this.blocking) move=0;
 
     // A stick is a held direction, not a one-frame button press.
     // Reading only just.up loses jumps if the fighter was stunned or airborne
@@ -193,12 +199,46 @@ export class Fighter {
       this.vy=-490;
       this.yOffset=-.2;
     }
-    if (this.stunned<=0 && !this.attack && !this.crouching) {
-      if (just.special && this.energy>=40) {
-        this.energy-=40; this.begin('special');
-      } else if (just.heavy) this.begin('heavy');
-      else if (just.kick) this.begin('kick');
-      else if (just.light) this.begin('light');
+    // A chord can arrive a few frames after the first button. Keep it
+    // buffered briefly, with priority above both of its component attacks.
+    this.queuedSpecial=Math.max(0,this.queuedSpecial-dt);
+    if (just.special) {
+      this.queuedSpecial=.22;
+      this.queuedSolo=null;
+    }
+    const canAct=this.stunned<=0 && !this.crouching && !this.blocking;
+    if (!canAct) this.queuedSolo=null;
+
+    const canCancelForChord=Boolean(
+      this.attack &&
+      (this.attack.name==='kick' || this.attack.name==='heavy') &&
+      this.attack.elapsed<.22
+    );
+    if (canAct && this.queuedSpecial>0 && this.energy>=40 &&
+        (!this.attack || canCancelForChord)) {
+      this.energy-=40;
+      this.attack=null;
+      this.queuedSolo=null;
+      this.queuedSpecial=0;
+      this.begin('special');
+    } else if (canAct && !this.attack) {
+      if (just.light) {
+        this.queuedSolo=null;
+        this.begin('light');
+      } else {
+        if (!input.special && !this.queuedSolo) {
+          if (just.heavy) this.queuedSolo={name:'heavy',remaining:.075};
+          else if (just.kick) this.queuedSolo={name:'kick',remaining:.075};
+        }
+        if (this.queuedSolo) {
+          this.queuedSolo.remaining-=dt;
+          if (this.queuedSolo.remaining<=0) {
+            const name=this.queuedSolo.name;
+            this.queuedSolo=null;
+            if (!input.special && this.queuedSpecial<=0) this.begin(name);
+          }
+        }
+      }
     }
     // Regular attacks slow locomotion, but do not disable the joystick.
     // Hitstun and crouching still prevent movement as combat states.
@@ -243,6 +283,8 @@ export class Fighter {
     if(!blocked) {
       this.stunned=spec.stun;
       this.attack=null;
+      this.queuedSolo=null;
+      this.queuedSpecial=0;
       this.hitFlash=.15;
     } else {
       this.stunned=Math.min(.10,spec.stun*.25);
