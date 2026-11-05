@@ -21,6 +21,16 @@ npm run build
 npm run preview
 ```
 
+## Alpha 0.6.0 · Edge-to-edge arena and custom mobile controls
+
+The arena now fills the **entire landscape screen**, even on extra-wide phones. Phaser renders a wider logical viewport around the unchanged central world rather than stretching fighter artwork or cropping the HP HUD. Ground, city skyline and combat bounds extend into the additional space; health/energy bars stay anchored at the outer edges. Fullscreen and orientation changes resize the view.
+
+In **☰ Меню → 🎛️ Сенсорне керування**:
+- Set the joystick and ABXY diamond **scales independently** (65–160%).
+- Select **✥ Перемістити на екрані**, then drag the joystick and **entire ABXY diamond together**, while combat stays paused. Use **✓ Готово** to return to the pause menu.
+- **↺ Скинути** restores reasonable default positions and scales. Dragging cannot push a control entirely off-screen.
+- Positions use proportional coordinates and are stored in localStorage, so they survive reloading and adjust to screen size. The game is paused for the whole layout-editing session; no accidental attacks are sent.
+
 ## Alpha 0.5.0 · Single-screen pause menu
 
 The whole game now fits on one 16:9 screen. A centered **☰ Меню** button inside the arena opens a glass-like overlay for **CPU / 2 players**, hitbox debugging, full-screen toggle, new round and an expandable controls guide. There is no longer a separate toolbar, controls text or footer below the stage.

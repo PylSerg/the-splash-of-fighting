@@ -39,7 +39,7 @@
         <div class="pause-panel">
           <header class="pause-heading">
             <div>
-              <div class="pause-eyebrow">THE SPLASH OF FIGHTING <span>• ALPHA 0.5.0</span></div>
+              <div class="pause-eyebrow">THE SPLASH OF FIGHTING <span>• ALPHA 0.6.0</span></div>
               <h1 id="pause-title">ПАУЗА <span>Ⅱ</span></h1>
               <p>Бій зупинено. Можна змінити налаштування.</p>
             </div>
@@ -61,6 +61,22 @@
               </div>
             </section>
           </div>
+          <details class="pause-touch-settings">
+            <summary>🎛️ Сенсорне керування: масштаб і розташування</summary>
+            <div class="touch-setting-grid">
+              <label for="joystick-scale">🕹️ Джойстик
+                <span><input id="joystick-scale" type="range" min="65" max="160" step="5" value="100"/><output id="joystick-scale-value" for="joystick-scale">100%</output></span>
+              </label>
+              <label for="diamond-scale">🎮 Ромб ABXY
+                <span><input id="diamond-scale" type="range" min="65" max="160" step="5" value="100"/><output id="diamond-scale-value" for="diamond-scale">100%</output></span>
+              </label>
+            </div>
+            <div class="touch-setting-actions">
+              <button id="btn-layout-edit" type="button" class="pill primary">✥ Перемістити на екрані</button>
+              <button id="btn-layout-reset-menu" type="button" class="pill">↺ Типове розташування</button>
+            </div>
+            <p>Положення та масштаб зберігаються на цьому пристрої. Увесь ромб пересувається разом.</p>
+          </details>
           <div class="pause-actions">
             <button id="btn-restart" class="pill primary" type="button">↻ Новий раунд</button>
             <details class="pause-help">
@@ -78,6 +94,15 @@
           <p id="game-status" class="pause-status" aria-live="polite">Готуємо арену…</p>
         </div>
       </section>
+      <div id="control-layout-editor" class="layout-editor" hidden>
+        <div class="layout-editor-bar">
+          <span>✥ Перетягни джойстик і ромб ABXY. Бій на паузі.</span>
+          <div class="layout-editor-actions">
+            <button id="btn-layout-reset" type="button">↺ Скинути</button>
+            <button id="btn-layout-done" type="button">✓ Готово</button>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 </main>

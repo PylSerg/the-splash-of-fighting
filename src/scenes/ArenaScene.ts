@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { Controls, emptyInput, type InputState } from '../input/Controls';
-import { Fighter, GROUND_Y } from '../combat/Fighter';
+import { Fighter, GROUND_Y, STAGE_MIN_X, STAGE_MAX_X, setStageViewportWidth } from '../combat/Fighter';
 
 type GameMode = 'cpu' | 'versus';
 interface Grapple {
@@ -42,6 +42,9 @@ export class ArenaScene extends Phaser.Scene {
   private debugDraw!: Phaser.GameObjects.Graphics;
   private centerLabel!: Phaser.GameObjects.Text;
   private timeLabel!: Phaser.GameObjects.Text;
+  private leftName!: Phaser.GameObjects.Text;
+  private rightName!: Phaser.GameObjects.Text;
+  private extraHalf = 0;
   private readyTime = 1.5;
   private roundTime = 99;
   private roundOver = false;
@@ -64,8 +67,8 @@ export class ArenaScene extends Phaser.Scene {
     this.debugDraw = this.add.graphics().setDepth(12);
     this.hud = this.add.graphics().setDepth(20);
     const labelStyle = {fontFamily:'Rajdhani, Arial, sans-serif',fontSize:'27px',color:'#f7f4ff',fontStyle:'bold',stroke:'#12132d',strokeThickness:4};
-    this.add.text(39,11,'EVI',labelStyle).setDepth(21);
-    this.add.text(918,11,'NARA',labelStyle).setOrigin(1,0).setDepth(21);
+    this.leftName = this.add.text(39,11,'EVI',labelStyle).setDepth(21);
+    this.rightName = this.add.text(918,11,'NARA',labelStyle).setOrigin(1,0).setDepth(21);
     this.timeLabel = this.add.text(480,25,'99',{
       fontFamily:'Rajdhani, Arial, sans-serif',fontSize:'42px',color:'#ffe7a6',fontStyle:'bold',
       stroke:'#251e3a',strokeThickness:5,
@@ -77,22 +80,39 @@ export class ArenaScene extends Phaser.Scene {
     this.add.text(480,510,'THE SPLASH OF FIGHTING   •   FIRST PLAYABLE', {
       fontFamily:'Rajdhani, sans-serif',fontSize:'15px',color:'#bb9dbb',fontStyle:'bold',
     }).setOrigin(.5).setDepth(10);
+    this.resizeViewport(this.scale.width);
     this.paintHud();
     this.onStatus('Готово! ABXY · захват X+A (G), вихід із захвату A або X.');
   }
 
+  /** Extend the camera horizontally instead of distorting/cropping 16:9 fighters. */
+  resizeViewport(width: number): void {
+    if (!this.cameras?.main) return;
+    const screenWidth = Math.max(960, Math.round(width));
+    this.extraHalf = (screenWidth - 960) / 2;
+    setStageViewportWidth(screenWidth);
+    this.cameras.main.setViewport(0,0,screenWidth,540);
+    this.cameras.main.setScroll(-this.extraHalf,0);
+    if (this.leftName) this.leftName.x = 39 - this.extraHalf;
+    if (this.rightName) this.rightName.x = 918 + this.extraHalf;
+    this.paintHud();
+    this.paintDebug();
+  }
+
   private drawStage(): void {
     const g=this.add.graphics().setDepth(-10);
+    // Overscan: expose extra buildings / platform on wide devices.
+    const leftEdge = -1600, sceneWidth = 4160;
     for(let y=0;y<540;y+=7){
       const ratio=y/540;
       const r=Math.floor(11+ratio*22), gr=Math.floor(16+ratio*10), b=Math.floor(39+ratio*42);
-      g.fillStyle((r<<16)|(gr<<8)|b).fillRect(0,y,960,7);
+      g.fillStyle((r<<16)|(gr<<8)|b).fillRect(leftEdge,y,sceneWidth,7);
     }
     g.fillStyle(0xc8a2d0,.24).fillCircle(490,138,91);
     g.fillStyle(0xebcade,.25).fillCircle(490,138,57);
     g.lineStyle(3,0xa775c4,.5).strokeCircle(490,138,100);
     // Distant towers and lit windows, deterministic so the arena is reproducible.
-    for(let i=0;i<21;i++){
+    for(let i=-34;i<56;i++){
       const x=i*49-14;
       const h=65+(i*61%130);
       g.fillStyle(i%2?0x22243c:0x1b233e,.95).fillRect(x,373-h,42,h);
@@ -101,22 +121,22 @@ export class ArenaScene extends Phaser.Scene {
         for(let xx=x+7;xx<x+38;xx+=12) if((xx+yy+i)%4!==0)g.fillRect(xx,yy,4,6);
       }
     }
-    g.fillStyle(0x121a32).fillRect(0,373,960,74);
-    g.lineStyle(2,0xcd6fbd,.7).lineBetween(0,374,960,374);
-    for(let i=0;i<17;i++){
+    g.fillStyle(0x121a32).fillRect(leftEdge,373,sceneWidth,74);
+    g.lineStyle(2,0xcd6fbd,.7).lineBetween(leftEdge,374,leftEdge+sceneWidth,374);
+    for(let i=-28;i<52;i++){
       const x=i*62;
       g.fillStyle(0x283f5c,.7).fillRoundedRect(x,352,24,75,8);
       g.fillStyle(0xee90bb,.6).fillRect(x+9,345,6,8);
     }
     // Fighting platform
-    g.fillStyle(0x20263a).fillRect(0,GROUND_Y,960,97);
-    g.fillStyle(0x434966).fillRect(0,GROUND_Y,960,5);
-    g.fillStyle(0xc28cb6,.8).fillRect(0,GROUND_Y+5,960,2);
+    g.fillStyle(0x20263a).fillRect(leftEdge,GROUND_Y,sceneWidth,97);
+    g.fillStyle(0x434966).fillRect(leftEdge,GROUND_Y,sceneWidth,5);
+    g.fillStyle(0xc28cb6,.8).fillRect(leftEdge,GROUND_Y+5,sceneWidth,2);
     g.lineStyle(2,0x66789e,.37);
-    for(let i=0;i<19;i++){
+    for(let i=-32;i<64;i++){
       g.lineBetween(i*70-155,540,i*50+80,GROUND_Y+8);
     }
-    for(let y=GROUND_Y+25;y<540;y+=24)g.lineBetween(0,y,960,y);
+    for(let y=GROUND_Y+25;y<540;y+=24)g.lineBetween(leftEdge,y,leftEdge+sceneWidth,y);
     // Arcades: poles, lamps, animated-looking neon rings
     for(const x of [80,880]){
       g.fillStyle(0x1b2440).fillRoundedRect(x-15,210,30,234,8);
@@ -296,7 +316,7 @@ export class ArenaScene extends Phaser.Scene {
 
     // During the hold both fighters are fixed at close range.
     // This provides a visible escape window instead of an instant throw.
-    g.defender.x=Phaser.Math.Clamp(g.attacker.x+g.attacker.face*47,64,896);
+    g.defender.x=Phaser.Math.Clamp(g.attacker.x+g.attacker.face*47,STAGE_MIN_X+4,STAGE_MAX_X-4);
     g.attacker.stepGrapple(dt,g.defender.x);
     g.defender.stepGrapple(dt,g.attacker.x);
     if(g.elapsed>=GRAB_HOLD_TIME) {
@@ -372,8 +392,8 @@ export class ArenaScene extends Phaser.Scene {
     if(Math.abs(dx)>=51)return;
     const sign=dx>=0?1:-1;
     const middle=(this.evi.x+this.nara.x)/2;
-    this.evi.x=Phaser.Math.Clamp(middle-sign*26,62,898);
-    this.nara.x=Phaser.Math.Clamp(middle+sign*26,62,898);
+    this.evi.x=Phaser.Math.Clamp(middle-sign*26,STAGE_MIN_X+2,STAGE_MAX_X-2);
+    this.nara.x=Phaser.Math.Clamp(middle+sign*26,STAGE_MIN_X+2,STAGE_MAX_X-2);
   }
 
   private resolveStrike(attacker: Fighter, target: Fighter): void {
@@ -418,10 +438,10 @@ export class ArenaScene extends Phaser.Scene {
   private paintHud(): void {
     if(!this.hud)return;
     this.hud.clear();
-    this.drawHealth(39,55,this.evi.hp,0xe78fb9,false);
-    this.drawHealth(571,55,this.nara.hp,0x69d6d2,true);
-    this.drawEnergy(39,82,this.evi.energy,0xa18afa);
-    this.drawEnergy(571,82,this.nara.energy,0xa18afa);
+    this.drawHealth(39-this.extraHalf,55,this.evi.hp,0xe78fb9,false);
+    this.drawHealth(571+this.extraHalf,55,this.nara.hp,0x69d6d2,true);
+    this.drawEnergy(39-this.extraHalf,82,this.evi.energy,0xa18afa);
+    this.drawEnergy(571+this.extraHalf,82,this.nara.energy,0xa18afa);
     this.timeLabel.setText(String(Math.ceil(this.roundTime)));
   }
 

@@ -194,3 +194,92 @@ button:focus-visible,summary:focus-visible{outline:3px solid #7bd3f9;outline-off
 }
 #game-frame:fullscreen{width:100vw!important;height:100dvh!important;aspect-ratio:auto;border-radius:0}
 #game-frame:fullscreen::backdrop{background:#0b1022}
+
+/* Alpha 0.6: show the entire wide world, not a fixed 16:9 letterbox.
+   The game's logical width changes to match the frame while its height stays 540. */
+#game-canvas{width:100%;height:100%}
+#game-canvas canvas{width:100%!important;height:100%!important;display:block}
+@media (orientation:landscape) {
+  html,body{overflow:hidden}
+  .site{width:100%;height:100dvh;min-height:0;padding:0;display:block}
+  .game-shell{
+    width:100%;height:100dvh;max-width:none;min-width:0;
+    padding:0;border:0;border-radius:0;box-shadow:none;background:#10152b
+  }
+  #game-frame{width:100%;height:100%;aspect-ratio:auto;border-radius:0}
+}
+
+/* Translate around the entire controller center, preserving ABXY geometry. */
+#virtual-joystick{
+  left:13%;top:78%;right:auto;bottom:auto;
+  transform:translate(-50%,-50%) scale(var(--control-scale,1));
+  transform-origin:center center;
+}
+.touch-attacks{
+  left:78%;top:73%;right:auto;bottom:auto;
+  transform:translate(-50%,-50%) scale(var(--control-scale,1));
+  transform-origin:center center;
+}
+
+/* Pause menu controls editor. */
+.pause-touch-settings{
+  margin:8px 0;border:1px solid #8680b77d;border-radius:12px;
+  padding:10px 12px;color:#d8dff8;font-size:12px;
+  background:linear-gradient(120deg,#24294ab0,#30274e88)
+}
+.pause-touch-settings>summary{cursor:pointer;font-weight:700;color:#f3eaff;letter-spacing:.2px}
+.touch-setting-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:10px 0 8px}
+.touch-setting-grid label{display:block;font-weight:700;font-size:12px}
+.touch-setting-grid label span{display:flex;align-items:center;gap:7px;margin-top:4px}
+.touch-setting-grid input[type=range]{flex:1;min-width:0;accent-color:#f3a8da;touch-action:pan-x}
+.touch-setting-grid output{min-width:42px;text-align:right;color:#bef6dd;font-variant-numeric:tabular-nums;font-weight:700}
+.touch-setting-actions{display:flex;gap:7px;flex-wrap:wrap}
+.touch-setting-actions .pill{flex:1}
+.pause-touch-settings p{font-size:11px;color:#b6c3dc;line-height:1.35;margin:8px 0 0}
+.layout-editor{
+  position:absolute;inset:0;z-index:13;
+  pointer-events:none;touch-action:none;
+  background:linear-gradient(180deg,#0c11275a,transparent 32%,transparent 76%,#10142c66);
+}
+.layout-editor-bar{
+  position:absolute;z-index:16;left:50%;top:calc(9px + env(safe-area-inset-top,0px));
+  transform:translateX(-50%);display:flex;align-items:center;gap:12px;
+  max-width:calc(100% - 26px);padding:6px 10px;
+  border:1px solid #c7c1fa8a;border-radius:13px;
+  color:#f7e9ff;background:#25264bed;box-shadow:0 7px 30px #0009;
+  font:700 12px Rajdhani,system-ui,sans-serif;pointer-events:auto;
+}
+.layout-editor-bar>span{max-width:300px;line-height:1.25}
+.layout-editor-actions{display:flex;gap:6px;flex-shrink:0}
+.layout-editor-actions button{background:#364265;color:#f7f5ff;border:1px solid #94a0ca;border-radius:8px;padding:6px 10px;font:700 12px Rajdhani,sans-serif}
+.layout-editor-actions #btn-layout-done{background:#b7efdc;color:#1b3430;border-color:#dbfff1}
+.touch-controls.layout-editing{display:block!important;z-index:14}
+.touch-controls.layout-editing #virtual-joystick,
+.touch-controls.layout-editing .touch-attacks{
+  pointer-events:auto;touch-action:none;cursor:move;
+  outline:2px dashed #ffe2f3;outline-offset:5px;
+  border-radius:17px;background:#aba0f215;
+  box-shadow:0 0 20px #e8baff33;
+}
+.touch-controls.layout-editing #virtual-joystick{border-radius:50%}
+.touch-controls.layout-editing .touch-attacks .attack{pointer-events:none}
+.touch-controls.layout-editing #virtual-joystick::before,
+.touch-controls.layout-editing .touch-attacks::before{
+  content:'↕ Джойстик';position:absolute;left:50%;top:-24px;
+  transform:translateX(-50%);white-space:nowrap;
+  font:700 12px Rajdhani,sans-serif;color:#fff4ff;
+  padding:2px 7px;border-radius:6px;background:#1d284cdd;
+  pointer-events:none;
+}
+.touch-controls.layout-editing .touch-attacks::before{content:'✥ ABXY разом'}
+.touch-controls.layout-editing .dragging{outline-color:#8dffd6!important;box-shadow:0 0 28px #5affb877!important}
+@media (max-height:480px) {
+  .pause-touch-settings{padding:6px 9px;margin:5px 0}
+  .touch-setting-grid{gap:7px;margin:6px 0}
+  .pause-touch-settings p{display:none}
+  .layout-editor-bar{padding:5px 7px;font-size:11px;top:4px}
+  .layout-editor-actions button{padding:5px 8px}
+}
+@media(max-width:580px){
+  .touch-setting-grid{grid-template-columns:1fr}
+}

@@ -15,8 +15,14 @@ export interface AttackSpec {
 }
 export interface ActiveAttack { name: AttackName; spec: AttackSpec; elapsed: number; connected: boolean; }
 export const GROUND_Y = 443;
-export const STAGE_MIN_X = 60;
-export const STAGE_MAX_X = 900;
+export let STAGE_MIN_X = 60;
+export let STAGE_MAX_X = 900;
+/** Keep the arena center unchanged while opening up space on wide screens. */
+export function setStageViewportWidth(width: number): void {
+  const extraHalf = Math.max(0, width - 960) / 2;
+  STAGE_MIN_X = 60 - extraHalf;
+  STAGE_MAX_X = 900 + extraHalf;
+}
 
 export const ATTACKS: Record<AttackName, AttackSpec> = {
   light: { duration: .27, startup: .065, activeEnd: .145, reach: 92, damage: 5, stun: .18, push: 110, gain: 7 },

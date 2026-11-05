@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import './styles.css';
 import { Controls } from './input/Controls';
 import { ArenaScene } from './scenes/ArenaScene';
+import { TouchLayoutEditor } from './ui/TouchLayoutEditor';
 
 const status = document.querySelector<HTMLElement>('#game-status');
 const controls = new Controls();
@@ -15,8 +16,10 @@ const game = new Phaser.Game({
   antialias: false,
   roundPixels: true,
   scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH,
+    // Manual resizing keeps 540 logical pixels vertically while revealing
+    // additional stage horizontally on wide screens (no stretching/cropping).
+    mode: Phaser.Scale.NONE,
+    autoCenter: Phaser.Scale.NO_CENTER,
     parent: 'game-canvas',
     width: 960,
     height: 540,
@@ -37,9 +40,46 @@ const menuButton = document.querySelector<HTMLButtonElement>('#btn-menu');
 const resumeButton = document.querySelector<HTMLButtonElement>('#btn-resume');
 const overlay = document.querySelector<HTMLElement>('#pause-overlay');
 const frame = document.querySelector<HTMLElement>('#game-frame');
+const layoutEditButton = document.querySelector<HTMLButtonElement>('#btn-layout-edit');
+const layoutDoneButton = document.querySelector<HTMLButtonElement>('#btn-layout-done');
+const touchLayout = new TouchLayoutEditor();
+
+let currentLogicalWidth = 960;
+function resizeArena(): void {
+  if (!frame) return;
+  const rect = frame.getBoundingClientRect();
+  if (rect.width < 1 || rect.height < 1) return;
+  const width = Math.max(960, Math.round(540 * rect.width / rect.height));
+  if (width !== currentLogicalWidth) {
+    game.scale.resize(width, 540);
+    currentLogicalWidth = width;
+    arena.resizeViewport(width);
+  }
+  touchLayout.sync();
+}
+if (frame && typeof ResizeObserver !== 'undefined') {
+  new ResizeObserver(resizeArena).observe(frame);
+}
+window.addEventListener('resize', resizeArena);
+requestAnimationFrame(resizeArena);
 
 let menuOpen = false;
 let gamepadStartWasDown = false;
+
+function finishLayoutEditing(): void {
+  if (!touchLayout.isEditing) return;
+  touchLayout.stop();
+  if (menuOpen && overlay) {
+    overlay.hidden = false;
+    layoutEditButton?.focus({ preventScroll: true });
+  }
+}
+function openLayoutEditing(): void {
+  if (!menuOpen || !overlay || touchLayout.isEditing) return;
+  controls.clear();
+  overlay.hidden = true;
+  touchLayout.start();
+}
 
 function openMenu(): void {
   if (menuOpen || !overlay) return;
@@ -53,6 +93,7 @@ function openMenu(): void {
 }
 function closeMenu(): void {
   if (!menuOpen || !overlay) return;
+  finishLayoutEditing();
   controls.clear();
   menuOpen = false;
   overlay.hidden = true;
@@ -61,6 +102,7 @@ function closeMenu(): void {
   menuButton?.focus({ preventScroll: true });
 }
 function toggleMenu(): void {
+  if (touchLayout.isEditing) { finishLayoutEditing(); return; }
   if (menuOpen) closeMenu();
   else openMenu();
 }
@@ -83,6 +125,8 @@ function restartRound(): void {
 }
 
 menuButton?.addEventListener('click', openMenu);
+layoutEditButton?.addEventListener('click', openLayoutEditing);
+layoutDoneButton?.addEventListener('click', finishLayoutEditing);
 resumeButton?.addEventListener('click', closeMenu);
 cpuButton?.addEventListener('click', () => setMode('cpu'));
 versusButton?.addEventListener('click', () => setMode('versus'));
@@ -93,13 +137,13 @@ fullscreenButton?.addEventListener('click', async () => {
   try {
     if (document.fullscreenElement) await document.exitFullscreen();
     else await frame.requestFullscreen();
-    game.scale.refresh();
+    resizeArena();
   } catch {
     if (status) status.textContent = 'Повноекранний режим недоступний у цьому браузері.';
   }
 });
 document.addEventListener('fullscreenchange', () => {
-  game.scale.refresh();
+  requestAnimationFrame(resizeArena);
   if (fullscreenButton) {
     fullscreenButton.textContent = document.fullscreenElement ? '⛶ Згорнути екран' : '⛶ На весь екран';
   }
