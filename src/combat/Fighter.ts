@@ -369,7 +369,7 @@ export class Fighter {
     if(counterPunch) {
       this.hp=Math.max(0,this.hp-3);
       this.hitFlash=.18;
-      if(this.knockedOut) this.startKnockout(-this.face);
+      if(this.knockedOut) this.startKnockout(this.face===1 ? -1 : 1);
     }
   }
 
