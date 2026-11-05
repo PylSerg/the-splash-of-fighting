@@ -33,7 +33,6 @@ export class CharacterSelector {
   private mode: MatchMode = 'cpu';
   private picks: [FighterId, FighterId];
   private ready: [boolean, boolean] = [false, false];
-  private previousPair: { first: FighterId; second: FighterId } | null = null;
   private allowBack = true;
   private swipe: [SwipeStart | null, SwipeStart | null] = [null, null];
   private suppressClicks: [number, number] = [0, 0];
@@ -145,7 +144,6 @@ export class CharacterSelector {
     previous?: { first: FighterId; second: FighterId },
   ): void {
     this.mode = mode;
-    this.previousPair = previous ?? null;
     const valid = previous && previous.first !== previous.second &&
       CHARACTERS.some(c => c.id === previous.first) &&
       CHARACTERS.some(c => c.id === previous.second);
