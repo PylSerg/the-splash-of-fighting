@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <meta name="theme-color" content="#0c1022"/>
+  <meta name="description" content="The Splash of Fighting: browser arcade fighting game."/>
+  <title>The Splash of Fighting · Evi VS Nara</title>
+</head>
+<body>
+<main class="site">
+  <header class="topbar">
+    <div class="brand"><span class="star">✦</span><span><strong>THE SPLASH</strong><small>OF FIGHTING · ALPHA 0.1</small></span></div>
+    <div class="top-actions"><span class="online">● LOCAL ARCADE</span><button id="btn-fullscreen" title="На весь екран" aria-label="На весь екран">⛶</button></div>
+  </header>
+  <section class="game-shell" aria-label="Арена">
+    <div id="game-frame">
+      <div id="game-canvas"></div>
+      <div class="touch-controls" aria-label="Сенсорне керування">
+        <div class="touch-pad">
+          <button data-control="up" class="pad up" aria-label="Стрибок">▲</button>
+          <button data-control="left" class="pad left" aria-label="Ліворуч">◀</button>
+          <button data-control="down" class="pad down" aria-label="Присісти">▼</button>
+          <button data-control="right" class="pad right" aria-label="Праворуч">▶</button>
+        </div>
+        <div class="touch-attacks">
+          <button data-control="kick" class="attack kick" aria-label="Удар ногою">C</button>
+          <button data-control="heavy" class="attack heavy" aria-label="Сильний удар">B</button>
+          <button data-control="light" class="attack light" aria-label="Легкий удар">A</button>
+          <button data-control="special" class="attack special" aria-label="Спецприйом">SP</button>
+        </div>
+      </div>
+      <div class="portrait-warning">↻ Поверни телефон горизонтально, щоб грати</div>
+    </div>
+  </section>
+  <section class="toolbar" aria-label="Налаштування бою">
+    <div class="toolbar-group"><button id="btn-cpu" class="pill selected">⚡ Проти CPU</button><button id="btn-versus" class="pill">🎮 Два гравці</button></div>
+    <div class="toolbar-group"><button id="btn-debug" class="pill">▣ Хітбокси: викл.</button><button id="btn-restart" class="pill primary">↻ Новий раунд</button></div>
+  </section>
+  <div class="details"><p id="game-status" aria-live="polite">Готуємо арену…</p><details><summary>⌨ Керування</summary><p><b>Гравець 1:</b> WASD рух, J легкий, K сильний, U нога, I спеціальний.</p><p><b>Гравець 2:</b> стрілки рух, Num1 легкий, Num2 сильний, Num4 нога, Num5 спецприйом.</p><p><b>Геймпад:</b> стік або D-pad, X легкий, Y сильний, A нога, B спеціальний.</p><p><b>Інше:</b> захист триманням назад, R рестарт, H хітбокси, 1/2 режим.</p></details></div>
+  <footer>FIRST PLAYABLE · EVI × NARA · WORK IN PROGRESS</footer>
+</main>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
