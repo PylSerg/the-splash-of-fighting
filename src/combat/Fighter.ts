@@ -180,9 +180,14 @@ export class Fighter {
     const backward = this.face===1?input.left:input.right;
     this.blocking = backward && !this.airborne && !this.attack && this.stunned<=0 && !input.up;
     let move = Number(input.right)-Number(input.left);
-    if (this.crouching || this.stunned>0 || this.attack) move=0;
-    this.walking = move!==0 && !this.airborne;
+    if (this.crouching || this.stunned>0) move=0;
 
+    // Process up from the directional stick independently of attacks.
+    // This allows running jump and jumping while an attack button is held.
+    if (this.stunned<=0 && (just.up || just.jump) && !this.airborne && !this.crouching) {
+      this.vy=-490;
+      this.yOffset=-.2;
+    }
     if (this.stunned<=0 && !this.attack && !this.crouching) {
       if (just.special && this.energy>=40) {
         this.energy-=40; this.begin('special');
@@ -190,11 +195,10 @@ export class Fighter {
       else if (just.kick) this.begin('kick');
       else if (just.light) this.begin('light');
     }
-    if (this.stunned<=0 && !this.attack && (just.up || just.jump) && !this.airborne) {
-      this.vy=-490;
-      this.yOffset=-.2;
-    }
-    const moveSpeed = this.blocking ? 90 : 185;
+    // Regular attacks slow locomotion, but do not disable the joystick.
+    // Hitstun and crouching still prevent movement as combat states.
+    const moveSpeed = this.blocking ? 90 : this.attack ? 115 : 185;
+    this.walking = move!==0 && !this.airborne;
     this.x += move*moveSpeed*dt;
     this.x = Phaser.Math.Clamp(this.x,STAGE_MIN_X,STAGE_MAX_X);
     if(this.airborne || this.vy!==0) {

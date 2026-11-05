@@ -52,6 +52,9 @@ export class Controls {
   private buttons = new Map<Action, HTMLButtonElement>();
 
   private joystickPointer: number | null = null;
+  // Directional state is owned by the joystick pointer, never by attack pointers.
+  // Its last known position persists while other fingers press attack buttons.
+  private joystickPosition: {x: number; y: number} | null = null;
   private joystickDirections: Record<Direction, boolean> = {
     left: false, right: false, up: false, down: false,
   };
@@ -92,16 +95,19 @@ export class Controls {
       if (this.joystickPointer !== null) return;
       if (event.cancelable) event.preventDefault();
       this.joystickPointer = event.pointerId;
-      // Capturing this pointer allows thumb movement even outside the base.
+      // This finger owns the stick until it releases; other fingers cannot steal it.
       area.setPointerCapture(event.pointerId);
       area.classList.add('engaged');
       this.moveJoystick(event);
     });
-    area.addEventListener('pointermove', event => {
+    const track = (event: PointerEvent) => {
       if (event.pointerId !== this.joystickPointer) return;
       if (event.cancelable) event.preventDefault();
       this.moveJoystick(event);
-    });
+    };
+    area.addEventListener('pointermove', track);
+    // Use higher frequency position reports where the browser supports them.
+    area.addEventListener('pointerrawupdate', track as EventListener);
     const release = (event: PointerEvent) => {
       if (event.pointerId === this.joystickPointer) this.releaseJoystick();
     };
@@ -112,13 +118,20 @@ export class Controls {
   }
 
   private moveJoystick(event: PointerEvent): void {
-    if (!this.joystickBase || !this.joystickThumb) return;
+    this.joystickPosition = {x: event.clientX, y: event.clientY};
+    this.updateJoystickDirections();
+  }
+
+  private updateJoystickDirections(): void {
+    if (!this.joystickPosition || !this.joystickBase || !this.joystickThumb) return;
+    // Read the stick from its own last position at every simulation sample,
+    // independently of what the attacking finger is doing.
     const rect = this.joystickBase.getBoundingClientRect();
-    const dx = event.clientX - (rect.left + rect.width / 2);
-    const dy = event.clientY - (rect.top + rect.height / 2);
+    const dx = this.joystickPosition.x - (rect.left + rect.width / 2);
+    const dy = this.joystickPosition.y - (rect.top + rect.height / 2);
     const distance = Math.hypot(dx, dy);
-    const maxRadius = rect.width * 0.30; // 36px for a 120px base
-    const deadZone = rect.width / 6; // 20px for a 120px base
+    const maxRadius = rect.width * 0.30;
+    const deadZone = rect.width / 6;
     const ratio = distance > 0 ? Math.min(1, maxRadius / distance) : 0;
     this.joystickThumb.style.setProperty('--joy-x', `${Math.round(dx * ratio)}px`);
     this.joystickThumb.style.setProperty('--joy-y', `${Math.round(dy * ratio)}px`);
@@ -129,11 +142,9 @@ export class Controls {
       return;
     }
     this.joystickBase.classList.add('moving');
-    // Wider diagonal sectors: up + horizontal can be activated without releasing movement.
-    // The separate jump button has an independent state, so jumping remains possible
-    // even when the directional stick is already held upward.
     const nx = dx / distance;
     const ny = dy / distance;
+    // A generous diagonal sector allows pushing up while holding left or right.
     const diagonalThreshold = 0.30;
     this.joystickDirections.left = nx < -diagonalThreshold;
     this.joystickDirections.right = nx > diagonalThreshold;
@@ -144,6 +155,7 @@ export class Controls {
   private releaseJoystick(): void {
     const pointer = this.joystickPointer;
     this.joystickPointer = null;
+    this.joystickPosition = null;
     for (const direction of DIRECTIONS) this.joystickDirections[direction] = false;
     this.joystickThumb?.style.setProperty('--joy-x', '0px');
     this.joystickThumb?.style.setProperty('--joy-y', '0px');
@@ -201,6 +213,7 @@ export class Controls {
       state[action] = this.keys.has(map[action]) || Boolean(touched?.has(action));
     }
     if (player === 0) {
+      if (this.joystickPointer !== null) this.updateJoystickDirections();
       for (const direction of DIRECTIONS) {
         state[direction] ||= this.joystickDirections[direction];
       }

@@ -16,7 +16,7 @@ button:focus-visible,summary:focus-visible{outline:3px solid #7bd3f9;outline-off
 #game-frame{position:relative;aspect-ratio:16/9;width:100%;overflow:hidden;border-radius:11px;background:#10152e;isolation:isolate}
 #game-canvas{position:absolute;inset:0}
 #game-canvas canvas{display:block;image-rendering:pixelated}
-.touch-controls{display:none;position:absolute;inset:0;z-index:5;pointer-events:none;touch-action:none}
+.touch-controls{display:none;position:absolute;inset:0;z-index:5;pointer-events:none;touch-action:none;user-select:none;-webkit-user-select:none}
 /* Alpha 0.2: 8-way joystick and four-button diamond; both accept independent pointers. */
 .virtual-joystick{
   position:absolute;left:calc(clamp(42px, 6vw, 96px) + env(safe-area-inset-left,0px));
@@ -73,8 +73,6 @@ button:focus-visible,summary:focus-visible{outline:3px solid #7bd3f9;outline-off
   text-shadow:0 2px 3px #0008;
   transition:filter .08s,scale .08s;
 }
-.attack.jump{grid-column:1;grid-row:1;width:56px;height:56px;font-size:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;background:linear-gradient(145deg,#82b6eeec,#4268c3ec)}
-.attack.jump small{font-size:9px;letter-spacing:.3px;line-height:1}
 .attack.heavy{grid-column:2;grid-row:1;background:linear-gradient(140deg,#f8ac52d9,#a75f30ed)}
 .attack.light{grid-column:1;grid-row:2;background:linear-gradient(140deg,#fc85b8e5,#b6346fcf)}
 .attack.kick{grid-column:3;grid-row:2;background:linear-gradient(140deg,#69dce6e5,#1d819fdf)}
@@ -110,8 +108,6 @@ footer{text-align:center;color:#647499;font:700 12px Rajdhani,sans-serif;letter-
 .touch-attacks{width:162px;height:162px;right:calc(clamp(56px, 8vw, 120px) + env(safe-area-inset-right,0px));bottom:calc(clamp(24px, 5vh, 42px) + env(safe-area-inset-bottom,0px))}
 .attack{width:55px;height:55px;font-size:22px}
 .attack.special{width:59px;height:59px;font-size:16px}
-.attack.jump{width:50px;height:50px;font-size:19px}
-.attack.jump small{font-size:8px}
 }
 #game-frame:fullscreen{width:100vw!important;height:100dvh!important;aspect-ratio:auto;border-radius:0}
 #game-frame:fullscreen::backdrop{background:#0b1022}

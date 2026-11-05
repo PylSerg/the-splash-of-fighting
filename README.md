@@ -21,9 +21,11 @@ npm run build
 npm run preview
 ```
 
-## Alpha 0.2.1 · Mobile jump & spacing fix
+## Alpha 0.2.2 · Joystick-first multitouch fix
 
-The **↑ JUMP** button is separate from the directional joystick. Hold the joystick horizontally and tap JUMP to leap without releasing movement; diagonal jump on the stick also works. The independent jump action is mapped to **Space** (player 1), **Numpad0** (player 2) and **RB** (standard gamepad). Touch controls now have larger safe edge margins in landscape and fullscreen, including phones with display cutouts.
+Mobile has exactly four attack buttons (A, B, C and SP). **No separate jump button.** Slide the joystick diagonally up while running to jump. The directional pointer keeps its own position and is sampled continuously regardless of how many attack buttons are being pressed. Attacks slow movement rather than freezing directional input; jumping is evaluated before attacks and also works while attack buttons are pressed. Touch controls retain the larger safe edge margins from Alpha 0.2.1.
+
+The keyboard retains optional **Space** (player 1) and **Numpad0** (player 2), and a standard gamepad retains **RB** as alternative jump triggers; on touchscreens jump uses only the joystick.
 
 ## Alpha 0.2 · Mobile controls
 
