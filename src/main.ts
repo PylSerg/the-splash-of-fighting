@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import './styles.css';
+import './ui/selection.css';
 import { Controls } from './input/Controls';
 import { ArenaScene } from './scenes/ArenaScene';
 import { TouchLayoutEditor } from './ui/TouchLayoutEditor';
@@ -64,6 +65,10 @@ let pendingPair: Pair | null=null;
 let activeStage: StageId='city';
 let logicalWidth=960;
 let gamepadStartHeld=false;
+let selectionDirectionHeld=0;
+let selectionDirectionTime=0;
+let selectionAHeld=false;
+let selectionBHeld=false;
 let pendingConfirmation: DisruptiveAction | null=null;
 let confirmationReturnFocus: HTMLElement | null=null;
 
@@ -333,8 +338,8 @@ function togglePause(): void {
   if(screen==='battle') showMenu('battle');
   else if(screen==='menu') leaveMenu();
   else if(screen==='layout') finishLayout();
-  else if(screen==='characters') backFromCharacter();
-  else if(screen==='stages') backFromStage();
+  else if(screen==='characters') characterSelector.goBack();
+  else if(screen==='stages') stageSelector.goBack();
 }
 
 // Home screen: no combat starts until the player chooses a fighter AND stage.
@@ -391,6 +396,28 @@ window.addEventListener('keydown',event=>{
     togglePause();
     return;
   }
+  // Fullscreen selection carousel: arrows spin the carousel; Enter/Space
+  // confirms whichever character or stage is centered. Focused navigation
+  // buttons keep their normal native keyboard semantics.
+  if(screen==='characters'||screen==='stages'){
+    const isCharacter=screen==='characters';
+    if(event.code==='ArrowLeft'||event.code==='ArrowRight'){
+      event.preventDefault();
+      const direction=event.code==='ArrowLeft'?-1:1;
+      if(isCharacter)characterSelector.navigate(direction);
+      else stageSelector.navigate(direction);
+    } else if(event.code==='Enter'||event.code==='Space'){
+      const active=document.activeElement;
+      const viewport=isCharacter
+        ? get<HTMLElement>('#select-carousel') : get<HTMLElement>('#arena-carousel');
+      if(active===viewport||active===document.body){
+        event.preventDefault();
+        if(isCharacter)characterSelector.confirmCurrent();
+        else stageSelector.confirm();
+      }
+    }
+    return;
+  }
   if(screen!=='battle')return;
   switch(event.code){
     case 'KeyR':requestConfirmation('restart');break;
@@ -399,10 +426,47 @@ window.addEventListener('keydown',event=>{
   }
 });
 function pollGamepadMenu(): void {
-  const pads=navigator.getGamepads?.()??[];
-  const down=Array.from(pads).some(p=>Boolean(p?.buttons[9]?.pressed));
+  const pads=Array.from(navigator.getGamepads?.()??[]).filter(
+    (pad):pad is Gamepad=>Boolean(pad && pad.connected));
+  const down=pads.some(p=>Boolean(p.buttons[9]?.pressed));
   if(down&&!gamepadStartHeld&&(screen==='battle'||screen==='menu')) togglePause();
   gamepadStartHeld=down;
+
+  if(screen==='characters'||screen==='stages'){
+    // Standard gamepads: D-pad 14/15 and left stick axis 0.
+    // Key repeat is deliberately slower than combat input.
+    const direction=pads.reduce((result,pad)=>{
+      if(result!==0)return result;
+      if(pad.buttons[14]?.pressed||((pad.axes[0]??0)<-.55))return -1;
+      if(pad.buttons[15]?.pressed||((pad.axes[0]??0)>.55))return 1;
+      return 0;
+    },0);
+    const now=performance.now();
+    if(direction && (direction!==selectionDirectionHeld ||
+        now-selectionDirectionTime>260)){
+      if(screen==='characters')characterSelector.navigate(direction as -1|1);
+      else stageSelector.navigate(direction as -1|1);
+      selectionDirectionTime=now;
+    }
+    selectionDirectionHeld=direction;
+
+    const confirmDown=pads.some(p=>Boolean(p.buttons[0]?.pressed));
+    const backDown=pads.some(p=>Boolean(p.buttons[1]?.pressed));
+    if(confirmDown&&!selectionAHeld){
+      if(screen==='characters')characterSelector.confirmCurrent();
+      else if(screen==='stages')stageSelector.confirm();
+    }
+    if(backDown&&!selectionBHeld){
+      if(screen==='characters')characterSelector.goBack();
+      else if(screen==='stages')stageSelector.goBack();
+    }
+    selectionAHeld=confirmDown;
+    selectionBHeld=backDown;
+  } else {
+    selectionDirectionHeld=0;
+    selectionAHeld=false;
+    selectionBHeld=false;
+  }
   requestAnimationFrame(pollGamepadMenu);
 }
 requestAnimationFrame(pollGamepadMenu);

@@ -21,6 +21,17 @@ npm run build
 npm run preview
 ```
 
+## Alpha 1.0.0 · Fullscreen animated character and arena carousel
+
+The two cramped selection windows are replaced with **true fullscreen arcade selection scenes**. All three fighters are displayed as **full-body procedural SVGs**, matching their current in-game color schemes and gear, instead of small headshot cards. The centered fighter appears at full brightness and size, while the previous/next fighters remain **behind at 76% scale, dimmed by a CSS filter**. Changing the selection smoothly animates the exact same three SVG elements across the screen, without loading additional duplicated images.
+
+- **Touch:** swipe directly across the fighters to rotate the carousel (a tap on a side fighter brings them to the center, and a tap on the centered fighter confirms).
+- **Keyboard:** left/right arrows rotate, Enter/Space confirms, Esc goes back.
+- **Gamepad:** D-pad or left stick left/right rotates; **A** confirms, **B** goes back. Held directions repeat at a controlled speed rather than racing through the roster.
+- **PvP:** first player chooses and confirms, then the second player chooses from the remaining fighters. The taken fighter is marked and cannot be confirmed again. Back returns from player 2 to player 1. CPU still chooses randomly from the other fighters; reselecting the unchanged character/opponent during an active round does not discard progress.
+- **Arna selection:** the same fullscreen carousel approach now shows a large original CSS-rendered neon city or moonlit lagoon, with the inactive arena receding behind. Swipe, arrows, gamepad and click/confirm all work. No extra image files are created.
+- The **pause/settings interface also fills the screen**, replacing its centered window. The user-requested small custom **loss-of-progress warning** remains deliberately separate for destructive actions, and all existing confirmation safety and reversible navigation rules remain intact.
+
 ## Alpha 0.9.4 · In-game confirmation before losing round progress
 
 A custom, touch-friendly **unsaved progress** warning appears before **Рестарт**, **Змінити персонажа**, **Змінити арену** and **Вийти** in the fight menu. There is no browser `window.confirm()`. Each action has a specific warning that accurately describes what changes and what stays unchanged.
