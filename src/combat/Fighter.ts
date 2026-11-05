@@ -39,6 +39,7 @@ export class Fighter {
   walking = false;
   attack: ActiveAttack | null = null;
   hitFlash = 0;
+  private blockFlash = 0;
   private impactVelocity = 0;
   // A short chord window prevents B and Y being mistaken for separate
   // kick/heavy attacks when the player presses them nearly together.
@@ -48,6 +49,7 @@ export class Fighter {
 
   readonly rig: Phaser.GameObjects.Container;
   private shadow: Phaser.GameObjects.Ellipse;
+  private guardAura: Phaser.GameObjects.Ellipse;
   private cape: Phaser.GameObjects.Graphics;
   private leftLeg: Phaser.GameObjects.Graphics;
   private rightLeg: Phaser.GameObjects.Graphics;
@@ -69,6 +71,8 @@ export class Fighter {
 
     this.rig = scene.add.container(initialX, GROUND_Y);
     this.shadow = scene.add.ellipse(0, 5, 90, 17, 0x060c1d, .50);
+    this.guardAura = scene.add.ellipse(4, -78, 83, 154, 0x66e1d2, .12)
+      .setStrokeStyle(3, 0x8cf2f2, .85).setVisible(false);
     this.cape = scene.add.graphics();
     this.backArm = scene.add.graphics();
     this.leftLeg = scene.add.graphics();
@@ -146,7 +150,7 @@ export class Fighter {
     }
 
     this.rig.add([
-      this.shadow,this.cape,this.backArm,this.leftLeg,this.rightLeg,
+      this.shadow,this.guardAura,this.cape,this.backArm,this.leftLeg,this.rightLeg,
       this.body,this.weapon,this.frontArm,this.hair,this.head
     ]);
     this.draw(0);
@@ -159,7 +163,7 @@ export class Fighter {
     this.x=x; this.face=face; this.hp=100; this.energy=50;
     this.yOffset=0; this.vy=0; this.stunned=0; this.blocking=false;
     this.crouching=false; this.walking=false; this.attack=null;
-    this.hitFlash=0; this.impactVelocity=0; this.time=0;
+    this.hitFlash=0; this.blockFlash=0; this.impactVelocity=0; this.time=0;
     this.queuedSolo=null; this.queuedSpecial=0;
     this.draw(0);
   }
@@ -168,6 +172,7 @@ export class Fighter {
     this.time += dt;
     this.face = opponentX >= this.x ? 1 : -1;
     this.hitFlash = Math.max(0, this.hitFlash-dt);
+    this.blockFlash = Math.max(0, this.blockFlash-dt);
     const knock = this.impactVelocity;
     this.x += knock*dt;
     this.impactVelocity *= Math.pow(.055,dt);
@@ -181,12 +186,18 @@ export class Fighter {
       if (this.attack.elapsed >= this.attack.spec.duration) this.attack=null;
     }
 
+    // Guard has priority over regular attacks. A can cancel a normal punch
+    // or kick immediately, including while moving or airborne.
+    // A special attack remains committed until its animation finishes.
+    if (input.block && this.stunned<=0 && this.attack?.name !== 'special') {
+      this.attack=null;
+      this.queuedSolo=null;
+      this.queuedSpecial=0;
+    }
     this.crouching = Boolean(input.down && !this.airborne && !this.attack && this.stunned<=0);
-    // Blocking is now a deliberate hold on A, not "back" on the joystick.
-    // A + down gives a crouching guard. Guarding pauses locomotion.
-    this.blocking = Boolean(input.block && !this.airborne && !this.attack && this.stunned<=0);
+    this.blocking = Boolean(input.block && !this.attack && this.stunned<=0);
     let move = Number(input.right)-Number(input.left);
-    if (this.crouching || this.stunned>0 || this.blocking) move=0;
+    if (this.crouching || this.stunned>0) move=0;
 
     // A stick is a held direction, not a one-frame button press.
     // Reading only just.up loses jumps if the fighter was stunned or airborne
@@ -203,7 +214,7 @@ export class Fighter {
     // buffered briefly, with priority above both of its component attacks.
     this.queuedSpecial=Math.max(0,this.queuedSpecial-dt);
     if (just.special) {
-      this.queuedSpecial=.22;
+      this.queuedSpecial=.55;
       this.queuedSolo=null;
     }
     const canAct=this.stunned<=0 && !this.crouching && !this.blocking;
@@ -211,8 +222,7 @@ export class Fighter {
 
     const canCancelForChord=Boolean(
       this.attack &&
-      (this.attack.name==='kick' || this.attack.name==='heavy') &&
-      this.attack.elapsed<.22
+      (this.attack.name==='kick' || this.attack.name==='heavy')
     );
     if (canAct && this.queuedSpecial>0 && this.energy>=40 &&
         (!this.attack || canCancelForChord)) {
@@ -276,7 +286,7 @@ export class Fighter {
 
   receiveHit(spec: AttackSpec, attackerFace: 1|-1): {damage:number;blocked:boolean} {
     const blocked=this.blocking;
-    const damage=blocked?Math.max(1,Math.ceil(spec.damage*.16)):spec.damage;
+    const damage=blocked?0:spec.damage;
     this.hp=Math.max(0,this.hp-damage);
     this.energy=Math.min(100,this.energy+(blocked?3:9));
     this.impactVelocity=attackerFace*spec.push*(blocked?.43:1);
@@ -287,7 +297,10 @@ export class Fighter {
       this.queuedSpecial=0;
       this.hitFlash=.15;
     } else {
-      this.stunned=Math.min(.10,spec.stun*.25);
+      // Keep the guard up through successive hits; guard stun must not
+      // create a tiny opening that lets the next hit bypass a held A.
+      this.stunned=0;
+      this.blockFlash=.18;
     }
     this.x=Phaser.Math.Clamp(this.x,STAGE_MIN_X,STAGE_MAX_X);
     return {damage,blocked};
@@ -329,6 +342,10 @@ export class Fighter {
     this.rig.setPosition(this.x,GROUND_Y+this.yOffset);
     this.rig.setScale(this.face,1);
     this.rig.alpha=this.knockedOut ? .65 : 1;
+    this.guardAura.setVisible(this.blocking);
+    this.guardAura.setAlpha(this.blockFlash>0 ? .90 : .44);
+    this.guardAura.setY(this.crouching ? -54 : -78);
+    this.guardAura.setScale(this.crouching ? .9 : 1,this.crouching ? .65 : 1);
     if(this.hitFlash>0) this.body.setAlpha(.45);
     else this.body.setAlpha(1);
     this.shadow.setScale(this.airborne?Math.max(.45,1+this.yOffset/500):1,1);

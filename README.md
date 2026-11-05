@@ -21,6 +21,13 @@ npm run build
 npm run preview
 ```
 
+## Alpha 0.3.1 · Guard and one-finger B+Y
+
+- Holding **A** guards on the ground, while walking and in the air. Guarding interrupts a regular punch or kick, but cannot be activated during hitstun or a committed special move.
+- Guarding absorbs **100% of normal damage** and shows a turquoise shield. Movement while guarding is slower; crouching guard works with down+A.
+- Swipe **from B into Y**, or **from Y into B**, while maintaining one finger on the screen. This triggers the same special as simultaneous B+Y with two fingers (or R1 on a gamepad), without adding a fifth button.
+- The B+Y special buffer is extended for swipe recognition and can cancel an ongoing B or Y normal attack. A special requires at least 40 energy.
+
 ## Alpha 0.3.0 · ABXY combat controls
 
 - **X** (left): quick light punch, **Y** (top): slower heavy punch, **B** (right): kick, **A** (bottom): hold to block.

@@ -52,6 +52,11 @@ export class Controls {
   private keys = new Set<string>();
   private touches = new Map<number, Action>();
   private buttons = new Map<Action, HTMLButtonElement>();
+  // One-finger combo swipe: drag a held B (kick) onto Y (heavy), or the reverse.
+  // The gesture remains active for the pointer lifetime, like a two-button chord.
+  private comboSwipePointers = new Set<number>();
+  // Preserve fast swipes long enough for the next 60Hz simulation sample.
+  private comboSwipePulseUntil = 0;
 
   private joystickPointer: number | null = null;
   // Directional state is owned by the joystick pointer, never by attack pointers.
@@ -178,8 +183,27 @@ export class Controls {
         this.touches.set(event.pointerId, action);
         this.updateVisuals();
       });
+      // Keep pointer capture on the originating attack button, then inspect
+      // whether that finger has crossed into the other combo button's hit area.
+      // This does not interfere with a second finger or with the joystick.
+      button.addEventListener('pointermove', event => {
+        if (this.touches.get(event.pointerId) !== action) return;
+        const other = action === 'kick' ? 'heavy' : action === 'heavy' ? 'kick' : null;
+        if (!other || this.comboSwipePointers.has(event.pointerId)) return;
+        const partner = this.buttons.get(other);
+        if (!partner) return;
+        const rect = partner.getBoundingClientRect();
+        const tolerance = 9;
+        if (event.clientX >= rect.left - tolerance && event.clientX <= rect.right + tolerance &&
+            event.clientY >= rect.top - tolerance && event.clientY <= rect.bottom + tolerance) {
+          this.comboSwipePointers.add(event.pointerId);
+          this.comboSwipePulseUntil = performance.now() + 220;
+          this.updateVisuals();
+        }
+      });
       const release = (event: PointerEvent) => {
         this.touches.delete(event.pointerId);
+        this.comboSwipePointers.delete(event.pointerId);
         this.updateVisuals();
       };
       button.addEventListener('pointerup', release);
@@ -194,12 +218,15 @@ export class Controls {
     for (const [action, button] of this.buttons) {
       button.classList.toggle('pressed', pressed.has(action));
     }
-    document.querySelector('.touch-attacks')?.classList.toggle('combo-active', pressed.has('kick') && pressed.has('heavy'));
+    document.querySelector('.touch-attacks')?.classList.toggle('combo-active',
+      (pressed.has('kick') && pressed.has('heavy')) || this.comboSwipePointers.size > 0);
   }
 
   clear(): void {
     this.keys.clear();
     this.touches.clear();
+    this.comboSwipePointers.clear();
+    this.comboSwipePulseUntil=0;
     this.releaseJoystick();
     this.updateVisuals();
   }
@@ -228,7 +255,11 @@ export class Controls {
     for (const action of ACTIONS) {
       state[action] ||= pad[action];
     }
+    // Touchscreen: a single thumb swipe B<->Y produces the same special
+    // signal as the two-finger chord. No additional visible button is needed.
     state.special ||= state.kick && state.heavy;
+    if (player === 0 && (this.comboSwipePointers.size > 0 ||
+        performance.now() < this.comboSwipePulseUntil)) state.special = true;
     return state;
   }
 }
