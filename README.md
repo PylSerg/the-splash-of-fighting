@@ -21,6 +21,12 @@ npm run build
 npm run preview
 ```
 
+## Alpha 0.9.2 · Correct settings tabs and character-select navigation
+
+- Opening **Налаштування** from the title screen shows **Керування**, **Графіка** and **Довідка**, with no **Бій** tab. These three tabs expand to fill the width. Opening the pause menu during a match restores all four tabs and its five battle actions.
+- **Назад** is now visible in character selection at all times. In a new game it returns to the **title screen**, while choosing new fighters from a paused fight returns to the **fight's pause menu** without resetting the current match.
+- Keyboard **Escape / P** follows the same back navigation when the character selector is open.
+
 ## Alpha 0.9.1 · Landscape title-screen layout and larger menu controls
 
 - The main screen no longer uses a three-row grid that could push the game title off the top of short landscape displays. Title, subtitle and primary buttons now form one centered, height-aware column.

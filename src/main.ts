@@ -100,6 +100,8 @@ function setScreen(next: Screen): void {
   menuButton.setAttribute('aria-expanded',String(next==='menu'));
 }
 function selectMenuTab(tab: MenuTab): void {
+  // The front-screen settings panel has no fight actions.
+  if (menuOrigin==='home' && tab==='game') tab='controls';
   for(const button of document.querySelectorAll<HTMLButtonElement>('[data-menu-tab]')){
     const chosen=button.dataset.menuTab===tab;
     button.classList.toggle('selected',chosen);
@@ -130,6 +132,10 @@ function showMenu(origin:'home'|'battle', tab:MenuTab='game'): void {
   for(const id of ['#btn-restart','#btn-choose-characters','#btn-choose-stage']){
     get<HTMLButtonElement>(id).disabled=origin==='home';
   }
+  // The first "Бій" tab exists only when a match has been paused.
+  // Three remaining settings tabs stretch across the full tab bar.
+  get<HTMLButtonElement>('[data-menu-tab="game"]').hidden=origin==='home';
+  get<HTMLElement>('.pause-tabs').classList.toggle('settings-only',origin==='home');
   setScreen('menu');
   selectMenuTab(tab);
 }
@@ -151,7 +157,11 @@ function showCharacters(origin:'home'|'menu'): void {
   setScreen('characters');
   const previous=origin==='menu'&&activePair
     ? {first:activePair.first,second:activePair.second} : undefined;
-  characterSelector.show(activePair?.mode??'cpu',origin==='menu',previous);
+  // "Назад" is available both on the initial selection and mid-match.
+  // The destination differs: title screen vs paused fight menu.
+  get<HTMLButtonElement>('#btn-select-back').textContent=
+    origin==='home'?'← На головну':'← До меню';
+  characterSelector.show(activePair?.mode??'cpu',true,previous);
 }
 function onCharacterChosen(first:FighterId,second:FighterId,mode:MatchMode): void {
   const next={first,second,mode};
