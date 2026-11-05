@@ -21,6 +21,12 @@ npm run build
 npm run preview
 ```
 
+## Alpha 0.3.2 · Tactical guard and heavy chip damage
+
+Hold **A** to guard only while **standing still on the ground**, **retreating backward**, or **holding backward + down to crouch**. Backward is relative to the opponent, including when the fighters switch sides. Guard does not work while approaching, jumping, crouching without backward, stunned, or committed to a special. Guarding can cancel an ordinary attack.
+
+Guard absorbs **100%** of X, B and special attacks, but **75%** of a heavy Y attack. Heavy Y deals 11 HP normally, so its exact guarded chip damage is **2.75 HP**. Defensive retreat is slower; the CPU obeys the same directional restrictions.
+
 ## Alpha 0.3.1 · Guard and one-finger B+Y
 
 - Holding **A** guards on the ground, while walking and in the air. Guarding interrupts a regular punch or kick, but cannot be activated during hitstun or a committed special move.

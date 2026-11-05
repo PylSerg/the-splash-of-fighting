@@ -186,16 +186,22 @@ export class Fighter {
       if (this.attack.elapsed >= this.attack.spec.duration) this.attack=null;
     }
 
-    // Guard has priority over regular attacks. A can cancel a normal punch
-    // or kick immediately, including while moving or airborne.
-    // A special attack remains committed until its animation finishes.
-    if (input.block && this.stunned<=0 && this.attack?.name !== 'special') {
+    // A only guards in safe stances: on the ground at rest, retreating,
+    // or crouching while holding back. Back follows the opponent's side.
+    const forward = this.face===1 ? input.right : input.left;
+    const backward = this.face===1 ? input.left : input.right;
+    const neutral = !input.left && !input.right && !input.up && !input.down;
+    const validGuardStance = !this.airborne && !input.up && !forward &&
+      (neutral || backward);
+    const canRaiseGuard = input.block && validGuardStance && this.stunned<=0;
+    // A valid guard cancels a normal attack, but not a committed special.
+    if (canRaiseGuard && this.attack?.name !== 'special') {
       this.attack=null;
       this.queuedSolo=null;
       this.queuedSpecial=0;
     }
     this.crouching = Boolean(input.down && !this.airborne && !this.attack && this.stunned<=0);
-    this.blocking = Boolean(input.block && !this.attack && this.stunned<=0);
+    this.blocking = Boolean(canRaiseGuard && !this.attack);
     let move = Number(input.right)-Number(input.left);
     if (this.crouching || this.stunned>0) move=0;
 
@@ -284,9 +290,11 @@ export class Fighter {
     return {x:this.x-25,y:GROUND_Y+this.yOffset-(this.crouching?73:145),w:50,h:this.crouching?72:142};
   }
 
-  receiveHit(spec: AttackSpec, attackerFace: 1|-1): {damage:number;blocked:boolean} {
+  receiveHit(spec: AttackSpec, attackerFace: 1|-1, attackName: AttackName): {damage:number;blocked:boolean} {
     const blocked=this.blocking;
-    const damage=blocked?0:spec.damage;
+    // Y heavy retains 25% chip damage against an otherwise successful guard.
+    // Keep fractional HP: 11 HP heavy deals exactly 2.75 HP through block.
+    const damage=blocked ? (attackName==='heavy' ? spec.damage*.25 : 0) : spec.damage;
     this.hp=Math.max(0,this.hp-damage);
     this.energy=Math.min(100,this.energy+(blocked?3:9));
     this.impactVelocity=attackerFace*spec.push*(blocked?.43:1);

@@ -194,6 +194,13 @@ export class ArenaScene extends Phaser.Scene {
     if(distance>130)input[forward]=true;
     else if(distance<75 && this.aiCount%5===0)input.block=true;
     if(distance<160 && this.evi.attack && this.aiCount%4===0) input.block=true;
+    // The CPU has the same guard restrictions: halt its approach or
+    // retreat when blocking rather than guarding while moving forward.
+    if (input.block) {
+      input[forward]=false;
+      const backward=forward==='left'?'right':'left';
+      if (distance<135 && this.evi.attack) input[backward]=true;
+    }
     this.aiCooldown-=dt;
     if(this.aiCooldown<=0){
       this.aiCount++;
@@ -224,13 +231,15 @@ export class ArenaScene extends Phaser.Scene {
     const box=attacker.strikeBox();
     if(!box||!overlap(box,target.bodyBox()))return;
     strike.connected=true;
-    const hit=target.receiveHit(strike.spec,attacker.face);
+    const hit=target.receiveHit(strike.spec,attacker.face,strike.name);
     attacker.rewardHit(strike.spec);
     this.spawnSparks(target.x,GROUND_Y+target.yOffset-85,hit.blocked);
     if(!hit.blocked)this.cameras.main.shake(75,.003);
-    this.onStatus(hit.blocked?'Блок!':attacker.id==='evi'
-      ?'Еві влучила! -'+hit.damage+' HP Нари.'
-      :'Нара влучила! -'+hit.damage+' HP Еві.');
+    this.onStatus(hit.blocked
+      ? (hit.damage>0 ? 'Блок! Y пробив '+hit.damage.toLocaleString('uk-UA')+' HP (25% шкоди).' : 'Блок! Ушкодження поглинуто.')
+      : attacker.id==='evi'
+        ?'Еві влучила! -'+hit.damage+' HP Нари.'
+        :'Нара влучила! -'+hit.damage+' HP Еві.');
   }
 
   private spawnSparks(x:number,y:number,blocked:boolean): void {
