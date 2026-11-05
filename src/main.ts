@@ -6,7 +6,8 @@ import { ArenaScene } from './scenes/ArenaScene';
 import { TouchLayoutEditor } from './ui/TouchLayoutEditor';
 import { CharacterSelector, type MatchMode } from './ui/CharacterSelector';
 import { StageSelector } from './ui/StageSelector';
-import { getCharacter, portraitSvg } from './characters/Roster';
+import { CHARACTERS, getCharacter, portraitSvg } from './characters/Roster';
+import gamePackage from '../package.json';
 import { getStage, type StageId } from './stages/Stages';
 import type { FighterId } from './combat/Fighter';
 
@@ -19,6 +20,13 @@ const get = <T extends HTMLElement>(selector: string): T => {
   if(!el) throw new Error('Missing interface element: ' + selector);
   return el;
 };
+
+// Derive the title-screen and pause-menu release labels from package.json.
+ // This prevents stale version names when the roster or game is updated.
+const releaseName=`ALPHA ${gamePackage.version}`;
+get<HTMLElement>('.home-version').textContent =
+  releaseName + ' · ' + CHARACTERS.map(character=>character.name).join(' × ');
+get<HTMLElement>('.pause-eyebrow span').textContent = '• ' + releaseName;
 
 const status=get<HTMLElement>('#game-status');
 const controls=new Controls();

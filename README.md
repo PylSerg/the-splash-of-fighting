@@ -21,6 +21,12 @@ npm run build
 npm run preview
 ```
 
+## Alpha 1.2.1 · Accurate build version labels
+
+- Fixed the main title screen, which still displayed **Alpha 1.1.1** despite the deployed game already running 1.2.0.
+- Both the main screen and pause menu now read their release version directly from `package.json` at build time, and the title screen builds its fighter list directly from the live character roster. Future character additions and version bumps no longer require separately editing these labels.
+- No gameplay or fighter mechanics are changed in this patch.
+
 ## Alpha 1.2.0 · Kai joins the four-fighter roster
 
 - **КАЙ** joins Evi, Nara and Lyra: a silver-haired, electric-blue fighter with midnight armor, flowing energy ribbons and two energized tonfa batons.
