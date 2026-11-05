@@ -27,6 +27,14 @@ npm run preview
 - Both the main screen and pause menu now read their release version directly from `package.json` at build time, and the title screen builds its fighter list directly from the live character roster. Future character additions and version bumps no longer require separately editing these labels.
 - No gameplay or fighter mechanics are changed in this patch.
 
+## Alpha 1.4.0 · Character stories and deliberate arena selection
+
+- Tap a focused fighter in either carousel to read their **original story, weapon and combat style** in an accessible, fullscreen portrait dialog. Tap an adjacent fighter to select them. Tapping a fighter **never starts the match**.
+- **Далі: арена** is the explicit way to leave fighter selection, and tapping the focused stage cannot launch combat. Use the **На арену!** button to confirm the stage.
+- Changing fighters from the paused match menu now brings up the **arena selector**, instead of jumping straight into battle. Going back from the stage restores your selected fighters without modifying the paused game.
+- CPU gamepad A or keyboard Enter on a focused carousel opens a biography; PvP maintains its separate Ready buttons. Escape and gamepad B close the modal.
+- The existing vector art remains temporary until all original pixel-art models are ready.
+
 ## Alpha 1.3.0 · Runa, an original powerhouse concept
 
 - Replaces the previous third-party-inspired fighter identity across selection, HUD, match defaults, gameplay IDs and title-screen copy.

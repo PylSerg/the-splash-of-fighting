@@ -67,7 +67,7 @@ const touchLayout=new TouchLayoutEditor();
 let screen: Screen='home';
 let menuOrigin: 'home' | 'battle'='battle';
 let characterOrigin: 'home' | 'menu'='home';
-let stageOrigin: 'new' | 'menu'='new';
+let stageOrigin: 'new' | 'menu' | 'after-fighters'='new';
 let activePair: Pair | null=null;
 let pendingPair: Pair | null=null;
 let activeStage: StageId='city';
@@ -208,41 +208,43 @@ function showCharacters(origin:'home'|'menu'): void {
   controls.clear();
   game.scene.pause('Arena');
   setScreen('characters');
-  const previous=origin==='menu'&&activePair
-    ? {first:activePair.first,second:activePair.second}
-    : origin==='home' && pendingPair
-      ? {first:pendingPair.first,second:pendingPair.second} : undefined;
+  const previous=pendingPair
+    ? {first:pendingPair.first,second:pendingPair.second}
+    : origin==='menu'&&activePair
+      ? {first:activePair.first,second:activePair.second} : undefined;
   // "Назад" is available both on the initial selection and mid-match.
   // The destination differs: title screen vs paused fight menu.
   get<HTMLButtonElement>('#btn-select-back').textContent=
     origin==='home'?'← На головну':'← До меню';
-  characterSelector.show(origin==='home' && pendingPair
-    ? pendingPair.mode : activePair?.mode??'cpu',true,previous);
+  characterSelector.show(pendingPair?.mode ?? activePair?.mode ?? 'cpu',true,previous);
 }
 function onCharacterChosen(first:FighterId,second:FighterId,mode:MatchMode): void {
   const next={first,second,mode};
   if(characterOrigin==='menu') {
     if(activePair&&isSamePair(activePair,next)){
+      pendingPair=null;
       showMenu('battle');
       return; // Same characters: leave the existing match untouched.
     }
-    // Changing fighters restarts the fight but preserves its arena.
-    startBattle(next,activeStage);
+    // Let the players choose an arena even when changing fighters mid-match.
+    // The existing match remains paused until final stage confirmation.
+    pendingPair=next;
+    showStageSelect('after-fighters');
   } else {
     pendingPair=next;
     showStageSelect('new');
   }
 }
 function backFromCharacter(): void {
-  if(characterOrigin==='menu') showMenu('battle');
+  if(characterOrigin==='menu') { pendingPair=null; showMenu('battle'); }
   else goHome();
 }
-function showStageSelect(origin:'new'|'menu'): void {
+function showStageSelect(origin:'new'|'menu'|'after-fighters'): void {
   stageOrigin=origin;
   controls.clear();
   game.scene.pause('Arena');
   setScreen('stages');
-  stageSelector.show(origin==='menu'?activeStage:null);
+  stageSelector.show(origin==='new'?null:activeStage);
 }
 function onStageChosen(id:StageId): void {
   getStage(id);
@@ -262,7 +264,7 @@ function onStageChosen(id:StageId): void {
 }
 function backFromStage(): void {
   if(stageOrigin==='menu') showMenu('battle');
-  else showCharacters('home');
+  else showCharacters(stageOrigin==='after-fighters'?'menu':'home');
 }
 function startBattle(pair:Pair,id:StageId): void {
   activeStage=id;
@@ -416,6 +418,7 @@ window.addEventListener('keydown',event=>{
   // Character selection is split into TWO independent touch/control zones.
   // Keyboard P1: A/D; keyboard P2: arrows. Both can change simultaneously.
   if(screen==='characters'){
+    if(characterSelector.isBioOpen) return;
     const p1:Record<string,-1|1>={KeyA:-1,KeyD:1};
     const p2:Record<string,-1|1>={ArrowLeft:-1,ArrowRight:1};
     const direction1=p1[event.code];
@@ -431,7 +434,9 @@ window.addEventListener('keydown',event=>{
       event.preventDefault();characterSelector.confirmPlayer(1);
     } else if(event.code==='Space' && (active===zone1 || active===zone2)){
       event.preventDefault();characterSelector.confirmPlayer(active===zone1?0:1);
-    } else if(event.code==='Enter' && (active===zone1||active===zone2||active===document.body)){
+    } else if(event.code==='Enter' && (active===zone1||active===zone2)){
+      event.preventDefault();characterSelector.inspectPlayer(active===zone1?0:1);
+    } else if(event.code==='Enter' && active===document.body){
       event.preventDefault();characterSelector.confirmCurrent();
     }
     return;
@@ -474,6 +479,19 @@ function pollGamepadMenu(): void {
   };
   const now=performance.now();
   if(screen==='characters'){
+    if(characterSelector.isBioOpen){
+      // B closes the biography. A/Start must not activate the underlying UI.
+      const back=connected.some(p=>Boolean(p.buttons[1]?.pressed));
+      if(back&&!selectionBHeld) characterSelector.closeBio();
+      selectionBHeld=back;
+      selectionStartHeld=start;
+      for(const p of [0,1] as const){
+        playerAHeld[p]=Boolean(pads[p]?.buttons[0]?.pressed);
+        playerDirectionHeld[p]=0;
+      }
+      requestAnimationFrame(pollGamepadMenu);
+      return;
+    }
     // Gamepad 1 controls P1 and gamepad 2 controls P2 at the same time.
     // On a single controller, the right analog stick can steer the CPU/P2
     // carousel while the D-pad / left stick steers P1.

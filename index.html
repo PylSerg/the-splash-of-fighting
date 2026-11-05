@@ -43,7 +43,7 @@
         <div class="pause-panel">
           <header class="pause-heading">
             <div>
-              <div class="pause-eyebrow">THE SPLASH OF FIGHTING <span>• ALPHA 1.3.0</span></div>
+              <div class="pause-eyebrow">THE SPLASH OF FIGHTING <span>• ALPHA 1.4.0</span></div>
               <h1 id="pause-title">ПАУЗА <span>Ⅱ</span></h1>
             </div>
             <div class="pause-heading-actions">
@@ -133,7 +133,7 @@
         <div class="home-logo">
           <div class="home-kicker">✦ ARCADE FIGHTING ✦</div>
           <h1 id="home-title"><span>THE SPLASH</span><small>OF FIGHTING</small></h1>
-          <div class="home-version">ALPHA 1.3.0 · ЕВІ × РУНА × ЛІРА × КАЙ</div>
+          <div class="home-version">ALPHA 1.4.0 · ЕВІ × РУНА × ЛІРА × КАЙ</div>
         </div>
         <div class="home-buttons">
           <button id="btn-home-start" class="home-primary" type="button">🥊 Почати</button>
@@ -154,7 +154,7 @@
           <div id="stage-counter" class="cinematic-counter" aria-live="polite">1 / 2</div>
         </header>
         <div id="arena-carousel" class="stage-carousel-viewport" tabindex="0"
-          aria-label="Карусель арен. Свайп для перемикання, Enter для вибору.">
+          aria-label="Карусель арен. Свайп для перемикання, натисни кнопку На арену для старту.">
           <div class="stage-floor-glow" aria-hidden="true"></div>
           <div id="stage-roster" class="stage-carousel-track"></div>
         </div>
@@ -178,7 +178,7 @@
           <div class="cinematic-heading">
             <div class="cinematic-kicker">THE SPLASH OF FIGHTING · DUAL CHARACTER SELECT</div>
             <h1 id="select-title">ОБЕРИ БІЙЦІВ <span>✦</span></h1>
-            <p id="select-instructions">Обидва гравці обирають персонажів незалежно.</p>
+            <p id="select-instructions">Торкнися вибраного персонажа, щоб прочитати його історію.</p>
           </div>
           <div class="cinematic-top-right">
             <div class="select-mode-row" aria-label="Режим поєдинку">
@@ -227,6 +227,30 @@
             <button id="btn-select-fight" class="cinematic-confirm" type="button">✓ Далі: арена</button>
           </div>
         </footer>
+      </section>
+      <section id="fighter-bio-dialog" class="fighter-bio-overlay" role="dialog"
+        aria-modal="true" aria-labelledby="fighter-bio-name" aria-describedby="fighter-bio-story" hidden>
+        <div class="fighter-bio-panel">
+          <button id="fighter-bio-close" class="fighter-bio-close" type="button"
+            aria-label="Закрити історію персонажа">✕</button>
+          <div class="fighter-bio-kicker">✧ АРХІВ БІЙЦІВ / ІСТОРІЯ ПЕРСОНАЖА</div>
+          <div class="fighter-bio-main">
+            <div class="fighter-bio-portrait" id="fighter-bio-portrait" aria-hidden="true"></div>
+            <div class="fighter-bio-body">
+              <h2 id="fighter-bio-name">ЕВІ</h2>
+              <p id="fighter-bio-title" class="fighter-bio-title">Стиль і швидкість</p>
+              <p id="fighter-bio-story" class="fighter-bio-story"></p>
+              <div class="fighter-bio-facts">
+                <p><span>⚔ ЗБРОЯ</span><strong id="fighter-bio-weapon"></strong></p>
+                <p><span>✦ БОЙОВИЙ СТИЛЬ</span><strong id="fighter-bio-style"></strong></p>
+              </div>
+            </div>
+          </div>
+          <div class="fighter-bio-footer">
+            <span>Ескізи тимчасові · піксельні образи попереду</span>
+            <button id="fighter-bio-return" type="button">← До вибору</button>
+          </div>
+        </div>
       </section>
     </div>
   </section>

@@ -55,7 +55,7 @@ export class StageSelector {
         if(target !== this.index){
           this.index=target;
           this.paint();
-        } else this.confirm();
+        } // An already selected stage does not launch a fight.
       });
       this.roster.append(button);
     });
@@ -84,8 +84,7 @@ export class StageSelector {
       } else if(event.pointerType==='touch' && tapped){
         this.suppressClickUntil=performance.now()+350;
         const index=STAGES.findIndex(stage=>stage.id===tapped);
-        if(index===this.index) this.confirm();
-        else if(index>=0){ this.index=index; this.paint(); }
+        if(index>=0 && index!==this.index){ this.index=index; this.paint(); }
       }
     });
     this.carousel.addEventListener('pointercancel',()=>{this.drag=null;});

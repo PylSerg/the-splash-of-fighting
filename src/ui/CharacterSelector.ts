@@ -1,5 +1,5 @@
 import type { FighterId } from '../combat/Fighter';
-import { CHARACTERS, getCharacter } from '../characters/Roster';
+import { CHARACTERS, getCharacter, portraitSvg } from '../characters/Roster';
 import { characterFigureSvg } from '../characters/Figures';
 
 export type MatchMode = 'cpu' | 'versus';
@@ -30,6 +30,16 @@ export class CharacterSelector {
   private cpuButton: HTMLButtonElement;
   private versusButton: HTMLButtonElement;
   private resetButton: HTMLButtonElement;
+  private bioOverlay: HTMLElement;
+  private bioPortrait: HTMLElement;
+  private bioName: HTMLElement;
+  private bioTitle: HTMLElement;
+  private bioStory: HTMLElement;
+  private bioWeapon: HTMLElement;
+  private bioStyle: HTMLElement;
+  private bioClose: HTMLButtonElement;
+  private bioReturn: HTMLButtonElement;
+  private bioPreviousFocus: HTMLElement | null = null;
   private mode: MatchMode = 'cpu';
   private picks: [FighterId, FighterId];
   private ready: [boolean, boolean] = [false, false];
@@ -62,6 +72,29 @@ export class CharacterSelector {
     this.cpuButton = get('#btn-select-cpu');
     this.versusButton = get('#btn-select-versus');
     this.resetButton = get('#btn-select-reset');
+    this.bioOverlay = get('#fighter-bio-dialog');
+    this.bioPortrait = get('#fighter-bio-portrait');
+    this.bioName = get('#fighter-bio-name');
+    this.bioTitle = get('#fighter-bio-title');
+    this.bioStory = get('#fighter-bio-story');
+    this.bioWeapon = get('#fighter-bio-weapon');
+    this.bioStyle = get('#fighter-bio-style');
+    this.bioClose = get('#fighter-bio-close');
+    this.bioReturn = get('#fighter-bio-return');
+    this.bioClose.addEventListener('click', () => this.closeBio());
+    this.bioReturn.addEventListener('click', () => this.closeBio());
+    this.bioOverlay.addEventListener('click', event => {
+      if (event.target === this.bioOverlay) this.closeBio();
+    });
+    this.bioOverlay.addEventListener('keydown', event => {
+      // Keep keyboard Tab focus inside the biography panel.
+      if (event.key !== 'Tab') return;
+      if (event.shiftKey && document.activeElement === this.bioClose) {
+        event.preventDefault(); this.bioReturn.focus();
+      } else if (!event.shiftKey && document.activeElement === this.bioReturn) {
+        event.preventDefault(); this.bioClose.focus();
+      }
+    });
 
     const first = CHARACTERS[0]?.id;
     const second = CHARACTERS[1]?.id;
@@ -85,7 +118,7 @@ export class CharacterSelector {
           <span class="fighter-ground" aria-hidden="true"></span>`;
         button.addEventListener('click', () => {
           if (performance.now() < this.suppressClicks[p]) return;
-          if (this.picks[p] === character.id) this.confirmPlayer(p);
+          if (this.picks[p] === character.id) this.inspectPlayer(p);
           else this.select(p, character.id);
         });
         this.rosters[p].append(button);
@@ -114,7 +147,7 @@ export class CharacterSelector {
           event.preventDefault();
         } else if (event.pointerType === 'touch' && start.target) {
           this.suppressClicks[p] = performance.now() + 350;
-          if (this.picks[p] === start.target) this.confirmPlayer(p);
+          if (this.picks[p] === start.target) this.inspectPlayer(p);
           else this.select(p, start.target);
         }
       });
@@ -143,6 +176,7 @@ export class CharacterSelector {
     allowBack: boolean,
     previous?: { first: FighterId; second: FighterId },
   ): void {
+    this.closeBio(false);
     this.mode = mode;
     const valid = previous && previous.first !== previous.second &&
       CHARACTERS.some(c => c.id === previous.first) &&
@@ -160,12 +194,46 @@ export class CharacterSelector {
   }
 
   hide(): void {
+    this.closeBio(false);
     this.root.hidden = true;
     this.swipe = [null, null];
   }
   get isOpen(): boolean { return !this.root.hidden; }
+  get isBioOpen(): boolean { return !this.bioOverlay.hidden; }
   get canGoBack(): boolean { return this.allowBack; }
-  goBack(): void { if (this.isOpen && this.allowBack) this.onBack(); }
+  goBack(): void {
+    if (this.isBioOpen) { this.closeBio(); return; }
+    if (this.isOpen && this.allowBack) this.onBack();
+  }
+
+  /** A tap on the current fighter never confirms a match. */
+  inspectPlayer(player: Player): void {
+    if (!this.isOpen || this.isBioOpen) return;
+    const fighter = getCharacter(this.picks[player]);
+    this.bioPreviousFocus = document.activeElement instanceof HTMLElement
+      ? document.activeElement : this.areas[player];
+    this.bioOverlay.style.setProperty('--bio-accent', fighter.color);
+    this.bioPortrait.innerHTML = portraitSvg(fighter.id);
+    this.bioName.textContent = fighter.name;
+    this.bioTitle.textContent = fighter.title;
+    this.bioStory.textContent = fighter.bio ?? 'Історія незабаром з’явиться.';
+    this.bioWeapon.textContent = fighter.weapon ?? 'Не визначена';
+    this.bioStyle.textContent = fighter.style ?? fighter.title;
+    this.root.inert = true;
+    this.bioOverlay.hidden = false;
+    this.bioClose.focus({ preventScroll: true });
+  }
+
+  closeBio(restoreFocus=true): void {
+    if (!this.isBioOpen) return;
+    this.bioOverlay.hidden = true;
+    this.root.inert = false;
+    const previousFocus = this.bioPreviousFocus;
+    this.bioPreviousFocus = null;
+    if (restoreFocus && previousFocus?.isConnected) {
+      previousFocus.focus({ preventScroll: true });
+    }
+  }
 
   /** The list is always derived from the opponent's current reservation. */
   private available(player: Player): FighterId[] {
@@ -174,7 +242,7 @@ export class CharacterSelector {
   }
 
   navigate(player: Player, direction: -1 | 1): void {
-    if (!this.isOpen || (this.mode === 'versus' && this.ready[player])) return;
+    if (!this.isOpen || this.isBioOpen || (this.mode === 'versus' && this.ready[player])) return;
     const choices = this.available(player);
     if (choices.length < 2) return;
     const current = choices.indexOf(this.picks[player]);
@@ -184,7 +252,7 @@ export class CharacterSelector {
 
   /** Both choices are exclusive already before either player presses Ready. */
   private select(player: Player, id: FighterId): void {
-    if (!this.isOpen || (this.mode === 'versus' && this.ready[player])) return;
+    if (!this.isOpen || this.isBioOpen || (this.mode === 'versus' && this.ready[player])) return;
     if (!this.available(player).includes(id) || this.picks[player] === id) return;
     this.picks[player] = id;
     this.ready[player] = false;
@@ -192,18 +260,18 @@ export class CharacterSelector {
   }
 
   confirmPlayer(player: Player): void {
-    if (!this.isOpen) return;
+    if (!this.isOpen || this.isBioOpen) return;
     if (this.mode === 'versus') {
       this.ready[player] = !this.ready[player];
       this.paint();
-    } else if (player === 0 || player === 1) {
-      this.confirmCurrent();
+    } else {
+      this.inspectPlayer(player);
     }
   }
 
   /** CPU selection can be swiped manually or rerolled with one touch. */
   randomizeOpponent(): void {
-    if (!this.isOpen || this.mode !== 'cpu') return;
+    if (!this.isOpen || this.isBioOpen || this.mode !== 'cpu') return;
     const candidates = this.available(1);
     if (!candidates.length) return;
     // Uniform random draw from every legal opponent (including the current).
@@ -212,7 +280,7 @@ export class CharacterSelector {
   }
 
   confirmCurrent(): void {
-    if (!this.isOpen) return;
+    if (!this.isOpen || this.isBioOpen) return;
     if (this.mode === 'versus' && (!this.ready[0] || !this.ready[1])) return;
     const [first, second] = this.picks;
     if (first === second) return;
@@ -220,13 +288,14 @@ export class CharacterSelector {
   }
 
   private switchMode(mode: MatchMode): void {
-    if (this.mode === mode) return;
+    if (this.isBioOpen || this.mode === mode) return;
     this.mode = mode;
     this.ready = [false, false];
     this.paint();
   }
 
   private reset(): void {
+    if (this.isBioOpen) return;
     this.ready = [false, false];
     this.picks = [CHARACTERS[0].id, CHARACTERS[1].id];
     this.paint();
@@ -241,8 +310,8 @@ export class CharacterSelector {
     this.backButton.hidden = !this.allowBack;
     this.secondLabel.textContent = versus ? 'P2 · ГРАВЕЦЬ 2' : '⚡ СУПЕРНИК CPU';
     this.instructions.textContent = versus
-      ? 'ДВА ГРАВЦІ · Незалежні свайпи · Підтвердіть свій вибір'
-      : 'ТИ ПРОТИ CPU · Обери обох бійців або натисни «Рандомний»';
+      ? 'PvP · Свайп для вибору · Торкнись бійця для історії · Підтверди готовність'
+      : 'CPU · Свайп для вибору · Торкнись бійця для історії · Далі: арена';
 
     this.randomButton.hidden = versus;
     for (const p of [0, 1] as const) {
@@ -278,6 +347,9 @@ export class CharacterSelector {
         item.tabIndex = -1;
         item.setAttribute('aria-hidden', String(slot === 'hidden'));
         item.setAttribute('aria-pressed', String(slot === 'center'));
+        item.setAttribute('aria-label', 'Персонаж ' + getCharacter(id).name +
+          (slot === 'center' ? '. Натисни, щоб прочитати історію.' :
+            '. Натисни, щоб вибрати.'));
       }
     }
 

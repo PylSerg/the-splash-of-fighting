@@ -585,3 +585,96 @@
     bottom:0;
   }
 }
+
+/* Alpha 1.4: Fullscreen lore dialog. Artwork stays temporary until pixel-art pass. */
+.fighter-bio-overlay{
+  position:absolute;inset:0;z-index:90;
+  display:grid;place-items:center;
+  padding:clamp(7px,1.7dvh,18px);
+  background:radial-gradient(ellipse at 50% 42%,#29314bd9,#080b1af4 79%);
+  backdrop-filter:blur(9px);
+}
+.fighter-bio-panel{
+  position:relative;width:min(760px,98%);max-height:100%;
+  overflow:auto;overscroll-behavior:contain;
+  padding:clamp(12px,2.9dvh,25px);
+  border:1px solid var(--bio-accent,#c6a4ff);
+  border-radius:clamp(12px,2.6dvh,22px);
+  background:linear-gradient(145deg,#283252f7,#12182df9 57%,#201b36fa);
+  box-shadow:0 20px 70px #000c,0 0 50px color-mix(in srgb,var(--bio-accent,#e2a6eb) 18%,transparent);
+  scrollbar-width:thin;
+}
+.fighter-bio-kicker{
+  padding-right:34px;color:var(--bio-accent,#f2c4ec);
+  font:800 clamp(10px,2dvh,15px)/1.1 Rajdhani,sans-serif;
+  letter-spacing:clamp(1px,.3vw,3px);
+}
+.fighter-bio-close{
+  position:absolute;right:clamp(9px,2vw,18px);top:clamp(9px,2vw,18px);
+  display:grid;place-items:center;
+  width:clamp(29px,6dvh,42px);height:clamp(29px,6dvh,42px);
+  background:#47506a;color:#fff;border:1px solid #b5b5d3;border-radius:9px;
+  font-size:clamp(16px,3dvh,25px);
+}
+.fighter-bio-main{
+  display:grid;grid-template-columns:clamp(92px,23dvh,168px) minmax(0,1fr);
+  gap:clamp(10px,3vw,26px);align-items:start;
+  margin-top:clamp(9px,2dvh,18px);
+}
+.fighter-bio-portrait{
+  aspect-ratio:1;border:2px solid var(--bio-accent,#fff);border-radius:16px;
+  overflow:hidden;box-shadow:0 0 22px #fff2;
+}
+.fighter-bio-portrait svg{width:100%;height:100%;display:block}
+.fighter-bio-body h2{
+  margin:0;color:white;text-shadow:0 0 21px var(--bio-accent,#bbb);
+  font:800 clamp(23px,6.1dvh,49px)/.97 Rajdhani,sans-serif;
+  letter-spacing:3px;
+}
+.fighter-bio-title{
+  margin:2px 0 clamp(6px,2dvh,14px);color:var(--bio-accent,#ebb);
+  font:700 clamp(12px,2.5dvh,20px) Rajdhani,sans-serif;
+}
+.fighter-bio-story{
+  margin:0;color:#e7eaf8;
+  font:500 clamp(11px,2.3dvh,16px)/1.53 Inter,system-ui,sans-serif;
+}
+.fighter-bio-facts{
+  display:grid;grid-template-columns:1fr 1fr;gap:9px;
+  margin-top:clamp(9px,2.1dvh,17px);
+}
+.fighter-bio-facts p{
+  margin:0;padding:clamp(7px,1.3dvh,12px);
+  border:1px solid #9facc144;border-radius:10px;background:#0a172b79;
+}
+.fighter-bio-facts span{
+  display:block;margin-bottom:5px;color:var(--bio-accent,#d9bdf2);
+  font:800 clamp(10px,1.75dvh,13px)/1 Rajdhani,sans-serif;
+}
+.fighter-bio-facts strong{
+  color:#f4f6ff;font:600 clamp(11px,2.1dvh,15px)/1.22 Inter,system-ui,sans-serif;
+}
+.fighter-bio-footer{
+  display:flex;justify-content:space-between;align-items:center;gap:15px;
+  margin-top:clamp(8px,2dvh,17px);
+}
+.fighter-bio-footer span{
+  color:#98aac4;font:600 clamp(9px,1.8dvh,12px)/1.25 Rajdhani,sans-serif;
+}
+#fighter-bio-return{
+  flex-shrink:0;padding:clamp(7px,1.7dvh,12px) clamp(12px,2vw,20px);
+  background:linear-gradient(120deg,var(--bio-accent,#e7b9e2),#a9a5e8);
+  color:#16213b;border:1px solid #fff9;border-radius:10px;
+  font:800 clamp(12px,2.3dvh,18px)/1 Rajdhani,sans-serif;
+}
+@media(max-width:560px){
+  .fighter-bio-main{grid-template-columns:clamp(75px,21dvh,110px) minmax(0,1fr)}
+  .fighter-bio-facts{grid-template-columns:1fr;gap:5px}
+}
+@media(orientation:landscape) and (max-height:375px){
+  .fighter-bio-panel{padding:10px 15px}
+  .fighter-bio-kicker{font-size:10px}
+  .fighter-bio-story{line-height:1.4}
+  .fighter-bio-facts p{padding:6px}
+  .fighter-bio-footer{margin-top:8px}
+}
