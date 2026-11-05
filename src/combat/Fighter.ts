@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { InputState } from '../input/Controls';
 
-export type FighterId = 'evi' | 'nara' | 'lyra' | 'kai';
+export type FighterId = 'evi' | 'runa' | 'lyra' | 'kai';
 export type AttackName = 'light' | 'heavy' | 'kick' | 'special';
 export interface AttackSpec {
   /** Wind-up/swing completes at this time; collision is tested exactly once then. */
@@ -30,6 +30,14 @@ export const ATTACKS: Record<AttackName, AttackSpec> = {
   heavy: { duration: .48, reach: 116, damage: 11, stun: .32, push: 185, gain: 12 },
   kick: { duration: .40, reach: 135, damage: 9, stun: .27, push: 150, gain: 10 },
   special: { duration: .82, reach: 205, damage: 20, stun: .40, push: 290, gain: 0 },
+};
+
+/** Runa: slower and stronger, but her attacks can still be interrupted. */
+const RUNA_ATTACKS: Record<AttackName,AttackSpec> = {
+  light: ATTACKS.light,
+  heavy: { ...ATTACKS.heavy, duration: .56, reach: 114, damage: 14, stun: .36, push: 225 },
+  kick: ATTACKS.kick,
+  special: { ...ATTACKS.special, duration: .94, reach: 195, damage: 23, stun: .44, push: 335 },
 };
 
 export class Fighter {
@@ -162,12 +170,13 @@ export class Fighter {
       this.weapon.lineStyle(3,0x66dcef,.70).lineBetween(23,-11,82,-26);
       this.weapon.lineStyle(2,0xc5ffff,.90).lineBetween(82,-26,95,-15);
     } else if (lyra) {
-      // Twin-edged amber fan blade, visually distinct from Nara's cleaver.
+      // Twin-edged amber fan blade; Runa still has temporary placeholder art.
       this.weapon.fillStyle(0xffd093,.9).fillTriangle(7,-7,81,-33,72,12);
       this.weapon.fillStyle(0xff8b4d,.83).fillTriangle(22,-3,73,-35,54,6);
       this.weapon.lineStyle(3,0xffeed3).lineBetween(9,-6,81,-33);
       this.weapon.fillStyle(0x62465c).fillRoundedRect(-4,-5,34,9,4);
     } else if (!evi) {
+      // Temporary stand-in weapon for Runa until her original pixel gauntlets.
       this.weapon.fillStyle(0x4d3b42).fillRect(-5,-6,89,10);
       this.weapon.fillStyle(0xc0cbd4).fillRoundedRect(61,-33,93,45,8);
       this.weapon.fillStyle(0x8997a5).fillRect(65,-27,86,4);
@@ -359,7 +368,9 @@ export class Fighter {
     }
     // Regular attacks slow locomotion, but do not disable the joystick.
     // Hitstun and crouching still prevent movement as combat states.
-    const moveSpeed = this.blocking ? 90 : this.attack ? 115 : 185;
+    // Runa is the grounded powerhouse: 20% slower than the other fighters.
+    const baseMoveSpeed = this.blocking ? 90 : this.attack ? 115 : 185;
+    const moveSpeed = baseMoveSpeed * (this.id === 'runa' ? .8 : 1);
     this.walking = move!==0 && !this.airborne;
     this.x += move*moveSpeed*dt;
     this.x = Phaser.Math.Clamp(this.x,STAGE_MIN_X,STAGE_MAX_X);
@@ -466,9 +477,14 @@ export class Fighter {
     this.hitFlash=.18;
   }
 
+  /** Unique spec is selected at wind-up; the shared engine still resolves hits. */
   private begin(name: AttackName): void {
-    this.attack={name,spec:ATTACKS[name],elapsed:0,connected:false};
+    const spec = this.id === 'runa' ? RUNA_ATTACKS[name] : ATTACKS[name];
+    this.attack={name,spec,elapsed:0,connected:false};
   }
+
+  /** A successful grappler throw should be rewarding, but still escapable. */
+  get throwDamage(): number { return this.id === 'runa' ? 21 : 16; }
 
   getActiveStrike(): ActiveAttack | null {
     const a=this.attack;
@@ -556,7 +572,7 @@ export class Fighter {
     this.frontArm.rotation=swing*.5;
     this.weapon.rotation=.15+motion*.2;
     this.cape.rotation=-motion*.08;
-    this.hair.rotation=this.id==='nara'?-motion*.04:0;
+    this.hair.rotation=this.id==='runa'?-motion*.04:0;
 
     if(this.crouching) {
       this.leftLeg.rotation=.8;this.rightLeg.rotation=-.8;

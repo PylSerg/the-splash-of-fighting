@@ -6,12 +6,17 @@ export interface CharacterInfo {
   title: string;
   color: string;
   glow: string;
+  /** Story identity, independent of the temporary vector art. */
+  bio?: string;
+  weapon?: string;
 }
 
 /** Add playable fighters here as new FighterId visuals become available. */
 export const CHARACTERS: readonly CharacterInfo[] = [
   { id: 'evi', name: 'ЕВІ', title: 'Стиль і швидкість', color: '#f49bc8', glow: '#e8abff' },
-  { id: 'nara', name: 'НАРА', title: 'Сила і натиск', color: '#69e5da', glow: '#9ba7ff' },
+  { id: 'runa', name: 'РУНА', title: 'Міць і незламність', color: '#d87793', glow: '#efac76',
+    bio: 'Колишня захисниця Мідного Бастіону. Мовчазна, витривала й непохитна: відповідає за тих, кому ніхто не допоможе.',
+    weapon: 'Броньовані ударні рукавиці (майбутній оригінальний піксельний образ)' },
   { id: 'lyra', name: 'ЛІРА', title: 'Полум’я та точність', color: '#ffaf69', glow: '#ffdd93' },
   { id: 'kai', name: 'КАЙ', title: 'Блискавка та реакція', color: '#70e6ef', glow: '#8fb3ff' },
 ];
@@ -93,14 +98,14 @@ export function portraitSvg(id: FighterId): string {
       <path d="M45 90 59 105 75 90" fill="none" stroke="#c88baf" stroke-width="3"/>
     </svg>`;
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Портрет Нари">
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Портрет Руни">
     <defs>
-      <linearGradient id="bg-nara" x2="1" y2="1"><stop stop-color="#31578c"/><stop offset="1" stop-color="#392545"/></linearGradient>
-      <linearGradient id="hair-nara" x2="0" y2="1"><stop stop-color="#96fff2"/><stop offset="1" stop-color="#26b7b9"/></linearGradient>
+      <linearGradient id="bg-runa" x2="1" y2="1"><stop stop-color="#31578c"/><stop offset="1" stop-color="#392545"/></linearGradient>
+      <linearGradient id="hair-runa" x2="0" y2="1"><stop stop-color="#96fff2"/><stop offset="1" stop-color="#26b7b9"/></linearGradient>
     </defs>
-    <rect width="120" height="120" rx="16" fill="url(#bg-nara)"/>
+    <rect width="120" height="120" rx="16" fill="url(#bg-runa)"/>
     <path d="M0 115Q19 81 54 85L86 82Q109 89 120 120H0" fill="#292337"/>
-    <path d="M20 45Q8 24 29 15Q49 7 61 19Q73 9 86 24Q105 28 97 47Q112 47 113 59Q102 69 89 61L79 83 38 77Z" fill="url(#hair-nara)"/>
+    <path d="M20 45Q8 24 29 15Q49 7 61 19Q73 9 86 24Q105 28 97 47Q112 47 113 59Q102 69 89 61L79 83 38 77Z" fill="url(#hair-runa)"/>
     <path d="M34 50Q39 33 59 33Q83 32 86 54L81 76Q72 89 60 89Q44 88 37 71Z" fill="#c5a3a4"/>
     <path d="M33 44Q45 20 66 27Q87 22 99 43L87 50Q75 41 58 42Q43 46 33 44" fill="#56e7da"/>
     <path d="M88 45Q112 28 117 47Q120 59 95 61" fill="#38c5c9"/>

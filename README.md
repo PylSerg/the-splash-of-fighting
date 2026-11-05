@@ -1,6 +1,6 @@
 # The Splash of Fighting 🥊
 
-A browser-based 2D arcade fighting game featuring Evi, Nara, Lyra and Kai.
+A browser-based 2D arcade fighting game featuring Evi, Runa, Lyra and Kai.
 
 **Stack:** Phaser 4.2.1, TypeScript, Vite, GitHub Pages.
 
@@ -27,9 +27,17 @@ npm run preview
 - Both the main screen and pause menu now read their release version directly from `package.json` at build time, and the title screen builds its fighter list directly from the live character roster. Future character additions and version bumps no longer require separately editing these labels.
 - No gameplay or fighter mechanics are changed in this patch.
 
+## Alpha 1.3.0 · Runa, an original powerhouse concept
+
+- Replaces the previous third-party-inspired fighter identity across selection, HUD, match defaults, gameplay IDs and title-screen copy.
+- **Руна (Runa)** is a former defender of the **Мідний Бастіон / Copper Bastion**, a calm, stubborn protector. Her planned signature weapon for the pixel-art phase is a pair of **armored impact gauntlets**.
+- Runa now plays differently: **20% slower** movement, a heavy strike for **14 HP** rather than 11 with a longer wind-up, special for **23 HP** rather than 20 with a longer wind-up, and successful throws for **21 HP** rather than 16. Standard interruptions, blocks and grab escapes remain in force.
+- **Art has deliberately NOT been changed.** The existing vector figure, portrait and temporary weapon are placeholders. Every fighter will be redrawn in a coherent original pixel-art style later; the temporary visuals should not be presented as an independent final design.
+- Available fighters: **ЕВІ · РУНА · ЛІРА · КАЙ**.
+
 ## Alpha 1.2.0 · Kai joins the four-fighter roster
 
-- **КАЙ** joins Evi, Nara and Lyra: a silver-haired, electric-blue fighter with midnight armor, flowing energy ribbons and two energized tonfa batons.
+- **КАЙ** joins Evi, Runa and Lyra: a silver-haired, electric-blue fighter with midnight armor, flowing energy ribbons and two energized tonfa batons.
 - The fourth fighter has his own full-body vector figure, a bespoke 120×120 SVG portrait, and an actual Phaser combat model. Combat, throws, blocking, interrupts and KO all work in both player slots and CPU mode.
 - Both simultaneous player-selection carousels derive their options from the shared four-character roster. Since the other player's highlighted character is excluded, **three legal choices remain per side**: center, previous and next. Swipes, keyboard, independent gamepad controls and PvP readiness keep working without extra image assets.
 - CPU manual selection and random selection include Kai, and the match HUD displays his name, portrait and cyan health bar.
@@ -92,7 +100,7 @@ A prominent, touch-friendly **✕** in the top-right of the settings/pause panel
 A complete game flow is now available:
 
 1. **Title screen:** THE SPLASH OF FIGHTING with centered **Почати**, **Налаштування**, **На весь екран**. Settings opens the same tabbed controls/display menu without beginning a match.
-2. **Character select:** choose one of **Evi**, **Nara** or the new fire-themed fighter **Lyra**, wearing a navy/gold outfit and carrying an amber fan blade. Portraits and the fight HUD support all three.
+2. **Character select:** choose one of **Evi**, **Runa** or the new fire-themed fighter **Lyra**, wearing a navy/gold outfit and carrying an amber fan blade. Portraits and the fight HUD support all three.
 3. **Stage select:** choose **Неонове місто** or the new **Місячна лагуна**, a moonlit seaside arena with distant islands, stars, rippling water and shoreline lights.
 4. **Fight:** the selected pair enters the chosen stage. CPU randomly selects from all other available roster members, and PvP forbids mirror matches.
 
@@ -109,7 +117,7 @@ Both worlds share the same fighter physics, hitbox, counterattack and block rule
 ## Alpha 0.8.0 · Fighter portraits and character select
 
 - **Character selection on launch:** no match timer or CPU logic runs until the player explicitly chooses a fighter and starts the match.
-- A small, data-driven character roster in `src/characters/Roster.ts` currently offers **Evi** and **Nara**, each with an original stylized portrait. New characters can be added to the roster as their gameplay visuals and `FighterId` implementations become available.
+- A small, data-driven character roster in `src/characters/Roster.ts` currently offers **Evi** and **Runa**, each with an original stylized portrait. New characters can be added to the roster as their gameplay visuals and `FighterId` implementations become available.
 - **CPU:** player 1 selects a fighter; the game picks a **uniform random** opponent from all remaining roster characters. The player's own character is excluded. With only two fighters available, the other is necessarily picked.
 - **Local PvP:** player 1 chooses first, then player 2 chooses from the remaining fighters. Mirror matches are disabled; the same character cannot fill both slots.
 - The chosen fighter may now occupy **either side** of the arena. Keyboard/gamepad/touch input follows the player slot, not the character's name. CPU always controls slot 2.
@@ -122,7 +130,7 @@ Both worlds share the same fighter physics, hitbox, counterattack and block rule
 **Damage timing:** Each punch, kick and special has one true impact at the **end of its strike animation**, not at the first frame of the wind-up. The target must still overlap the strike hitbox at that exact moment. Missing an attack consumes the impact (it cannot hit late during the follow-through). A 0.12 s non-damaging recovery follows.
 
 - **X light punch:** 0.27 s to impact; **B kick:** 0.40 s; **Y heavy punch:** 0.48 s; **B+Y / R1 special:** 0.82 s.
-- If an opponent's quick X connects before the heavy Y or special reaches its impact frame, hitstun **cancels the unfinished attack**, its damage never triggers, and **INTERRUPT!** appears over the fighter. The same rule works for both Evi and Nara.
+- If an opponent's quick X connects before the heavy Y or special reaches its impact frame, hitstun **cancels the unfinished attack**, its damage never triggers, and **INTERRUPT!** appears over the fighter. The same rule works for both Evi and Runa.
 - Successful blocking still uses the established tactical stance constraints, and a guarded Y still deals 25% chip damage.
 - Defeat by depleted health starts a fall with an airborne tumble and ends in a **permanent prone KO pose**. Winner text appears once the loser actually lands.
 - Time-out also causes the fighter with less HP to fall and remain down while the winner result is shown. Ties remain a draw.
@@ -228,7 +236,7 @@ Press **1** for CPU opponent, **2** for local versus, **R** to restart. Toggle h
 
 ## Sprites / assets (planned)
 
-Reference images will be used to produce **original** pixel sprites later. Keep source PNGs and frame atlases under `public/assets/fighters/{evi,nara}/`. Animation metadata should be defined separately from collision boxes and attack frame data.
+Reference images will be used to produce **original** pixel sprites later. Keep source PNGs and frame atlases under `public/assets/fighters/{evi,runa}/`. Animation metadata should be defined separately from collision boxes and attack frame data.
 
 ## GitHub Pages
 

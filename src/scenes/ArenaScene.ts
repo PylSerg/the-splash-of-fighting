@@ -16,7 +16,6 @@ const GRAB_REACH_TIME = .32;
 const GRAB_HOLD_TIME = .62;
 const GRAB_MAX_START = 135;
 const GRAB_CATCH_RANGE = 90;
-const THROW_DAMAGE = 16;
 const STEP = 1/60;
 const ZERO = () => emptyInput();
 
@@ -69,12 +68,12 @@ export class ArenaScene extends Phaser.Scene {
   create(): void {
     this.drawStage();
     this.player1 = new Fighter(this,'evi',250,1);
-    this.player2 = new Fighter(this,'nara',710,-1);
+    this.player2 = new Fighter(this,'runa',710,-1);
     this.debugDraw = this.add.graphics().setDepth(12);
     this.hud = this.add.graphics().setDepth(20);
     const labelStyle = {fontFamily:'Rajdhani, Arial, sans-serif',fontSize:'27px',color:'#f7f4ff',fontStyle:'bold',stroke:'#12132d',strokeThickness:4};
     this.leftName = this.add.text(112,11,'ЕВІ',labelStyle).setDepth(21);
-    this.rightName = this.add.text(848,11,'НАРА',labelStyle).setOrigin(1,0).setDepth(21);
+    this.rightName = this.add.text(848,11,'РУНА',labelStyle).setOrigin(1,0).setDepth(21);
     this.timeLabel = this.add.text(480,25,'99',{
       fontFamily:'Rajdhani, Arial, sans-serif',fontSize:'42px',color:'#ffe7a6',fontStyle:'bold',
       stroke:'#251e3a',strokeThickness:5,
@@ -469,7 +468,8 @@ export class ArenaScene extends Phaser.Scene {
     g.defender.stepGrapple(dt,g.attacker.x);
     if(g.elapsed>=GRAB_HOLD_TIME) {
       const face=g.attacker.face;
-      g.defender.receiveThrow(THROW_DAMAGE,face);
+      const throwDamage = g.attacker.throwDamage;
+      g.defender.receiveThrow(throwDamage,face);
       g.attacker.grabPose='throw';
       g.attacker.grabRecovery=.40;
       g.defender.grabPose=null;
@@ -478,7 +478,7 @@ export class ArenaScene extends Phaser.Scene {
       this.cameras.main.shake(120,.006);
       this.combatNotice('THROW!',g.defender.x,240,0xffd29b);
       this.onStatus(getCharacter(g.attacker.id).name+
-        ' перекидає суперника за спину! -'+THROW_DAMAGE+' HP.'+
+        ' перекидає суперника за спину! -'+throwDamage+' HP.'+
         (g.defender.knockedOut ? ' Нокаут: суперник не підводиться!' :
         ' Падіння, 0,5 с лежачи й 0,5 с підйому.'));
       this.grapple=null;

@@ -7,6 +7,10 @@ import type { FighterId } from '../combat/Fighter';
  *
  * When real sprites arrive, replace this renderer without changing carousel
  * navigation, roster rules or the fight engine.
+ *
+ * IMPORTANT: Runa currently uses an old TEMPORARY vector placeholder.
+ * Her final silhouette, armor, hair and gauntlets will be fully redesigned
+ * as original pixel art with the other fighters. No graphics are redrawn here.
  */
 export function characterFigureSvg(id: FighterId): string {
   if (id === 'kai') {
@@ -123,7 +127,7 @@ export function characterFigureSvg(id: FighterId): string {
       trim: '#d7ac78', dark: '#5c506f', hair: '#f3cb92', hairLight: '#ffe6b4',
       cape: '#d9d0ef', accent: '#e698c1', boot: '#f6f1e4',
     },
-    nara: {
+    runa: {
       skin: '#cfa4a4', shadow: '#956d83', main: '#302a42', panel: '#67516b',
       trim: '#a6ef90', dark: '#191c36', hair: '#48cbd4', hairLight: '#9ef9e9',
       cape: '#23b7c9', accent: '#a6e786', boot: '#24253e',
@@ -141,7 +145,7 @@ export function characterFigureSvg(id: FighterId): string {
           fill="${palette.hairLight}"/>
        <path d="M105 112Q92 133 103 180L118 170L118 104Z" fill="${palette.hair}"/>
        <path d="M194 102Q207 141 191 174L179 169L182 103Z" fill="${palette.hair}"/>`
-    : id === 'nara'
+    : id === 'runa'
     ? `<path d="M114 112Q85 82 98 50Q111 19 153 27Q172 13 196 38Q216 57 207 94Q234 82 244 104Q253 133 220 147L191 129L116 152Z"
           fill="url(#hair-${id})" stroke="#23667f" stroke-width="4"/>
        <path d="M102 77Q89 41 125 25Q161 8 182 26Q209 23 211 59Q226 72 211 94Q191 67 161 70Q135 79 102 77"
@@ -160,7 +164,7 @@ export function characterFigureSvg(id: FighterId): string {
        <path d="M134 184L151 210L166 184L165 276L136 277Z" fill="${palette.panel}"/>
        <path d="M112 272L193 270L185 292L119 291Z" fill="${palette.trim}"/>
        <path d="M125 209L177 210" stroke="#ffffff" stroke-width="5" opacity=".75"/>`
-    : id === 'nara'
+    : id === 'runa'
     ? `<path d="M117 170L149 190L176 170L199 186L195 290L105 290L104 188Z"
           fill="${palette.main}" stroke="#9671a0" stroke-width="6"/>
        <path d="M136 194L168 194L181 254L117 255Z" fill="${palette.panel}"/>
@@ -179,7 +183,7 @@ export function characterFigureSvg(id: FighterId): string {
         <path d="M4 1L55 -69M8 5L74 -57M11 6L85 -34" stroke="#cba5ba" stroke-width="3"/>
         <path d="M-5 7L24 -9" stroke="#8a6389" stroke-width="8" stroke-linecap="round"/>
        </g>`
-    : id === 'nara'
+    : id === 'runa'
     ? `<g transform="translate(216 207) rotate(-8)">
          <path d="M-5 5L92 -1" stroke="#5b4651" stroke-width="13" stroke-linecap="round"/>
          <path d="M47 -25Q77 -40 113 -25L127 16Q87 37 47 25Z"
