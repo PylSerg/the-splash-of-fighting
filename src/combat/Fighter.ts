@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { InputState } from '../input/Controls';
 
-export type FighterId = 'evi' | 'nara' | 'lyra';
+export type FighterId = 'evi' | 'nara' | 'lyra' | 'kai';
 export type AttackName = 'light' | 'heavy' | 'kick' | 'special';
 export interface AttackSpec {
   /** Wind-up/swing completes at this time; collision is tested exactly once then. */
@@ -82,9 +82,10 @@ export class Fighter {
     this.face = face;
     const evi = id === 'evi';
     const lyra = id === 'lyra';
-    const skin = evi ? 0xe1a77f : lyra ? 0xf1bf9e : 0xdba3a0;
-    const cloth = evi ? 0xf7f2eb : lyra ? 0x283953 : 0x282337;
-    const edge = evi ? 0xdab875 : lyra ? 0xeeb66b : 0x8d5c95;
+    const kai = id === 'kai';
+    const skin = evi ? 0xe1a77f : lyra ? 0xf1bf9e : kai ? 0xd4ac96 : 0xdba3a0;
+    const cloth = evi ? 0xf7f2eb : lyra ? 0x283953 : kai ? 0x19394e : 0x282337;
+    const edge = evi ? 0xdab875 : lyra ? 0xeeb66b : kai ? 0x72f0ec : 0x8d5c95;
 
     this.rig = scene.add.container(initialX, GROUND_Y);
     // Keep the shadow in world coordinates while the fighter rotates and tumbles.
@@ -104,6 +105,12 @@ export class Fighter {
     if (evi) {
       this.cape.fillStyle(0xe5e0f0, .72).fillTriangle(-12,-92,-68,-8,16,-34);
       this.cape.lineStyle(2,0xc7a8c8,.9).lineBetween(-12,-92,-68,-8).lineBetween(-68,-8,16,-34);
+    } else if (kai) {
+      // Kai: two wind-swept cyan energy ribbons and a midnight jacket.
+      this.cape.fillStyle(0x244c77,.90).fillTriangle(-9,-111,-82,-38,14,-37);
+      this.cape.fillStyle(0x2ccedb,.66).fillTriangle(-16,-109,-100,-69,-25,-40);
+      this.cape.lineStyle(3,0x9dfbfc,.90).lineBetween(-13,-110,-98,-67);
+      this.cape.lineStyle(2,0x638dff,.70).lineBetween(-14,-98,-77,-30);
     } else if (lyra) {
       // Lyra: distinctive ember-orange split cape over navy and gold armor.
       this.cape.fillStyle(0xf4a04f,.87);
@@ -119,7 +126,7 @@ export class Fighter {
     }
     const drawLeg = (leg: Phaser.GameObjects.Graphics) => {
       leg.fillStyle(cloth).fillRoundedRect(-11,0,22,54,7);
-      leg.fillStyle(evi?0xf7f0e4:lyra?0xdb8d4d:0x191727).fillRoundedRect(-13,40,25,13,5);
+      leg.fillStyle(evi?0xf7f0e4:lyra?0xdb8d4d:kai?0x1a6681:0x191727).fillRoundedRect(-13,40,25,13,5);
       leg.lineStyle(2,edge).strokeRoundedRect(-11,0,22,54,7);
       if(evi) leg.lineStyle(3,0xe7b881).lineBetween(-7,42,8,48);
     };
@@ -133,14 +140,28 @@ export class Fighter {
     this.backArm.setPosition(-20,-99);
     this.body.fillStyle(cloth).fillRoundedRect(-24,-105,49,63,12);
     this.body.lineStyle(3,edge).strokeRoundedRect(-24,-105,49,63,12);
-    this.body.fillStyle(evi?0xfef9f1:lyra?0x6c8db7:0x5d506d).fillEllipse(0,-89,32,24);
-    this.body.fillStyle(evi?0xdab775:lyra?0xffb859:0xa6e6ae).fillRect(-15,-60,30,5);
+    this.body.fillStyle(evi?0xfef9f1:lyra?0x6c8db7:kai?0x41728f:0x5d506d).fillEllipse(0,-89,32,24);
+    this.body.fillStyle(evi?0xdab775:lyra?0xffb859:kai?0x7dfaff:0xa6e6ae).fillRect(-15,-60,30,5);
+    if (kai) {
+      // Small luminous lightning insignia on the armor.
+      this.body.fillStyle(0xe2faff).fillTriangle(0,-103,-11,-83,7,-85);
+      this.body.fillStyle(0x6de6f3).fillTriangle(-2,-91,12,-96,-6,-73);
+      this.body.lineStyle(2,0x7bd7e8,.85).strokeRoundedRect(-24,-105,49,63,12);
+    }
     if (lyra) {
       this.body.fillStyle(0xf2a15b).fillTriangle(-12,-92,0,-108,12,-92);
       this.body.lineStyle(3,0xffd39a).strokeCircle(0,-80,8);
     }
 
-    if (lyra) {
+    if (kai) {
+      // A pair of energized tonfa batons for a distinctive electric silhouette.
+      this.weapon.fillStyle(0x182c45).fillRoundedRect(-3,-8,67,16,5);
+      this.weapon.fillStyle(0x7beaf4,.95).fillRoundedRect(20,-5,73,10,4);
+      this.weapon.fillStyle(0xd8ffff,.84).fillRoundedRect(46,-3,47,4,2);
+      this.weapon.fillStyle(0x5b92fc,.90).fillRoundedRect(6,-13,11,29,4);
+      this.weapon.lineStyle(3,0x66dcef,.70).lineBetween(23,-11,82,-26);
+      this.weapon.lineStyle(2,0xc5ffff,.90).lineBetween(82,-26,95,-15);
+    } else if (lyra) {
       // Twin-edged amber fan blade, visually distinct from Nara's cleaver.
       this.weapon.fillStyle(0xffd093,.9).fillTriangle(7,-7,81,-33,72,12);
       this.weapon.fillStyle(0xff8b4d,.83).fillTriangle(22,-3,73,-35,54,6);
@@ -159,13 +180,20 @@ export class Fighter {
     this.weapon.setPosition(21,-69);
     this.frontArm.fillStyle(skin).fillRoundedRect(-7,0,15,49,7);
     this.frontArm.fillStyle(cloth).fillRoundedRect(-10,0,19,17,4);
-    this.frontArm.fillStyle(evi?0xeac69b:lyra?0xffd08a:0x201d2f).fillCircle(0,48,8);
+    this.frontArm.fillStyle(evi?0xeac69b:lyra?0xffd08a:kai?0x9ff0ec:0x201d2f).fillCircle(0,48,8);
     this.frontArm.setPosition(21,-99);
 
-    this.hair.fillStyle(evi?0xe6c38f:lyra?0xfa9c61:0x6fe8e2);
+    this.hair.fillStyle(evi?0xe6c38f:lyra?0xfa9c61:kai?0xdce9f7:0x6fe8e2);
     if (evi) {
       this.hair.fillEllipse(-3,-132,47,44);
       this.hair.fillStyle(0xf7dba8).fillEllipse(-16,-122,15,43);
+    } else if (kai) {
+      // Silver-white windswept spikes with a cool blue shadow.
+      this.hair.fillEllipse(-4,-153,58,42);
+      this.hair.fillStyle(0xb4c9ed).fillTriangle(-27,-151,-47,-172,-12,-160);
+      this.hair.fillTriangle(-10,-166,4,-194,16,-168);
+      this.hair.fillStyle(0xf3ffff).fillTriangle(6,-165,37,-184,29,-147);
+      this.hair.fillTriangle(-25,-156,20,-165,-2,-138);
     } else if (lyra) {
       // Flame-shaped copper ponytail that stays readable at game scale.
       this.hair.fillEllipse(-3,-146,52,46);
@@ -180,11 +208,15 @@ export class Fighter {
 
     this.head.fillStyle(skin).fillEllipse(0,-125,37,43);
     this.head.fillStyle(0x181727).fillEllipse(10,-128,6,5);
-    this.head.fillStyle(evi?0x74c2d4:lyra?0xfccf7c:0xaaff78).fillEllipse(11,-128,3,3);
+    this.head.fillStyle(evi?0x74c2d4:lyra?0xfccf7c:kai?0x8cfaff:0xaaff78).fillEllipse(11,-128,3,3);
     if (evi) {
       this.head.lineStyle(2,0x283344).strokeRoundedRect(-16,-136,30,17,5);
       this.head.lineStyle(2,0x283344).lineBetween(14,-128,21,-133);
       this.head.fillStyle(0xa95b62).fillEllipse(9,-115,9,3);
+    } else if (kai) {
+      this.head.lineStyle(2,0xa4ddeb).lineBetween(1,-138,17,-136);
+      this.head.fillStyle(0x396d93).fillRect(8,-143,5,11);
+      this.head.fillStyle(0x263044).fillEllipse(11,-114,10,3);
     } else {
       this.head.fillStyle(0xa63e60).fillRect(8,-143,4,11);
       this.head.fillStyle(0x321d2e).fillEllipse(12,-114,11,3);

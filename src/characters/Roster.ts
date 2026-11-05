@@ -13,6 +13,7 @@ export const CHARACTERS: readonly CharacterInfo[] = [
   { id: 'evi', name: 'ЕВІ', title: 'Стиль і швидкість', color: '#f49bc8', glow: '#e8abff' },
   { id: 'nara', name: 'НАРА', title: 'Сила і натиск', color: '#69e5da', glow: '#9ba7ff' },
   { id: 'lyra', name: 'ЛІРА', title: 'Полум’я та точність', color: '#ffaf69', glow: '#ffdd93' },
+  { id: 'kai', name: 'КАЙ', title: 'Блискавка та реакція', color: '#70e6ef', glow: '#8fb3ff' },
 ];
 
 export const getCharacter = (id: FighterId): CharacterInfo => {
@@ -23,6 +24,33 @@ export const getCharacter = (id: FighterId): CharacterInfo => {
 
 /** Original stylized SVG headshots, used for both the roster and fight HUD. */
 export function portraitSvg(id: FighterId): string {
+  if (id === 'kai') {
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Портрет Кая">
+      <defs>
+        <linearGradient id="kai-bg" x1="0" y1="0" x2="1" y2="1">
+          <stop stop-color="#28345b"/><stop offset="1" stop-color="#102d42"/>
+        </linearGradient>
+        <linearGradient id="kai-hair" x1="0" y1="0" x2=".8" y2="1">
+          <stop stop-color="#f4ffff"/><stop offset="1" stop-color="#abc1e5"/>
+        </linearGradient>
+      </defs>
+      <rect width="120" height="120" rx="16" fill="url(#kai-bg)"/>
+      <path d="M7 25L31 14 19 46 42 42" fill="none" stroke="#65e7f5" stroke-width="3" opacity=".6"/>
+      <path d="M100 23L84 41 110 43 94 68" fill="none" stroke="#9bb7ff" stroke-width="3" opacity=".7"/>
+      <path d="M5 120Q16 87 43 84L78 83Q105 88 116 120" fill="#19374c"/>
+      <path d="M37 86Q29 62 35 38Q41 21 61 20Q87 19 91 46L83 82Z" fill="#8da5c4"/>
+      <path d="M39 42Q41 32 61 32Q81 32 83 46L79 72Q68 90 60 89Q45 84 41 70Z" fill="#d5ad98"/>
+      <path d="M32 44L20 24 43 31 47 14 63 25 81 12 84 31 103 22 90 46
+        Q72 35 58 39Q43 43 32 44Z" fill="url(#kai-hair)" stroke="#789bbd" stroke-width="2"/>
+      <path d="M44 56L55 53M67 53L79 56" fill="none" stroke="#344761" stroke-width="3.5"/>
+      <circle cx="50" cy="61" r="2.5" fill="#65eafa"/><circle cx="73" cy="61" r="2.5" fill="#65eafa"/>
+      <path d="M55 76Q62 78 70 74" stroke="#906c73" stroke-width="3" fill="none"/>
+      <path d="M40 88L59 103 79 87Q96 93 102 120H18Q27 92 40 88Z"
+        fill="#1a354d" stroke="#65dce8" stroke-width="2"/>
+      <path d="M48 92L60 107 73 92" fill="none" stroke="#9ceff4" stroke-width="4"/>
+      <path d="M64 108L57 117 64 115 60 120" fill="none" stroke="#a9faff" stroke-width="3"/>
+    </svg>`;
+  }
   if (id === 'lyra') {
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Портрет Ліри">
       <defs>

@@ -1,6 +1,6 @@
 # The Splash of Fighting 🥊
 
-A browser-based 2D arcade fighting game featuring Evi, Nara and Lyra.
+A browser-based 2D arcade fighting game featuring Evi, Nara, Lyra and Kai.
 
 **Stack:** Phaser 4.2.1, TypeScript, Vite, GitHub Pages.
 
@@ -20,6 +20,13 @@ npm run check
 npm run build
 npm run preview
 ```
+
+## Alpha 1.2.0 · Kai joins the four-fighter roster
+
+- **КАЙ** joins Evi, Nara and Lyra: a silver-haired, electric-blue fighter with midnight armor, flowing energy ribbons and two energized tonfa batons.
+- The fourth fighter has his own full-body vector figure, a bespoke 120×120 SVG portrait, and an actual Phaser combat model. Combat, throws, blocking, interrupts and KO all work in both player slots and CPU mode.
+- Both simultaneous player-selection carousels derive their options from the shared four-character roster. Since the other player's highlighted character is excluded, **three legal choices remain per side**: center, previous and next. Swipes, keyboard, independent gamepad controls and PvP readiness keep working without extra image assets.
+- CPU manual selection and random selection include Kai, and the match HUD displays his name, portrait and cyan health bar.
 
 ## Alpha 1.1.1 · Mirrored PvP ready buttons
 

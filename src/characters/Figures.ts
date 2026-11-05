@@ -9,6 +9,114 @@ import type { FighterId } from '../combat/Fighter';
  * navigation, roster rules or the fight engine.
  */
 export function characterFigureSvg(id: FighterId): string {
+  if (id === 'kai') {
+    // Dedicated electric fighter silhouette, no extra image files or duplicate
+    // rendered variants required by the selection carousel.
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 330 500"
+      role="img" aria-label="Повноростова фігура Кая">
+      <defs>
+        <linearGradient id="kai-jacket" x1="0" y1="0" x2="1" y2="1">
+          <stop stop-color="#315771"/><stop offset=".57" stop-color="#203853"/>
+          <stop offset="1" stop-color="#132941"/>
+        </linearGradient>
+        <linearGradient id="kai-silver" x1="0" y1="0" x2=".8" y2="1">
+          <stop stop-color="#f7ffff"/><stop offset=".58" stop-color="#d1e3f7"/>
+          <stop offset="1" stop-color="#91afd6"/>
+        </linearGradient>
+        <linearGradient id="kai-energy" x1="0" y1="0" x2="1" y2="0">
+          <stop stop-color="#6bb4ff"/><stop offset=".5" stop-color="#d9ffff"/>
+          <stop offset="1" stop-color="#5ce9f1"/>
+        </linearGradient>
+      </defs>
+      <g stroke-linecap="round" stroke-linejoin="round">
+        <!-- Flowing split scarf and electric-blue coat tails. -->
+        <path d="M125 174Q77 222 46 396L110 371 146 265
+          Q207 317 256 402L217 256 181 173Z"
+          fill="#284871" stroke="#6cd4ec" stroke-width="5"/>
+        <path d="M120 180Q91 256 72 361M181 181Q225 270 238 352"
+          fill="none" stroke="#77ddfc" stroke-width="4" opacity=".75"/>
+        <path d="M93 295L60 350 86 338 73 390"
+          fill="none" stroke="#9deef6" stroke-width="4" opacity=".8"/>
+        <!-- Long boots and separately posed legs. -->
+        <path d="M120 283L154 285L146 380L141 474L100 475L108 382Z"
+          fill="#20364b" stroke="#10243e" stroke-width="6"/>
+        <path d="M163 283L195 279L203 388L212 470L172 475L161 388Z"
+          fill="#26465e" stroke="#10243e" stroke-width="6"/>
+        <path d="M107 424L146 425L139 476Q125 490 94 478Z"
+          fill="#174762" stroke="#74eaf3" stroke-width="5"/>
+        <path d="M170 425L205 425L220 473Q211 489 173 477Z"
+          fill="#174762" stroke="#74eaf3" stroke-width="5"/>
+        <path d="M105 444L140 444M174 446L211 446"
+          stroke="#a9faff" stroke-width="5"/>
+        <path d="M115 348L147 348M168 349L198 349"
+          stroke="#618ba9" stroke-width="4"/>
+        <!-- Rear arm with navy sleeve. -->
+        <path d="M116 176Q93 181 86 200L61 266
+          Q59 281 72 286Q85 283 90 267L117 217Z"
+          fill="#d4ac96" stroke="#8c6d78" stroke-width="5"/>
+        <path d="M112 179L95 181L78 237L101 245L130 202Z"
+          fill="url(#kai-jacket)" stroke="#64d9eb" stroke-width="5"/>
+        <path d="M88 227L99 238" stroke="#bafaff" stroke-width="4"/>
+        <!-- Jacket torso with asymmetric electric insignia. -->
+        <path d="M116 168L141 160L178 162L200 182L194 290
+          Q159 306 105 283L102 193Z"
+          fill="url(#kai-jacket)" stroke="#0e263d" stroke-width="7"/>
+        <path d="M137 167L155 206L174 167L183 275L129 275Z"
+          fill="#355a76" stroke="#88dae9" stroke-width="4"/>
+        <path d="M154 200L141 228L157 222L144 257L174 215L158 219L168 202Z"
+          fill="url(#kai-energy)" stroke="#e0ffff" stroke-width="2"/>
+        <path d="M113 275L194 274" stroke="#72d9ed" stroke-width="9"/>
+        <path d="M117 290L182 293" stroke="#132c42" stroke-width="7"/>
+        <!-- Neck and pale complexion. -->
+        <path d="M136 148L138 177Q154 193 170 176L170 146Z"
+          fill="#d4ac96" stroke="#9a7984" stroke-width="5"/>
+        <!-- Short tousled silver hair, separated into angular strands. -->
+        <path d="M103 102Q83 64 116 37Q142 16 169 33
+          Q199 20 210 59L197 111L112 137Z"
+          fill="url(#kai-silver)" stroke="#799ab7" stroke-width="5"/>
+        <path d="M113 60L84 32 115 38 128 14 146 39 178 18
+          184 40 209 25 196 65Z"
+          fill="url(#kai-silver)" stroke="#83a6c4" stroke-width="4"/>
+        <path d="M110 90Q116 70 153 60Q176 57 196 83L188 140
+          Q179 170 152 174Q127 169 115 141Z"
+          fill="#d8b09a" stroke="#a37e80" stroke-width="5"/>
+        <path d="M111 94Q122 70 143 76L161 67 199 81
+          Q191 105 164 102L148 88Q129 104 111 108Z"
+          fill="url(#kai-silver)"/>
+        <path d="M119 116L144 114M162 115L184 112"
+          stroke="#34506a" stroke-width="5"/>
+        <ellipse cx="138" cy="125" rx="5" ry="6" fill="#54e9f2"/>
+        <ellipse cx="177" cy="124" rx="5" ry="6" fill="#54e9f2"/>
+        <path d="M146 138L154 141L161 138"
+          fill="none" stroke="#9c737d" stroke-width="3"/>
+        <path d="M141 150Q155 156 170 149"
+          fill="none" stroke="#906b73" stroke-width="4"/>
+        <path d="M122 110Q130 102 141 103"
+          stroke="#6d9bb1" stroke-width="3" opacity=".7"/>
+        <!-- Forward arm and electrified double batons. -->
+        <path d="M189 181Q210 176 218 197L246 251
+          Q249 268 234 279Q219 281 212 262L183 211Z"
+          fill="#d4ac96" stroke="#9c7780" stroke-width="5"/>
+        <path d="M184 183L200 178L229 225L211 240L181 207Z"
+          fill="url(#kai-jacket)" stroke="#78d9ed" stroke-width="5"/>
+        <path d="M217 251L236 250L244 265Q238 282 226 282
+          Q212 274 217 251Z" fill="#d4ac96" stroke="#9c7780" stroke-width="4"/>
+        <g transform="translate(231 258) rotate(-29)">
+          <path d="M-7 5L95 -47" stroke="#1f385a" stroke-width="18"/>
+          <path d="M15 -6L99 -50" stroke="url(#kai-energy)" stroke-width="11"/>
+          <path d="M39 -20L96 -49" stroke="#e7ffff" stroke-width="3"/>
+          <path d="M18 -12L-1 -36" stroke="#648dff" stroke-width="10"/>
+          <path d="M87 -58L103 -69 92 -48 113 -44"
+            fill="none" stroke="#94f9fb" stroke-width="4" opacity=".87"/>
+        </g>
+        <g transform="translate(65 273) rotate(29)">
+          <path d="M0 0L-39 -67" stroke="#1f385a" stroke-width="14"/>
+          <path d="M-5 -8L-36 -64" stroke="#8ef6fa" stroke-width="7"/>
+          <path d="M-32 -66L-41 -79 -33 -59" stroke="#d5ffff" stroke-width="3"/>
+        </g>
+      </g>
+    </svg>`;
+  }
   const palette = {
     evi: {
       skin: '#eac6a8', shadow: '#bb887a', main: '#fff4e9', panel: '#f6dbe4',
