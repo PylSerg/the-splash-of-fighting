@@ -111,7 +111,9 @@ function selectMenuTab(tab: MenuTab): void {
 }
 function goHome(): void {
   controls.clear();
-  game.scene.pause('Arena');
+  // Before the very first matchup, Arena is intentionally inert. Do not
+  // pause a still-booting scene before its create() can construct HUD/stage.
+  if (activePair) game.scene.pause('Arena');
   pendingPair=null;
   setScreen('home');
   home.querySelector<HTMLButtonElement>('#btn-home-start')?.focus({preventScroll:true});

@@ -1,6 +1,6 @@
 # The Splash of Fighting 🥊
 
-A browser-based 2D fighting game prototype featuring Evi and Nara.
+A browser-based 2D arcade fighting game featuring Evi, Nara and Lyra.
 
 **Stack:** Phaser 4.2.1, TypeScript, Vite, GitHub Pages.
 

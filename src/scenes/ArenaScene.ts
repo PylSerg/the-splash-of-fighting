@@ -604,10 +604,11 @@ export class ArenaScene extends Phaser.Scene {
     // Leave room for the portraits at both outer edges.
     const left=112-this.extraHalf;
     const right=548+this.extraHalf;
+    // Each roster fighter contributes their own HUD color, including Lyra.
     this.drawHealth(left,55,this.player1.hp,
-      this.player1.id==='evi'?0xe78fb9:0x69d6d2,false);
+      Number.parseInt(getCharacter(this.player1.id).color.slice(1),16),false);
     this.drawHealth(right,55,this.player2.hp,
-      this.player2.id==='evi'?0xe78fb9:0x69d6d2,true);
+      Number.parseInt(getCharacter(this.player2.id).color.slice(1),16),true);
     this.drawEnergy(left,82,this.player1.energy,0xa18afa);
     this.drawEnergy(right,82,this.player2.energy,0xa18afa);
     this.timeLabel.setText(String(Math.ceil(this.roundTime)));
