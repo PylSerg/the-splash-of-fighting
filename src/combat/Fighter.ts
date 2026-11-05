@@ -182,9 +182,14 @@ export class Fighter {
     let move = Number(input.right)-Number(input.left);
     if (this.crouching || this.stunned>0) move=0;
 
-    // Process up from the directional stick independently of attacks.
-    // This allows running jump and jumping while an attack button is held.
-    if (this.stunned<=0 && (just.up || just.jump) && !this.airborne && !this.crouching) {
+    // A stick is a held direction, not a one-frame button press.
+    // Reading only just.up loses jumps if the fighter was stunned or airborne
+    // when the player first tilted the stick upward. Keep checking the live
+    // direction every simulation step and jump as soon as landing/stun allows.
+    // A held upward direction will naturally trigger the next jump on landing.
+    // The optional keyboard/gamepad jump key still uses a press edge.
+    const wantsJump = input.up || just.jump;
+    if (this.stunned<=0 && wantsJump && !this.airborne && !this.crouching) {
       this.vy=-490;
       this.yOffset=-.2;
     }
