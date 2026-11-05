@@ -1,22 +1,22 @@
-export type Action = 'left' | 'right' | 'up' | 'down' | 'light' | 'heavy' | 'kick' | 'special';
+export type Action = 'left' | 'right' | 'up' | 'down' | 'jump' | 'light' | 'heavy' | 'kick' | 'special';
 export type InputState = Record<Action, boolean>;
 type Direction = 'left' | 'right' | 'up' | 'down';
 
-const ACTIONS: Action[] = ['left', 'right', 'up', 'down', 'light', 'heavy', 'kick', 'special'];
+const ACTIONS: Action[] = ['left', 'right', 'up', 'down', 'jump', 'light', 'heavy', 'kick', 'special'];
 const DIRECTIONS: Direction[] = ['left', 'right', 'up', 'down'];
 
 export const emptyInput = (): InputState => ({
-  left: false, right: false, up: false, down: false,
+  left: false, right: false, up: false, down: false, jump: false,
   light: false, heavy: false, kick: false, special: false,
 });
 
 const KEYMAPS: Record<Action, string>[] = [
   {
-    left: 'KeyA', right: 'KeyD', up: 'KeyW', down: 'KeyS',
+    left: 'KeyA', right: 'KeyD', up: 'KeyW', down: 'KeyS', jump: 'Space',
     light: 'KeyJ', heavy: 'KeyK', kick: 'KeyU', special: 'KeyI',
   },
   {
-    left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown',
+    left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown', jump: 'Numpad0',
     light: 'Numpad1', heavy: 'Numpad2', kick: 'Numpad4', special: 'Numpad5',
   },
 ];
@@ -37,6 +37,7 @@ function gamepadInput(pad: Gamepad | null): InputState {
   state.heavy = held(3);
   state.kick = held(0);
   state.special = held(1);
+  state.jump = held(5); // Optional: right shoulder button for jumping while moving.
   return state;
 }
 
@@ -128,18 +129,16 @@ export class Controls {
       return;
     }
     this.joystickBase.classList.add('moving');
-    // Clockwise sectors starting at right, then down-right, down, ...
-    const sector = (Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8;
-    switch (sector) {
-      case 0: this.joystickDirections.right = true; break;
-      case 1: this.joystickDirections.right = this.joystickDirections.down = true; break;
-      case 2: this.joystickDirections.down = true; break;
-      case 3: this.joystickDirections.left = this.joystickDirections.down = true; break;
-      case 4: this.joystickDirections.left = true; break;
-      case 5: this.joystickDirections.left = this.joystickDirections.up = true; break;
-      case 6: this.joystickDirections.up = true; break;
-      case 7: this.joystickDirections.right = this.joystickDirections.up = true; break;
-    }
+    // Wider diagonal sectors: up + horizontal can be activated without releasing movement.
+    // The separate jump button has an independent state, so jumping remains possible
+    // even when the directional stick is already held upward.
+    const nx = dx / distance;
+    const ny = dy / distance;
+    const diagonalThreshold = 0.30;
+    this.joystickDirections.left = nx < -diagonalThreshold;
+    this.joystickDirections.right = nx > diagonalThreshold;
+    this.joystickDirections.up = ny < -diagonalThreshold;
+    this.joystickDirections.down = ny > diagonalThreshold;
   }
 
   private releaseJoystick(): void {

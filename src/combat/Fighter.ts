@@ -190,7 +190,7 @@ export class Fighter {
       else if (just.kick) this.begin('kick');
       else if (just.light) this.begin('light');
     }
-    if (this.stunned<=0 && !this.attack && just.up && !this.airborne) {
+    if (this.stunned<=0 && !this.attack && (just.up || just.jump) && !this.airborne) {
       this.vy=-490;
       this.yOffset=-.2;
     }

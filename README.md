@@ -21,6 +21,10 @@ npm run build
 npm run preview
 ```
 
+## Alpha 0.2.1 · Mobile jump & spacing fix
+
+The **↑ JUMP** button is separate from the directional joystick. Hold the joystick horizontally and tap JUMP to leap without releasing movement; diagonal jump on the stick also works. The independent jump action is mapped to **Space** (player 1), **Numpad0** (player 2) and **RB** (standard gamepad). Touch controls now have larger safe edge margins in landscape and fullscreen, including phones with display cutouts.
+
 ## Alpha 0.2 · Mobile controls
 
 Turn the phone to **landscape**. The left thumb controls a floating **8-direction joystick** with a dead zone; the right thumb uses four **circular buttons arranged in a diamond**: **A (left) light**, **B (top) heavy**, **C (right) kick**, **SP (bottom) special**. Supports simultaneous pointers on the joystick and attacks. The virtual stick centers when released. Fullscreen button is available on supported browsers.

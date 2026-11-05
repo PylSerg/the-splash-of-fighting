@@ -10,7 +10,7 @@
 <body>
 <main class="site">
   <header class="topbar">
-    <div class="brand"><span class="star">✦</span><span><strong>THE SPLASH</strong><small>OF FIGHTING · ALPHA 0.2</small></span></div>
+    <div class="brand"><span class="star">✦</span><span><strong>THE SPLASH</strong><small>OF FIGHTING · ALPHA 0.2.1</small></span></div>
     <div class="top-actions"><span class="online">● LOCAL ARCADE</span><button id="btn-fullscreen" title="На весь екран" aria-label="На весь екран">⛶</button></div>
   </header>
   <section class="game-shell" aria-label="Арена">
@@ -26,7 +26,8 @@
             <span class="joystick-thumb"><span class="joystick-thumb-inner"></span></span>
           </div>
         </div>
-        <div class="touch-attacks" role="group" aria-label="Кнопки атаки ромбом">
+        <div class="touch-attacks" role="group" aria-label="Кнопки ударів і стрибка">
+          <button type="button" data-control="jump" class="attack jump" aria-label="Стрибок під час руху"><span aria-hidden="true">↑</span><small>JUMP</small></button>
           <button type="button" data-control="heavy" class="attack heavy" aria-label="B: сильний удар">B</button>
           <button type="button" data-control="light" class="attack light" aria-label="A: легкий удар">A</button>
           <button type="button" data-control="kick" class="attack kick" aria-label="C: удар ногою">C</button>
@@ -40,7 +41,7 @@
     <div class="toolbar-group"><button id="btn-cpu" class="pill selected">⚡ Проти CPU</button><button id="btn-versus" class="pill">🎮 Два гравці</button></div>
     <div class="toolbar-group"><button id="btn-debug" class="pill">▣ Хітбокси: викл.</button><button id="btn-restart" class="pill primary">↻ Новий раунд</button></div>
   </section>
-  <div class="details"><p id="game-status" aria-live="polite">Готуємо арену…</p><details><summary>⌨ Керування</summary><p><b>Гравець 1:</b> WASD рух, J легкий, K сильний, U нога, I спеціальний.</p><p><b>Гравець 2:</b> стрілки рух, Num1 легкий, Num2 сильний, Num4 нога, Num5 спецприйом.</p><p><b>Геймпад:</b> стік або D-pad, X легкий, Y сильний, A нога, B спеціальний.</p><p><b>Телефон:</b> джойстик зліва, ромб атак справа. <b>Інше:</b> захист триманням назад, R рестарт, H хітбокси, 1/2 режим.</p></details></div>
+  <div class="details"><p id="game-status" aria-live="polite">Готуємо арену…</p><details><summary>⌨ Керування</summary><p><b>Гравець 1:</b> WASD рух, Space стрибок, J легкий, K сильний, U нога, I спеціальний.</p><p><b>Гравець 2:</b> стрілки рух, Num1 легкий, Num2 сильний, Num4 нога, Num5 спецприйом.</p><p><b>Геймпад:</b> стік або D-pad, X легкий, Y сильний, A нога, B спеціальний.</p><p><b>Телефон:</b> джойстик зліва, ромб атак справа та окрема кнопка ↑ JUMP для стрибка під час руху. <b>Інше:</b> захист триманням назад, R рестарт, H хітбокси, 1/2 режим.</p></details></div>
   <footer>FIRST PLAYABLE · EVI × NARA · WORK IN PROGRESS</footer>
 </main>
 <script type="module" src="/src/main.ts"></script>
