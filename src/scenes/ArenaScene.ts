@@ -613,9 +613,9 @@ export class ArenaScene extends Phaser.Scene {
         const choice=this.aiCount%7;
         if(choice===0 && distance<116) {
           // The AI occasionally uses the same crouched trip as the player.
-          input.down=true;input.light=true;
+          input.down=true;input.kick=true;
         } else if(choice===1 && distance<108) {
-          input.down=true;input.kick=true; // weak mid crouch jab.
+          input.down=true;input.light=true; // weak mid crouch jab.
         } else if(choice===2 || choice===3) input.light=true;
         else if(choice===4 || choice===5) input.kick=true;
         else input.heavy=true;

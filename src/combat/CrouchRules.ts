@@ -17,8 +17,9 @@ export interface CrouchInput {
 export function crouchMoveForPress(input: CrouchInput): CrouchMove | null {
   if (!input.down || !input.grounded || input.blocking ||
       input.grabbing || input.rolling || input.special || input.heavy) return null;
-  if (input.light && !input.kick) return 'sweep';
-  if (input.kick && !input.light) return 'crouchMid';
+  // On ABXY: B (kick) does the leg sweep; X (light) performs the jab.
+  if (input.kick && !input.light) return 'sweep';
+  if (input.light && !input.kick) return 'crouchMid';
   return null;
 }
 

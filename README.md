@@ -27,6 +27,14 @@ npm run preview
 - Both the main screen and pause menu now read their release version directly from `package.json` at build time, and the title screen builds its fighter list directly from the live character roster. Future character additions and version bumps no longer require separately editing these labels.
 - No gameplay or fighter mechanics are changed in this patch.
 
+## Alpha 1.8.1 · Correct crouching ABXY bindings
+
+- **Down + B** (kick button) executes the low **sweep**. An unblocked hit trips a grounded opponent.
+- **Down + X** (light button) executes the quick, weak **mid-level jab** without knockdown.
+- Only the input binding is swapped: move damage, knockdown, low-block interaction, procedural animations and recovery timings remain unchanged.
+- CPU now inputs Down+B for sweeps and Down+X for crouching mid strikes. Updated on-screen help and automated input-binding tests.
+- The Alpha 1.8.0 section below documents the earlier, reversed bindings for historical reference.
+
 ## Alpha 1.8.0 · Crouching offense and sweep knockdowns
 
 - **Down + X** now performs a dedicated ground-level leg sweep (5 HP; Runa 6 HP, slower). It has a longer startup than standing X, and a distinct procedural kicking animation.

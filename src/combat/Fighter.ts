@@ -43,9 +43,9 @@ export const ATTACKS: Record<AttackName, AttackSpec> = {
   kick: { duration: .40, reach: 135, damage: 9, level: 'mid', stun: .27, push: 150, gain: 10 },
   // Supers keep their own damage but behave as a mid-level strike defensively.
   special: { duration: .82, reach: 205, damage: 20, level: 'mid', stun: .40, push: 290, gain: 0 },
-  // Crouching X: low trip. Its knockdown triggers ONLY on an unblocked hit.
+  // Crouching B: low trip. Knockdown triggers ONLY on an unblocked hit.
   sweep: { duration: .47, reach: 114, damage: 5, level: 'low', stun: .12, push: 78, gain: 8 },
-  // Crouching B: short-range, weak mid jab. Strong high Y is unavailable.
+  // Crouching X: short-range, weak mid jab. Strong high Y is unavailable.
   crouchMid: { duration: .30, reach: 99, damage: 4, level: 'mid', stun: .15, push: 78, gain: 6 },
 };
 
@@ -555,7 +555,7 @@ export class Fighter {
     }
   }
 
-  /** A grounded, unguarded crouching X trips the rival without throwing
+  /** A grounded, unguarded crouching B trips the rival without throwing
    *  them behind the attacker. Short fall, same prone/rise recovery as throws.
    */
   receiveSweep(attackerFace: 1 | -1): void {

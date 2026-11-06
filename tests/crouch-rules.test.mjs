@@ -9,20 +9,20 @@ const input = {
 const select = patch => crouchMoveForPress({...input,...patch});
 
 // Only two crouching attacks exist. Upper Y and B+Y may not fire or buffer.
-assert.equal(select({light:true}), 'sweep', 'Down + X starts a low sweep');
-assert.equal(select({kick:true}), 'crouchMid', 'Down + B starts a weak mid jab');
+assert.equal(select({kick:true}), 'sweep', 'Down + B starts a low sweep');
+assert.equal(select({light:true}), 'crouchMid', 'Down + X starts a weak mid jab');
 assert.equal(select({heavy:true}), null, 'Down + Y must not attack');
 assert.equal(select({kick:true,heavy:true,special:true}), null, 'Down + B+Y is not a crouch move');
 assert.equal(select({light:true,kick:true}), null, 'Two overlapping buttons cannot produce a random attack');
-assert.equal(select({light:true,heavy:true}), null, 'Heavy plus light is not a crouch sweep');
+assert.equal(select({kick:true,heavy:true}), null, 'B+Y is not a crouch sweep');
 for (const constraints of [
   {down:false}, {grounded:false}, {blocking:true}, {grabbing:true},
   {rolling:true}, {special:true},
 ]) {
   assert.equal(select({...constraints,light:true}), null,
-    `X is disabled for invalid crouch state: ${JSON.stringify(constraints)}`);
+    `X jab is disabled for invalid crouch state: ${JSON.stringify(constraints)}`);
   assert.equal(select({...constraints,kick:true}), null,
-    `B is disabled for invalid crouch state: ${JSON.stringify(constraints)}`);
+    `B sweep is disabled for invalid crouch state: ${JSON.stringify(constraints)}`);
 }
 
 // A successful sweep trips standing and crouching targets, but a correct
