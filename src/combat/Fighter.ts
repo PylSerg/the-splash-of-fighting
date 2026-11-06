@@ -4,13 +4,14 @@ import { stopsHit, strikeBand, type HitLevel, type GuardStance } from './HitRule
 import { crouchMoveForPress } from './CrouchRules';
 import { blockedGrabRecoil } from './GrabRules';
 import { earnSpecialMeter, SPECIAL_METER_COST } from './CombatFeedback';
+import { DUEL_WHIFF_RECOVERY, forwardHeld, type DuelStrike } from './DuelRules';
 import {
   COMBO_LINK_WINDOW, COMBO_FINISH_RECOVERY, comboAllows,
   comboFinisherUnblockable, comboIsCleanHit, type ComboMove,
 } from './ComboRules';
 
 export type FighterId = 'evi' | 'runa' | 'lyra' | 'kai';
-export type AttackName = 'light' | 'heavy' | 'kick' | 'special' | 'sweep' | 'crouchMid';
+export type AttackName = 'light' | 'heavy' | 'kick' | 'special' | 'sweep' | 'crouchMid' | 'duel';
 export interface AttackSpec {
   /** Wind-up/swing completes at this time; collision is tested exactly once then. */
   duration: number;
@@ -60,6 +61,8 @@ export const ATTACKS: Record<AttackName, AttackSpec> = {
   sweep: { duration: .47, reach: 114, damage: 5, level: 'low', stun: .12, push: 78, gain: 8 },
   // Crouching X: short-range, weak mid jab. Strong high Y is unavailable.
   crouchMid: { duration: .30, reach: 99, damage: 4, level: 'mid', stun: .15, push: 78, gain: 6 },
+  // A Y-shaped, zero-damage, unblockable challenge swing.
+  duel: { duration: .43, reach: 116, damage: 0, level: 'high', stun: 0, push: 0, gain: 0 },
 };
 
 /** Runa: slower and stronger, but her attacks can still be interrupted. */
@@ -70,6 +73,7 @@ const RUNA_ATTACKS: Record<AttackName,AttackSpec> = {
   special: { ...ATTACKS.special, duration: .94, reach: 195, damage: 23, stun: .44, push: 335 },
   sweep: { ...ATTACKS.sweep, duration: .52, reach: 121, damage: 6 },
   crouchMid: { ...ATTACKS.crouchMid, duration: .34, damage: 5 },
+  duel: { ...ATTACKS.duel, duration: .50, reach: 114 },
 };
 
 export class Fighter {
@@ -108,6 +112,7 @@ export class Fighter {
   private comboClean = true;
   private comboLinkRemaining = 0;
   private comboRecovery = 0;
+  private duelWhiffRecovery = 0;
   private time = 0;
 
   readonly rig: Phaser.GameObjects.Container;
@@ -297,6 +302,61 @@ export class Fighter {
   get knockedDown(): boolean { return this.knockdownPhase !== null; }
   get knockoutSettled(): boolean { return this.knockedOut && this.knockdownPhase === 'ko'; }
   get isComboRecovering(): boolean { return this.comboRecovery > 0; }
+  get isDuelRecovering(): boolean { return this.duelWhiffRecovery > 0; }
+  get isDuelStarting(): boolean { return this.attack?.name==='duel'; }
+  canStartDuel(): boolean {
+    // Two fingers or a swipe may register B first, then Y about a tenth
+    // of a second later. Cancel ONLY the pre-impact startup of that
+    // component, never a landed attack or combo finisher.
+    const earlyChordComponent=Boolean(this.attack &&
+      (this.attack.name==='kick' || this.attack.name==='heavy') &&
+      this.attack.comboStage===1 && !this.attack.connected &&
+      this.attack.elapsed<.16);
+    return !this.knockedOut && !this.knockedDown && !this.airborne &&
+      !this.crouching && !this.isRolling && !this.grabPose &&
+      !this.stunned && (!this.attack || earlyChordComponent) &&
+      !this.comboRecovery && !this.grabRecovery && !this.duelWhiffRecovery;
+  }
+  /** The initial zero-damage swing cannot be blocked or shortened. */
+  tryBeginDuel(input: InputState): boolean {
+    if(!input.duel || input.special || !forwardHeld(this.face,input.left,input.right) ||
+       !this.canStartDuel()) return false;
+    this.clearCombo();
+    this.queuedSolo=null;this.queuedSpecial=0;
+    this.begin('duel');
+    this.blocking=false;this.walking=false;
+    return true;
+  }
+  duelStarterMiss(): void {
+    if(this.attack?.name!=='duel') return;
+    this.attack=null;
+    this.duelWhiffRecovery=DUEL_WHIFF_RECOVERY;
+    this.clearCombo();
+    this.queuedSolo=null;this.queuedSpecial=0;
+    this.blocking=false;this.walking=false;
+  }
+  duelStarterConnected(): void {
+    // Freeze begins with a clean state on BOTH fighters. Any partially
+    // prepared strike is discarded, not replayed after the duel.
+    this.attack=null;
+    this.clearCombo();
+    this.queuedSolo=null;this.queuedSpecial=0;
+    this.blocking=false;this.walking=false;
+  }
+  /** Knockback from a tie/defensive A, measured away from the rival. */
+  duelRecoil(rivalX: number, speed: number): void {
+    const direction=this.x===rivalX ? -this.face : this.x<rivalX?-1:1;
+    this.impactVelocity=direction*speed;
+    this.blocking=false;
+  }
+  /** One visual attack on resolution, with collision already consumed. */
+  showDuelResultStrike(move: DuelStrike): void {
+    const spec=this.id==='runa'?RUNA_ATTACKS[move]:ATTACKS[move];
+    this.clearCombo();
+    this.attack={name:move,spec,elapsed:spec.duration,connected:true,comboStage:0};
+    this.blocking=false;this.crouching=false;
+    this.draw(0);
+  }
   /** Only valid next strikes are exposed to the CPU and training UI. */
   get comboOptions(): ComboMove[] {
     return this.comboLinkRemaining>0 && !this.comboRecovery
@@ -360,7 +420,7 @@ export class Fighter {
     this.crouching=false; this.walking=false; this.attack=null;
     this.hitFlash=0; this.blockFlash=0; this.impactVelocity=0; this.time=0;
     this.queuedSolo=null; this.queuedSpecial=0;
-    this.clearCombo();this.comboRecovery=0;
+    this.clearCombo();this.comboRecovery=0;this.duelWhiffRecovery=0;
     this.grabPose=null; this.grabRecovery=0;
     this.rollElapsed=-1; this.rollDirection=1; this.rollCooldown=0;
     this.knockdownPhase=null;this.knockdownTimer=0;this.knockdownFlightAge=0;
@@ -388,6 +448,13 @@ export class Fighter {
     }
     if (this.knockedOut) { this.draw(dt); return; }
     if (this.stunned>0) this.stunned=Math.max(0,this.stunned-dt);
+    if(this.duelWhiffRecovery>0) {
+      this.duelWhiffRecovery=Math.max(0,this.duelWhiffRecovery-dt);
+      this.attack=null;
+      this.blocking=false;this.crouching=false;this.walking=false;
+      this.advanceGravity(dt);this.draw(dt);
+      return;
+    }
     if(this.comboLinkRemaining>0) {
       this.comboLinkRemaining=Math.max(0,this.comboLinkRemaining-dt);
       if(this.comboLinkRemaining===0) this.clearCombo();
@@ -412,7 +479,8 @@ export class Fighter {
     const horizontal = Number(input.right) - Number(input.left);
     const canCancelEarlyLight = this.attack?.name === 'light' &&
       this.attack.elapsed < .13;
-    if (just.roll && horizontal !== 0 && this.attack?.comboStage!==3 && !this.airborne &&
+    if (just.roll && horizontal !== 0 && this.attack?.comboStage!==3 &&
+        this.attack?.name!=='duel' && !this.airborne &&
         this.stunned <= 0 && this.grabRecovery <= 0 &&
         !this.grabPose && this.rollCooldown <= 0 &&
         (!this.attack || canCancelEarlyLight)) {
@@ -460,7 +528,7 @@ export class Fighter {
     // Finisher animation is committed, so guard cannot cancel away its
     // mandatory recovery (other normal strikes can still cancel to guard).
     if (canRaiseGuard && this.attack?.name !== 'special' &&
-        this.attack?.comboStage !== 3) {
+        this.attack?.name !== 'duel' && this.attack?.comboStage !== 3) {
       this.attack=null;
       this.queuedSolo=null;
       this.queuedSpecial=0;
@@ -494,8 +562,10 @@ export class Fighter {
     // must not secretly fire when the character stands up again.
     if (this.crouching) this.queuedSpecial=0;
     if (this.attack?.comboStage===3) this.queuedSpecial=0;
-    if (just.special && !this.crouching && this.attack?.comboStage!==3) {
-      this.queuedSpecial=.55;
+    if (just.special && forwardHeld(this.face,input.left,input.right) &&
+        !this.crouching && this.attack?.comboStage!==3 &&
+        this.attack?.name!=='duel') {
+      this.queuedSpecial=.35;
       this.queuedSolo=null;
     }
     // The two dedicated crouch moves may begin while grounded and pressing
@@ -539,7 +609,8 @@ export class Fighter {
       this.attack && this.attack.comboStage!==3 &&
       (this.attack.name==='kick' || this.attack.name==='heavy')
     );
-    if (!canLinkCombo && canAct && this.queuedSpecial>0 && this.energy>=SPECIAL_METER_COST &&
+    if (!canLinkCombo && canAct && forwardHeld(this.face,input.left,input.right) &&
+        this.queuedSpecial>0 && this.energy>=SPECIAL_METER_COST &&
         (!this.attack || canCancelForChord)) {
       this.energy-=SPECIAL_METER_COST;
       this.attack=null;
@@ -871,7 +942,11 @@ export class Fighter {
       const followThrough=Phaser.Math.Clamp(
         1-Math.max(0,a.elapsed-a.spec.duration)/ATTACK_RECOVERY,0,1);
       const recoil=swing*followThrough;
-      if(a.name==='sweep') {
+      if(a.name==='duel') {
+        // Readable, real high Y wind-up, but initiation itself deals ZERO HP.
+        this.frontArm.rotation=-.62-recoil*2.1;
+        this.weapon.rotation=-.36-recoil*1.5;
+      } else if(a.name==='sweep') {
         // Ground-level leg sweep. Keep the torso and head crouched while
         // extending one leg almost horizontally toward the opponent.
         const extension=Math.sin(Math.PI*ratio)*followThrough;

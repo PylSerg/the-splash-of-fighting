@@ -1,24 +1,26 @@
-export type Action = 'left' | 'right' | 'up' | 'down' | 'jump' | 'light' | 'heavy' | 'kick' | 'block' | 'grab' | 'special' | 'roll';
+import { deriveCommandChords } from './CommandRules';
+
+export type Action = 'left' | 'right' | 'up' | 'down' | 'jump' | 'light' | 'heavy' | 'kick' | 'block' | 'grab' | 'special' | 'duel' | 'roll';
 export type InputState = Record<Action, boolean>;
 type Direction = 'left' | 'right' | 'up' | 'down';
 
-const ACTIONS: Action[] = ['left', 'right', 'up', 'down', 'jump', 'light', 'heavy', 'kick', 'block', 'grab', 'special', 'roll'];
+const ACTIONS: Action[] = ['left', 'right', 'up', 'down', 'jump', 'light', 'heavy', 'kick', 'block', 'grab', 'special', 'duel', 'roll'];
 const DIRECTIONS: Direction[] = ['left', 'right', 'up', 'down'];
 
 export const emptyInput = (): InputState => ({
   left: false, right: false, up: false, down: false, jump: false,
-  light: false, heavy: false, kick: false, block: false, grab: false, special: false, roll: false,
+  light: false, heavy: false, kick: false, block: false, grab: false, special: false, duel: false, roll: false,
 });
 
 // Roll has no dedicated keyboard key: down+direction+block+light is its chord.
-const KEYMAPS: Record<Exclude<Action,'roll'>, string>[] = [
+const KEYMAPS: Record<Exclude<Action,'roll'|'duel'|'special'>, string>[] = [
   {
     left: 'KeyA', right: 'KeyD', up: 'KeyW', down: 'KeyS', jump: 'Space',
-    light: 'KeyJ', heavy: 'KeyK', kick: 'KeyL', block: 'KeyH', grab: 'KeyG', special: 'KeyI',
+    light: 'KeyJ', heavy: 'KeyK', kick: 'KeyL', block: 'KeyH', grab: 'KeyG',
   },
   {
     left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown', jump: 'Numpad0',
-    light: 'Numpad1', heavy: 'Numpad2', kick: 'Numpad4', block: 'Numpad5', grab: 'Numpad3', special: 'Numpad6',
+    light: 'Numpad1', heavy: 'Numpad2', kick: 'Numpad4', block: 'Numpad5', grab: 'Numpad3',
   },
 ];
 
@@ -34,12 +36,13 @@ function gamepadInput(pad: Gamepad | null): InputState {
   state.up = axisY < -0.55 || held(12);
   state.down = axisY > 0.55 || held(13);
   // Standard Xbox-style gamepad: A=block, B=kick, X=light, Y=heavy.
-  // B+Y is a chord; R1 / RB (button 5) is a direct special shortcut.
+  // B+Y initiates a duel; R1/RB initiates a duel after a short chord delay.
+  // R1+R2 (RB+RT) is the special chord. Both require forward direction.
   state.block = held(0);
   state.kick = held(1);
   state.light = held(2);
   state.heavy = held(3);
-  state.special = held(5) || (state.kick && state.heavy);
+  // Shoulder chords are resolved together with keyboard/touch in read().
   // L1/LB (button 4) is an independent grab shortcut.
   // X+A still triggers the same grab as before.
   state.grab = held(4) || (state.light && state.block);
@@ -59,11 +62,17 @@ export class Controls {
   private keys = new Set<string>();
   private touches = new Map<number, Action>();
   private buttons = new Map<Action, HTMLButtonElement>();
-  // One-finger combo swipe: drag a held B (kick) onto Y (heavy), or the reverse.
+  // One-finger duel swipe: drag a held B (kick) onto Y (heavy), or the reverse.
   // The gesture remains active for the pointer lifetime, like a two-button chord.
   private comboSwipePointers = new Set<number>();
   // Preserve fast swipes long enough for the next 60Hz simulation sample.
   private comboSwipePulseUntil = 0;
+  // A<->B is a one-finger special chord; B<->Y is the duel chord.
+  private specialSwipePointers = new Set<number>();
+  private specialSwipePulseUntil = 0;
+  // Delay single R1 so R1+R2 can register as a special without a duel.
+  private r1Started: [number,number] = [0,0];
+  private r1Held: [boolean,boolean] = [false,false];
   // X<->A swipe uses an independent pointer and a brief input pulse.
   private grabSwipePointers = new Set<number>();
   private grabSwipePulseUntil = 0;
@@ -198,29 +207,39 @@ export class Controls {
       // This does not interfere with a second finger or with the joystick.
       button.addEventListener('pointermove', event => {
         if (this.touches.get(event.pointerId) !== action) return;
-        const other = action === 'kick' ? 'heavy' :
-          action === 'heavy' ? 'kick' :
-          action === 'light' ? 'block' :
-          action === 'block' ? 'light' : null;
-        if (!other) return;
-        const isSpecial = action === 'kick' || action === 'heavy';
-        const pointers = isSpecial ? this.comboSwipePointers : this.grabSwipePointers;
-        if (pointers.has(event.pointerId)) return;
-        const partner = this.buttons.get(other);
-        if (!partner) return;
-        const rect = partner.getBoundingClientRect();
-        const tolerance = 9;
-        if (event.clientX >= rect.left - tolerance && event.clientX <= rect.right + tolerance &&
-            event.clientY >= rect.top - tolerance && event.clientY <= rect.bottom + tolerance) {
-          pointers.add(event.pointerId);
-          if (isSpecial) this.comboSwipePulseUntil = performance.now() + 220;
-          else this.grabSwipePulseUntil = performance.now() + 220;
-          this.updateVisuals();
+        // One-finger chord swipes: B↔Y duel, A↔B special, X↔A grab.
+        const partners: {other:Action;pointers:Set<number>;pulse:'duel'|'special'|'grab'}[] = [];
+        if(action==='kick') {
+          partners.push({other:'heavy',pointers:this.comboSwipePointers,pulse:'duel'});
+          partners.push({other:'block',pointers:this.specialSwipePointers,pulse:'special'});
+        } else if(action==='heavy') {
+          partners.push({other:'kick',pointers:this.comboSwipePointers,pulse:'duel'});
+        } else if(action==='block') {
+          partners.push({other:'light',pointers:this.grabSwipePointers,pulse:'grab'});
+          partners.push({other:'kick',pointers:this.specialSwipePointers,pulse:'special'});
+        } else if(action==='light') {
+          partners.push({other:'block',pointers:this.grabSwipePointers,pulse:'grab'});
+        }
+        for(const {other,pointers,pulse} of partners) {
+          if(pointers.has(event.pointerId)) continue;
+          const partner=this.buttons.get(other);
+          if(!partner) continue;
+          const rect=partner.getBoundingClientRect(),tolerance=9;
+          if (event.clientX >= rect.left-tolerance && event.clientX <= rect.right+tolerance &&
+              event.clientY >= rect.top-tolerance && event.clientY <= rect.bottom+tolerance) {
+            pointers.add(event.pointerId);
+            if(pulse==='duel') this.comboSwipePulseUntil=performance.now()+220;
+            else if(pulse==='special') this.specialSwipePulseUntil=performance.now()+220;
+            else this.grabSwipePulseUntil=performance.now()+220;
+            this.updateVisuals();
+            break;
+          }
         }
       });
       const release = (event: PointerEvent) => {
         this.touches.delete(event.pointerId);
         this.comboSwipePointers.delete(event.pointerId);
+        this.specialSwipePointers.delete(event.pointerId);
         this.grabSwipePointers.delete(event.pointerId);
         this.updateVisuals();
       };
@@ -238,7 +257,8 @@ export class Controls {
     }
     const diamond = document.querySelector('.touch-attacks');
     diamond?.classList.toggle('combo-active',
-      (pressed.has('kick') && pressed.has('heavy')) || this.comboSwipePointers.size > 0);
+      (pressed.has('kick') && pressed.has('heavy')) || this.comboSwipePointers.size > 0 ||
+      (pressed.has('kick') && pressed.has('block')) || this.specialSwipePointers.size > 0);
     diamond?.classList.toggle('grab-active',
       (pressed.has('light') && pressed.has('block')) || this.grabSwipePointers.size > 0);
   }
@@ -248,6 +268,9 @@ export class Controls {
     this.touches.clear();
     this.comboSwipePointers.clear();
     this.comboSwipePulseUntil=0;
+    this.specialSwipePointers.clear();
+    this.specialSwipePulseUntil=0;
+    this.r1Started=[0,0];this.r1Held=[false,false];
     this.grabSwipePointers.clear();
     this.grabSwipePulseUntil=0;
     this.releaseJoystick();
@@ -263,7 +286,7 @@ export class Controls {
     const map = KEYMAPS[player];
     const touched = player === 0 ? new Set(this.touches.values()) : null;
     for (const action of ACTIONS) {
-      if (action === 'roll') continue;
+      if (action === 'roll' || action === 'duel' || action === 'special') continue;
       state[action] = this.keys.has(map[action]) || Boolean(touched?.has(action));
     }
     if (player === 0) {
@@ -279,8 +302,26 @@ export class Controls {
     for (const action of ACTIONS) {
       state[action] ||= pad[action];
     }
+    const r1Down=Boolean(pads[player]?.buttons[5]?.pressed);
+    const r2Down=Boolean(pads[player]?.buttons[7]?.pressed) ||
+      (pads[player]?.buttons[7]?.value ?? 0)>.5;
+    if(r1Down && !this.r1Held[player]) this.r1Started[player]=performance.now();
+    this.r1Held[player]=r1Down;
+    // A slightly delayed lone R1 avoids triggering duel while the player
+    // is pressing R1+R2 to activate the forward special.
+    const r1Solo=r1Down && !r2Down &&
+      performance.now()-this.r1Started[player]>=105;
     // Two-finger or one-finger swipe chords work beside an independent joystick.
-    state.special ||= state.kick && state.heavy;
+    const commands=deriveCommandChords({
+      block:state.block,kick:state.kick,heavy:state.heavy,
+      r1Solo,r1AndR2:r1Down && r2Down,
+      duelSwipe:player===0 && (this.comboSwipePointers.size>0 ||
+        performance.now()<this.comboSwipePulseUntil),
+      specialSwipe:player===0 && (this.specialSwipePointers.size>0 ||
+        performance.now()<this.specialSwipePulseUntil),
+    });
+    state.duel=commands.duel;
+    state.special=commands.special;
     const touchGrabSwipe = player === 0 &&
       (this.grabSwipePointers.size > 0 ||
        performance.now() < this.grabSwipePulseUntil);
@@ -292,9 +333,6 @@ export class Controls {
     const horizontal = state.left !== state.right;
     const chordRoll = state.down && (state.light && state.block || touchGrabSwipe);
     state.roll = horizontal && (state.roll || chordRoll);
-    if (player === 0 &&
-        (this.comboSwipePointers.size > 0 ||
-         performance.now() < this.comboSwipePulseUntil)) state.special = true;
     return state;
   }
 }

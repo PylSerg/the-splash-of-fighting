@@ -27,6 +27,18 @@ npm run preview
 - Both the main screen and pause menu now read their release version directly from `package.json` at build time, and the title screen builds its fighter list directly from the live character roster. Future character additions and version bumps no longer require separately editing these labels.
 - No gameplay or fighter mechanics are changed in this patch.
 
+## Alpha 1.11.0 · Frozen secret-choice duels
+
+- New command **Forward+B+Y** (touch/keyboard) or **Forward+R1** (gamepad) starts an **unblockable, zero-damage Y-height challenge swing**. It must truly overlap the target's hurtbox, so a crouched fighter can duck under it and a roll can avoid it. If it misses, the attacker has **0.3 s** of attack/movement/guard recovery.
+- **Special attack moved to Forward+A+B** (touch/keyboard) or **Forward+R1+R2** (gamepad). The previous standalone B+Y and R1 special mappings no longer activate a special. The cost stays **40 meter**. A brief R1 grace period helps R1+R2 win over R1 alone. Keyboard P1 forward+H+L performs special and forward+L+K challenges; P2 uses forward+Num5+Num4 or forward+Num4+Num2.
+- Touch controller supports simultaneous touches and one-finger swipes for A↔B special, B↔Y duel, plus existing X↔A grab.
+- Challenge hit starts a fully frozen **2-second duel**. Character movement, attacks, gravity, CPU behavior, hit detection and the round clock stop. A **25-pixel-thick bar spanning the entire viewport** is rendered beneath both HUD meters, shrinking symmetrically from both edges to the center during the countdown.
+- Each player secretly selects **one X/Y/B strike after the countdown begins**. Defender can select **A for guard** instead; the first fresh press is locked, hidden and never revealed early. Held starter buttons cannot auto-select. CPU picks a random valid attack or (when defending) block.
+- Duel outcome is determined by **Y > X, X > B, B > Y**. Exactly one winner deals **24 HP** (Runa **28 HP**) with matching attack animation, shake, knockback and damage-based meter gain. Equal attacks knock both away with zero damage. Defender A always prevents damage and knocks the attacker back a much greater distance; if one player made no choice, the other's strike wins, while two no-choices are a tie.
+- Existing three-hit combos, block levels, throws, knockdowns, damage trails and regular special-meter accounting continue to work outside the duel.
+- New deterministic tests check all nine attack pairings, block priority, absent-choice behavior, command direction, time window and increased damage. Separate tests verify ABXY, R1 and R1+R2 chord priority and both one-finger swipe pairs.
+- The previous Alpha 1.10.0 section below is retained as historical release notes.
+
 ## Alpha 1.10.0 · Three-hit combo routes and unblockable third hit
 
 - Added **six distinct three-attack combinations**, using standing X/B/Y in different orders: **X → B → Y**, **X → Y → B**, **B → X → Y**, **B → Y → X**, **Y → X → B** and **Y → B → X**. Press each separately after the previous strike contacts the opponent. The next input must arrive within **0.80 s** of its previous impact; buttons are not auto-repeated.
