@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { InputState } from '../input/Controls';
+import { stopsHit, strikeBand, type HitLevel, type GuardStance } from './HitRules';
 
 export type FighterId = 'evi' | 'runa' | 'lyra' | 'kai';
 export type AttackName = 'light' | 'heavy' | 'kick' | 'special';
@@ -8,6 +9,8 @@ export interface AttackSpec {
   duration: number;
   reach: number;
   damage: number;
+  /** The vertical lane this strike actually occupies. */
+  level: HitLevel;
   stun: number;
   push: number;
   gain: number;
@@ -34,10 +37,11 @@ const ROLL_COOLDOWN = .88;
 const ROLL_IFRAME_START = .095;
 const ROLL_IFRAME_END = .31;
 export const ATTACKS: Record<AttackName, AttackSpec> = {
-  light: { duration: .27, reach: 92, damage: 5, stun: .18, push: 110, gain: 7 },
-  heavy: { duration: .48, reach: 116, damage: 11, stun: .32, push: 185, gain: 12 },
-  kick: { duration: .40, reach: 135, damage: 9, stun: .27, push: 150, gain: 10 },
-  special: { duration: .82, reach: 205, damage: 20, stun: .40, push: 290, gain: 0 },
+  light: { duration: .27, reach: 92, damage: 5, level: 'low', stun: .18, push: 110, gain: 7 },
+  heavy: { duration: .48, reach: 116, damage: 11, level: 'high', stun: .32, push: 185, gain: 12 },
+  kick: { duration: .40, reach: 135, damage: 9, level: 'mid', stun: .27, push: 150, gain: 10 },
+  // Supers keep their own damage but behave as a mid-level strike defensively.
+  special: { duration: .82, reach: 205, damage: 20, level: 'mid', stun: .40, push: 290, gain: 0 },
 };
 
 /** Runa: slower and stronger, but her attacks can still be interrupted. */
@@ -257,6 +261,10 @@ export class Fighter {
 
   get airborne(): boolean { return this.yOffset < -.1; }
   get knockedOut(): boolean { return this.hp <= 0; }
+  get guardStance(): GuardStance {
+    if (!this.blocking) return 'none';
+    return this.crouching ? 'crouching' : 'standing';
+  }
   get isRolling(): boolean { return this.rollElapsed >= 0; }
   get isRollInvulnerable(): boolean {
     return this.isRolling && this.rollElapsed >= ROLL_IFRAME_START &&
@@ -334,13 +342,13 @@ export class Fighter {
       if (this.attack.elapsed >= this.attack.spec.duration + ATTACK_RECOVERY) this.attack=null;
     }
 
-    // A only guards in safe stances: on the ground at rest, retreating,
-    // or crouching while holding back. Back follows the opponent's side.
+    // Standing A guards high/mid; crouching Down+A guards mid/low.
+    // Both guard stances work at rest or while retreating, never advancing.
     const forward = this.face===1 ? input.right : input.left;
     const backward = this.face===1 ? input.left : input.right;
     const neutral = !input.left && !input.right && !input.up && !input.down;
     const validGuardStance = !this.airborne && !input.up && !forward &&
-      (neutral || backward);
+      (input.down || neutral || backward);
     const canRaiseGuard = input.block && validGuardStance && this.stunned<=0;
     // A valid guard cancels a normal attack, but not a committed special.
     if (canRaiseGuard && this.attack?.name !== 'special') {
@@ -565,7 +573,11 @@ export class Fighter {
     const a=this.getActiveStrike();
     if(!a) return null;
     const w=a.spec.reach;
-    return {x:this.x+(this.face===1?12-w/8:-12-w*7/8), y:GROUND_Y+this.yOffset-117, w, h:86};
+    const band=strikeBand(a.spec.level);
+    return {
+      x:this.x+(this.face===1?12-w/8:-12-w*7/8),
+      y:GROUND_Y+this.yOffset+band.top, w, h:band.height,
+    };
   }
 
   bodyBox(): {x:number;y:number;w:number;h:number} {
@@ -573,13 +585,13 @@ export class Fighter {
     return {x:this.x-25,y:GROUND_Y+this.yOffset-(low?73:145),w:50,h:low?72:142};
   }
 
-  receiveHit(spec: AttackSpec, attackerFace: 1|-1, attackName: AttackName): {damage:number;blocked:boolean;interrupted:boolean} {
-    const blocked=this.blocking;
+  receiveHit(spec: AttackSpec, attackerFace: 1|-1): {damage:number;blocked:boolean;interrupted:boolean} {
+    const blocked=stopsHit(this.guardStance,spec.level);
     const interrupted=!blocked && Boolean(this.attack && !this.attack.connected &&
       this.attack.elapsed < this.attack.spec.duration);
-    // Y heavy retains 25% chip damage against an otherwise successful guard.
-    // Keep fractional HP: 11 HP heavy deals exactly 2.75 HP through block.
-    const damage=blocked ? (attackName==='heavy' ? spec.damage*.25 : 0) : spec.damage;
+    // A correct guard negates the entire hit. A low attack beats standing A;
+    // middle attacks are covered by both A and Down+A.
+    const damage=blocked ? 0 : spec.damage;
     this.hp=Math.max(0,this.hp-damage);
     this.energy=Math.min(100,this.energy+(blocked?3:9));
     this.impactVelocity=attackerFace*spec.push*(blocked?.43:1);
@@ -660,12 +672,26 @@ export class Fighter {
       const followThrough=Phaser.Math.Clamp(
         1-Math.max(0,a.elapsed-a.spec.duration)/ATTACK_RECOVERY,0,1);
       const recoil=swing*followThrough;
-      if(a.name==='kick') this.rightLeg.rotation=-recoil*1.5;
-      else this.frontArm.rotation=-recoil*(a.name==='heavy'?2.1:1.25);
+      if(a.name==='kick') {
+        // Mid kick: straight through the torso lane.
+        this.rightLeg.rotation=-recoil*1.5;
+      } else if(a.name==='light') {
+        // Low sweep/punch: keep the hit readable near the opponent's feet.
+        this.frontArm.rotation=.58+Math.abs(recoil)*1.0;
+        this.weapon.rotation=.38+Math.abs(recoil)*.8;
+        this.body.y=8;this.head.y=8;this.hair.y=8;
+        this.rightLeg.rotation=-.38;
+      } else {
+        this.frontArm.rotation=-recoil*(a.name==='heavy'?2.1:1.25);
+      }
       if(a.name==='special') {
         this.frontArm.rotation=-recoil*2.8;
         this.weapon.rotation=-recoil*2.7;
-      } else if(a.name==='heavy') this.weapon.rotation=-recoil*1.5;
+      } else if(a.name==='heavy') {
+        // High overhead swing, vulnerable to a crouched opponent.
+        this.frontArm.rotation=-.6-recoil*2.1;
+        this.weapon.rotation=-.35-recoil*1.5;
+      }
     }
     if(this.stunned>0) this.frontArm.rotation=-.5;
     if (this.knockedDown) {

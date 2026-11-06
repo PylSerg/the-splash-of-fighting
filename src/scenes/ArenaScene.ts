@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { Controls, emptyInput, type InputState } from '../input/Controls';
 import { Fighter, GROUND_Y, STAGE_MIN_X, STAGE_MAX_X, setStageViewportWidth, type FighterId } from '../combat/Fighter';
 import { getCharacter } from '../characters/Roster';
+import { HIT_LEVEL_NAMES } from '../combat/HitRules';
 import { getStage, type StageId } from '../stages/Stages';
 
 type GameMode = 'cpu' | 'versus';
@@ -573,13 +574,23 @@ export class ArenaScene extends Phaser.Scene {
     if(this.player2.stunned>0||this.player2.knockedOut||this.player2.knockedDown)return input;
     if(distance>130)input[forward]=true;
     else if(distance<75 && this.aiCount%5===0)input.block=true;
-    if(distance<160 && this.player1.attack && this.aiCount%4===0) input.block=true;
-    // The CPU has the same guard restrictions: halt its approach or
-    // retreat when blocking rather than guarding while moving forward.
-    if (input.block) {
+    if(distance<160 && this.player1.attack && this.aiCount%4===0) {
+      const incoming=this.player1.attack.spec.level;
+      // CPU considers the strike's real height when deciding its defense.
+      if(incoming==='high' && this.aiCount%3===0) {
+        input.block=false;
+        input.down=true; // duck beneath a high attack.
+      } else {
+        input.block=true;
+        input.down=incoming==='low'; // standing A loses against low X.
+      }
+    }
+    // The CPU cannot advance while guarding/crouching. Backward motion
+    // can be combined with down, preserving the low-guard stance.
+    if (input.block || input.down) {
       input[forward]=false;
       const backward=forward==='left'?'right':'left';
-      if (distance<135 && this.player1.attack) input[backward]=true;
+      if (input.block && distance<135 && this.player1.attack) input[backward]=true;
     }
     this.aiCooldown-=dt;
     if(this.aiCooldown<=0){
@@ -618,21 +629,36 @@ export class ArenaScene extends Phaser.Scene {
     // Consume the one impact frame even if the attack misses. Otherwise a
     // whiff could "hit late" during follow-through and become unavoidable.
     strike.connected=true;
-    if(target.knockedOut||target.knockedDown||!box||!overlap(box,target.bodyBox()))return;
+    if(target.knockedOut||target.knockedDown||!box)return;
+    const hurt=target.bodyBox();
+    if(!overlap(box,hurt)) {
+      // The high hitbox ends ABOVE crouching hurtboxes. Even an unguarded
+      // crouch slips beneath Y, so this is a true miss, not a blocked hit.
+      if(strike.spec.level==='high' && target.crouching &&
+         box.x<hurt.x+hurt.w && box.x+box.w>hurt.x) {
+        this.combatNotice('WHIFF!',target.x,GROUND_Y-150,0xa3d7ff);
+        this.onStatus('Верхній удар пройшов над присілим суперником!');
+      }
+      return;
+    }
     if(target.isRollInvulnerable) {
       this.combatNotice('DODGE!',target.x,GROUND_Y-152,0x9aeefb);
       return; // No damage or energy reward during the roll's evasion window.
     }
-    const hit=target.receiveHit(strike.spec,attacker.face,strike.name);
+    const hit=target.receiveHit(strike.spec,attacker.face);
     attacker.rewardHit(strike.spec);
-    this.spawnSparks(target.x,GROUND_Y+target.yOffset-85,hit.blocked);
+    this.spawnSparks(target.x,GROUND_Y+target.yOffset-(strike.spec.level==='low'?37:85),hit.blocked);
     if(hit.interrupted) {
       this.combatNotice('INTERRUPT!',target.x,GROUND_Y+target.yOffset-173,0xffd898);
     }
+    if(!hit.blocked && target.blocking) {
+      this.combatNotice('LOW HIT!',target.x,GROUND_Y-152,0xffd080);
+    }
     if(!hit.blocked)this.cameras.main.shake(75,.003);
+    const level=HIT_LEVEL_NAMES[strike.spec.level];
     this.onStatus(hit.blocked
-      ? (hit.damage>0 ? 'Блок! Y пробив '+hit.damage.toLocaleString('uk-UA')+' HP (25% шкоди).' : 'Блок! Ушкодження поглинуто.')
-      :getCharacter(attacker.id).name+' влучає! -'+hit.damage+
+      ? getCharacter(target.id).name+' блокує '+level+' атаку! Шкоди немає.'
+      :getCharacter(attacker.id).name+' влучає ('+level+' атака)! -'+hit.damage+
         ' HP '+getCharacter(target.id).name+'.');
   }
 

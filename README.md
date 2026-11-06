@@ -27,6 +27,19 @@ npm run preview
 - Both the main screen and pause menu now read their release version directly from `package.json` at build time, and the title screen builds its fighter list directly from the live character roster. Future character additions and version bumps no longer require separately editing these labels.
 - No gameplay or fighter mechanics are changed in this patch.
 
+## Alpha 1.7.0 · Three height lanes and tactical guarding
+
+- **High Y / heavy**: 11 HP (Runa: 14 HP), slower overhead attack that physically passes **over crouching** opponents, even if they are not guarding.
+- **Middle B / kick**: 9 HP, hits both standing and crouching opponents.
+- **Low X / quick light**: 5 HP, hits feet and exposes an incorrectly standing guard. Its temporary procedural attack pose also angles downward.
+- **B+Y / R1 special**: special middle attack (20 HP; Runa: 23 HP), using its own longer wind-up and energy requirement.
+- **Standing A** blocks high and middle strikes, but cannot block low. **Down+A** blocks middle and low strikes, while high strikes whiff overhead. These rules also work while retreating (back+down+A); guarding cannot advance or guard in midair.
+- Correct blocks now negate damage completely, including heavy Y: the former 25% chip rule no longer applies. Improper guard height means a real hit, hitstun and interruption.
+- The high, middle and low attacks each have a **different physical vertical hitbox** aligned to standing/crouching hurtboxes. Whiffed highs show **WHIFF!**; a low attack through a high guard shows **LOW HIT!**.
+- CPU attempts low guard against low attacks and sometimes ducks a high attack. Shared defender rules apply identically to PvP and CPU.
+- Combat-level regression tests cover the full three-level × three-stances block table and standing/crouching hitbox overlap, run automatically in `npm run build`.
+- Earlier alpha sections below describe historical chip rules and should not be treated as the current combat behavior.
+
 ## Alpha 1.6.0 · Manual standing grabs and overhead throws
 
 - **Standing only:** start a grab with **held A+X** (or L1 / keyboard G) while upright, grounded and close to the opponent. A crouched/down/up/rolling input cannot start a grab.
