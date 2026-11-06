@@ -1,9 +1,10 @@
 import Phaser from 'phaser';
 import type { InputState } from '../input/Controls';
 import { stopsHit, strikeBand, type HitLevel, type GuardStance } from './HitRules';
+import { crouchMoveForPress } from './CrouchRules';
 
 export type FighterId = 'evi' | 'runa' | 'lyra' | 'kai';
-export type AttackName = 'light' | 'heavy' | 'kick' | 'special';
+export type AttackName = 'light' | 'heavy' | 'kick' | 'special' | 'sweep' | 'crouchMid';
 export interface AttackSpec {
   /** Wind-up/swing completes at this time; collision is tested exactly once then. */
   duration: number;
@@ -42,6 +43,10 @@ export const ATTACKS: Record<AttackName, AttackSpec> = {
   kick: { duration: .40, reach: 135, damage: 9, level: 'mid', stun: .27, push: 150, gain: 10 },
   // Supers keep their own damage but behave as a mid-level strike defensively.
   special: { duration: .82, reach: 205, damage: 20, level: 'mid', stun: .40, push: 290, gain: 0 },
+  // Crouching X: low trip. Its knockdown triggers ONLY on an unblocked hit.
+  sweep: { duration: .47, reach: 114, damage: 5, level: 'low', stun: .12, push: 78, gain: 8 },
+  // Crouching B: short-range, weak mid jab. Strong high Y is unavailable.
+  crouchMid: { duration: .30, reach: 99, damage: 4, level: 'mid', stun: .15, push: 78, gain: 6 },
 };
 
 /** Runa: slower and stronger, but her attacks can still be interrupted. */
@@ -50,6 +55,8 @@ const RUNA_ATTACKS: Record<AttackName,AttackSpec> = {
   heavy: { ...ATTACKS.heavy, duration: .56, reach: 114, damage: 14, stun: .36, push: 225 },
   kick: ATTACKS.kick,
   special: { ...ATTACKS.special, duration: .94, reach: 195, damage: 23, stun: .44, push: 335 },
+  sweep: { ...ATTACKS.sweep, duration: .52, reach: 121, damage: 6 },
+  crouchMid: { ...ATTACKS.crouchMid, duration: .34, damage: 5 },
 };
 
 export class Fighter {
@@ -356,7 +363,11 @@ export class Fighter {
       this.queuedSolo=null;
       this.queuedSpecial=0;
     }
-    this.crouching = Boolean(input.down && !this.airborne && !this.attack && this.stunned<=0);
+    // A crouching strike keeps the body low until its follow-through ends,
+    // even if Down is released. This also keeps grapples from catching it.
+    const crouchAttack = this.attack?.name==='sweep' || this.attack?.name==='crouchMid';
+    this.crouching = Boolean(!this.airborne && this.stunned<=0 &&
+      (crouchAttack || (input.down && !this.attack)));
     this.blocking = Boolean(canRaiseGuard && !this.attack);
     let move = Number(input.right)-Number(input.left);
     if (this.crouching || this.stunned>0) move=0;
@@ -375,9 +386,26 @@ export class Fighter {
     // A chord can arrive a few frames after the first button. Keep it
     // buffered briefly, with priority above both of its component attacks.
     this.queuedSpecial=Math.max(0,this.queuedSpecial-dt);
-    if (just.special) {
+    // Supers are standing-only. A B+Y chord held while crouching
+    // must not secretly fire when the character stands up again.
+    if (this.crouching) this.queuedSpecial=0;
+    if (just.special && !this.crouching) {
       this.queuedSpecial=.55;
       this.queuedSolo=null;
+    }
+    // The two dedicated crouch moves may begin while grounded and pressing
+    // Down. They are not standing attacks and cannot be started while guarding.
+    if (this.crouching && !this.attack && this.stunned<=0) {
+      const crouchMove=crouchMoveForPress({
+        down:input.down, grounded:!this.airborne, blocking:this.blocking,
+        grabbing:input.grab, rolling:input.roll, special:input.special,
+        light:just.light, kick:just.kick, heavy:input.heavy,
+      });
+      if(crouchMove) {
+        this.queuedSolo=null;
+        this.queuedSpecial=0;
+        this.begin(crouchMove);
+      }
     }
     const canAct=this.stunned<=0 && !this.crouching && !this.blocking;
     if (!canAct) this.queuedSolo=null;
@@ -527,6 +555,30 @@ export class Fighter {
     }
   }
 
+  /** A grounded, unguarded crouching X trips the rival without throwing
+   *  them behind the attacker. Short fall, same prone/rise recovery as throws.
+   */
+  receiveSweep(attackerFace: 1 | -1): void {
+    if (this.knockedDown || this.knockedOut) return;
+    this.attack=null;
+    this.queuedSolo=null;
+    this.queuedSpecial=0;
+    this.grabPose=null;
+    this.grabRecovery=0;
+    this.blocking=false;
+    this.crouching=false;
+    this.walking=false;
+    this.rollElapsed=-1;
+    this.stunned=0;
+    this.impactVelocity=attackerFace*170;
+    this.vy=-160;
+    this.yOffset=-1;
+    this.knockdownPhase='flying';
+    this.knockdownTimer=0;
+    this.knockdownFlightAge=0;
+    this.hitFlash=.18;
+  }
+
   receiveThrow(damage: number, attackerFace: 1 | -1): void {
     this.grabPose=null;
     this.attack=null;
@@ -672,7 +724,22 @@ export class Fighter {
       const followThrough=Phaser.Math.Clamp(
         1-Math.max(0,a.elapsed-a.spec.duration)/ATTACK_RECOVERY,0,1);
       const recoil=swing*followThrough;
-      if(a.name==='kick') {
+      if(a.name==='sweep') {
+        // Ground-level leg sweep. Keep the torso and head crouched while
+        // extending one leg almost horizontally toward the opponent.
+        const extension=Math.sin(Math.PI*ratio)*followThrough;
+        this.rightLeg.rotation=-1.42*extension;
+        this.leftLeg.rotation=.62;
+        this.frontArm.rotation=.9;
+        this.weapon.rotation=.28;
+        this.body.y=27;this.head.y=27;this.hair.y=27;
+      } else if(a.name==='crouchMid') {
+        // Short mid jab at waist height with arm/weapon, feet planted.
+        this.frontArm.rotation=-recoil*1.35;
+        this.weapon.rotation=-recoil*.85;
+        this.leftLeg.rotation=.68;this.rightLeg.rotation=-.68;
+        this.body.y=24;this.head.y=24;this.hair.y=24;
+      } else if(a.name==='kick') {
         // Mid kick: straight through the torso lane.
         this.rightLeg.rotation=-recoil*1.5;
       } else if(a.name==='light') {

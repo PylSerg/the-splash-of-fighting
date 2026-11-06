@@ -27,6 +27,17 @@ npm run preview
 - Both the main screen and pause menu now read their release version directly from `package.json` at build time, and the title screen builds its fighter list directly from the live character roster. Future character additions and version bumps no longer require separately editing these labels.
 - No gameplay or fighter mechanics are changed in this patch.
 
+## Alpha 1.8.0 · Crouching offense and sweep knockdowns
+
+- **Down + X** now performs a dedicated ground-level leg sweep (5 HP; Runa 6 HP, slower). It has a longer startup than standing X, and a distinct procedural kicking animation.
+- If the sweep actually hits a grounded opponent **without a successful crouching guard**, the victim trips and falls. The victim stays prone for 0.5 seconds, then rises over 0.5 seconds; a KO uses the existing permanent knockout fall. Grounded targets may be standing or crouching when hit.
+- Low block **Down + A** fully negates the sweep and prevents falling. Sweep never trips jumping opponents and cannot bypass active roll invulnerability or existing knockdown protection. A **standing A block** does not protect against it.
+- **Down + B** performs a quick, weaker mid jab with the forearm/weapon (4 HP; Runa 5 HP). It does not knock down and can be blocked by both standing and crouching guards.
+- **Down + Y** and **Down + B+Y** do not begin high strikes or supers; crouching disallows any other attack. The two crouch moves remain low-profile throughout the animation, even if Down is released.
+- Grabs, backward-input overhead throws and directional rolls retain their priority over crouching attack chords; A+X is not mistaken for a sweep. CPU now occasionally tries both crouching attacks.
+- New deterministic tests cover the two allowed crouch moves, invalid chords, block stances, sweep knockdown eligibility, airborne immunity and hitbox overlap.
+- Visuals are temporary procedural poses until the planned pixel-art sprite pass.
+
 ## Alpha 1.7.1 · Grabs require a standing or walking defender
 
 - A standing grab may **start only against a grounded, upright opponent**. Walking toward or away from the attacker stays grab-eligible.

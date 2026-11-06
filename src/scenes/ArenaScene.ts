@@ -3,6 +3,7 @@ import { Controls, emptyInput, type InputState } from '../input/Controls';
 import { Fighter, GROUND_Y, STAGE_MIN_X, STAGE_MAX_X, setStageViewportWidth, type FighterId } from '../combat/Fighter';
 import { getCharacter } from '../characters/Roster';
 import { HIT_LEVEL_NAMES } from '../combat/HitRules';
+import { sweepTrips } from '../combat/CrouchRules';
 import { canBeGrabbed } from '../combat/GrabRules';
 import { getStage, type StageId } from '../stages/Stages';
 
@@ -608,10 +609,15 @@ export class ArenaScene extends Phaser.Scene {
       this.aiCooldown=.52+((this.aiCount*17)%9)*.09;
       if(distance<115 && this.aiCount%6===3) input.grab=true;
       else if(distance<210 && this.player2.energy>=40 && this.aiCount%5===0)input.special=true;
-      else if(distance<141) {
-        const choice=this.aiCount%3;
-        if(choice===0)input.light=true;
-        else if(choice===1)input.kick=true;
+      else if(distance<141 && !input.block) {
+        const choice=this.aiCount%7;
+        if(choice===0 && distance<116) {
+          // The AI occasionally uses the same crouched trip as the player.
+          input.down=true;input.light=true;
+        } else if(choice===1 && distance<108) {
+          input.down=true;input.kick=true; // weak mid crouch jab.
+        } else if(choice===2 || choice===3) input.light=true;
+        else if(choice===4 || choice===5) input.kick=true;
         else input.heavy=true;
       }
     }
@@ -640,6 +646,8 @@ export class ArenaScene extends Phaser.Scene {
     // whiff could "hit late" during follow-through and become unavoidable.
     strike.connected=true;
     if(target.knockedOut||target.knockedDown||!box)return;
+    // A ground-level leg sweep cannot trip an airborne opponent.
+    if(strike.name==='sweep' && target.airborne)return;
     const hurt=target.bodyBox();
     if(!overlap(box,hurt)) {
       // The high hitbox ends ABOVE crouching hurtboxes. Even an unguarded
@@ -655,21 +663,32 @@ export class ArenaScene extends Phaser.Scene {
       this.combatNotice('DODGE!',target.x,GROUND_Y-152,0x9aeefb);
       return; // No damage or energy reward during the roll's evasion window.
     }
+    const failedHighGuard=target.guardStance==='standing' && strike.spec.level==='low';
     const hit=target.receiveHit(strike.spec,attacker.face);
+    const sweepLanded=sweepTrips(strike.name,hit.blocked,target.airborne,target.knockedOut);
+    if(sweepLanded) {
+      // Only a real low hit trips: crouch block, roll invulnerability,
+      // jumping and out-of-range opponents never fall.
+      target.receiveSweep(attacker.face);
+      this.combatNotice('SWEEP!',target.x,GROUND_Y-143,0xffd596);
+    }
     attacker.rewardHit(strike.spec);
     this.spawnSparks(target.x,GROUND_Y+target.yOffset-(strike.spec.level==='low'?37:85),hit.blocked);
     if(hit.interrupted) {
       this.combatNotice('INTERRUPT!',target.x,GROUND_Y+target.yOffset-173,0xffd898);
     }
-    if(!hit.blocked && target.blocking) {
+    if(!hit.blocked && failedHighGuard && !sweepLanded) {
       this.combatNotice('LOW HIT!',target.x,GROUND_Y-152,0xffd080);
     }
-    if(!hit.blocked)this.cameras.main.shake(75,.003);
+    if(!hit.blocked)this.cameras.main.shake(sweepLanded?105:75,sweepLanded?.004:.003);
     const level=HIT_LEVEL_NAMES[strike.spec.level];
     this.onStatus(hit.blocked
       ? getCharacter(target.id).name+' блокує '+level+' атаку! Шкоди немає.'
-      :getCharacter(attacker.id).name+' влучає ('+level+' атака)! -'+hit.damage+
-        ' HP '+getCharacter(target.id).name+'.');
+      :sweepLanded
+        ? getCharacter(attacker.id).name+' виконує підсічку! -'+hit.damage+
+          ' HP, '+getCharacter(target.id).name+' падає на землю.'
+        :getCharacter(attacker.id).name+' влучає ('+level+' атака)! -'+hit.damage+
+          ' HP '+getCharacter(target.id).name+'.');
   }
 
   private spawnSparks(x:number,y:number,blocked:boolean): void {
