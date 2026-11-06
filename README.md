@@ -27,6 +27,15 @@ npm run preview
 - Both the main screen and pause menu now read their release version directly from `package.json` at build time, and the title screen builds its fighter list directly from the live character roster. Future character additions and version bumps no longer require separately editing these labels.
 - No gameplay or fighter mechanics are changed in this patch.
 
+## Alpha 1.6.0 · Manual standing grabs and overhead throws
+
+- **Standing only:** start a grab with **held A+X** (or L1 / keyboard G) while upright, grounded and close to the opponent. A crouched/down/up/rolling input cannot start a grab.
+- **No automatic throw:** when the grab connects after its **0.32 s** reach, continue holding A+X/L1 and **pull the stick BACK, away from the opponent**. Either backward diagonal (back+up or back+down) performs the same overhead throw. The thrower stays standing: no jump or crouch is performed.
+- A backward direction already held before the grip connects must be released and pressed again, so movement held during grab startup does not automatically throw.
+- Releasing A+X/L1 cancels the grab. If no throw is performed, the defender escapes after **1.65 s**; the defender can still interrupt with A or X. Throws retain the existing 16 HP damage (21 for Runa), trajectory behind the attacker, fall and recovery.
+- During an active grab, backward+down+A+X is interpreted as a **throw**, not the existing **roll**; outside a grab the roll continues to take priority. Touch X↔A swipe-held grips, keyboard, PvP and CPU inputs all use these rules.
+- CPU now holds its grab and deliberately pulls backward after catching, sometimes adding an up/down diagonal. The attacker cannot jump or crouch during the throw.
+
 ## Alpha 1.5.0 · Ground rolls and evasive movement
 
 - **Down + left/right + A + X** rolls in the chosen direction. On the touchscreen, hold a downward diagonal on the virtual stick and press X+A (including the existing one-finger X↔A swipe). The neutral X+A chord and L1 continue to grab.

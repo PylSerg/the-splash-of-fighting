@@ -286,13 +286,12 @@ export class Controls {
        performance.now() < this.grabSwipePulseUntil);
     state.grab ||= state.light && state.block || touchGrabSwipe;
 
-    // Roll has priority over grab only with an explicit horizontal direction:
-    // down+left/right+X+A, or left/right+L2/LT (gamepad button 6).
-    // A neutral X+A / L1 stays a grab; held L2 without a direction is inert.
+    // Preserve the held X+A/L1 input during a grapple, including diagonals.
+    // Outside a grapple, ArenaScene gives a roll priority over a new grab.
+    // Without a direction L2/LT remains inert.
     const horizontal = state.left !== state.right;
     const chordRoll = state.down && (state.light && state.block || touchGrabSwipe);
     state.roll = horizontal && (state.roll || chordRoll);
-    if (state.roll) state.grab = false;
     if (player === 0 &&
         (this.comboSwipePointers.size > 0 ||
          performance.now() < this.comboSwipePulseUntil)) state.special = true;

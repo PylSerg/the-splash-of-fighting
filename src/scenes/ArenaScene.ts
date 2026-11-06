@@ -10,10 +10,13 @@ interface Grapple {
   defender: Fighter;
   phase: 'reach' | 'hold';
   elapsed: number;
+  /** The pull must be a NEW backward gesture once the hold begins. */
+  backWasHeld: boolean;
 }
-// Slow, readable two-stage throw: reach first, then a counterable hold.
+// Two-stage grab: approach, then maintain grip and PULL backward to throw.
 const GRAB_REACH_TIME = .32;
-const GRAB_HOLD_TIME = .62;
+// A generous but finite opportunity to commit to the throw. No automatic throws.
+const GRAB_HOLD_TIMEOUT = 1.65;
 const GRAB_MAX_START = 135;
 const GRAB_CATCH_RANGE = 90;
 const STEP = 1/60;
@@ -87,7 +90,7 @@ export class ArenaScene extends Phaser.Scene {
     }).setOrigin(.5).setDepth(10);
     this.resizeViewport(this.scale.width);
     this.paintHud();
-    this.onStatus('Готово! X+A = захват. Вниз + напрямок + X+A або напрямок + L2 = перекат.');
+    this.onStatus('A+X утримувати для захвату; назад (у т. ч. ↖/↙) для кидка. Вниз+напрямок+X+A = перекат.');
   }
 
   /** Extend the camera horizontally instead of distorting/cropping 16:9 fighters. */
@@ -352,8 +355,11 @@ export class ArenaScene extends Phaser.Scene {
     this.prev1=input1;this.prev2=input2;
 
     if (!this.grapple) {
-      const p1CanGrab = just1.grab && this.canBeginGrab(this.player1,this.player2);
-      const p2CanGrab = just2.grab && this.canBeginGrab(this.player2,this.player1);
+      // The crouched or rolling X+A chord is NOT a standing grab.
+      const p1CanGrab = just1.grab &&
+        this.canBeginGrab(this.player1,this.player2,input1);
+      const p2CanGrab = just2.grab &&
+        this.canBeginGrab(this.player2,this.player1,input2);
       if (p1CanGrab && p2CanGrab) {
         // Simultaneous grabs clash; neither fighter gets a free throw.
         this.player1.grabRecovery=.24;this.player2.grabRecovery=.24;
@@ -392,13 +398,17 @@ export class ArenaScene extends Phaser.Scene {
     this.paintHud();
   }
 
-  private canBeginGrab(attacker: Fighter, defender: Fighter): boolean {
-    return !attacker.knockedOut && !defender.knockedOut &&
+  private canBeginGrab(attacker: Fighter, defender: Fighter, input: InputState): boolean {
+    // Must start upright, grounded and not performing a dodge/roll.
+    // Up and down are allowed only AFTER the opponent is actually caught,
+    // as part of a backward diagonal throw command.
+    return !input.down && !input.up && !input.jump && !input.roll &&
+      !attacker.crouching && !attacker.knockedOut && !defender.knockedOut &&
       attacker.stunned<=0 && defender.stunned<=0 &&
       !attacker.airborne && !defender.airborne &&
       !attacker.knockedDown && !defender.knockedDown &&
       !attacker.isRolling && !defender.isRolling &&
-      attacker.grabRecovery<=0 &&
+      !attacker.grabPose && attacker.grabRecovery<=0 &&
       attacker.attack?.name!=='special' &&
       Math.abs(attacker.x-defender.x)<=GRAB_MAX_START;
   }
@@ -407,23 +417,37 @@ export class ArenaScene extends Phaser.Scene {
     // The short windup is visible and still allows the defender to react.
     attacker.attack=null;
     attacker.grabPose='reach';
-    this.grapple={attacker,defender,phase:'reach',elapsed:0};
+    this.grapple={attacker,defender,phase:'reach',elapsed:0,backWasHeld:false};
     this.onStatus(getCharacter(attacker.id).name+
-      ' тягнеться до суперника! A (блок) або X (швидкий удар) зривають захват.');
+      ' тягнеться до суперника! Утримуй A+X; суперник може звільнитися A або X.');
     this.combatNotice('GRAB!', (attacker.x+defender.x)/2,290,0xd4b3f5);
   }
 
-  private stopGrab(counter: boolean): void {
+  private stopGrab(reason: 'block' | 'counter' | 'released' | 'expired'): void {
     const grapple=this.grapple;
     if (!grapple) return;
-    grapple.attacker.breakGrab(counter);
+    grapple.attacker.breakGrab(reason==='counter');
     grapple.defender.grabPose=null;
     this.grapple=null;
-    this.combatNotice(counter?'COUNTER!':'BREAK!',(grapple.attacker.x+grapple.defender.x)/2,260,
-      counter?0xffd1a4:0x9cf3eb);
-    this.onStatus(counter
-      ? 'Захват перервано швидким ударом X! Атакувальний втрачає 3 HP.'
-      : 'Захват перервано блоком A!');
+    const label=reason==='counter'?'COUNTER!':
+      reason==='block'?'BREAK!':reason==='released'?'RELEASE!':'ESCAPE!';
+    this.combatNotice(label,(grapple.attacker.x+grapple.defender.x)/2,260,
+      reason==='counter'?0xffd1a4:0x9cf3eb);
+    const status:Record<typeof reason,string>={
+      counter:'Захват перервано швидким ударом X! Атакувальний втрачає 3 HP.',
+      block:'Захват перервано блоком A!',
+      released:'Захват відпущено: для кидка треба продовжувати тримати A+X (або L1).',
+      expired:'Час на кидок вийшов. Суперник звільнився із захвату.',
+    };
+    this.onStatus(status[reason]);
+  }
+
+  /** Direction is always relative to the thrower's CURRENT opponent-facing side.
+   *  A backward diagonal is still backward: up/down MUST NOT jump/crouch.
+   */
+  private holdingBack(attacker: Fighter, input: InputState): boolean {
+    return attacker.face===1 ? input.left && !input.right :
+      input.right && !input.left;
   }
 
   private progressGrab(
@@ -434,9 +458,17 @@ export class ArenaScene extends Phaser.Scene {
     if (!g) return;
     const defenderInput=g.defender===this.player1?input1:input2;
     const defenderJust=g.defender===this.player1?just1:just2;
+    const attackerInput=g.attacker===this.player1?input1:input2;
+    // A+X (or its existing L1 / keyboard grab shortcut) must remain held.
+    // Even when a backward+down diagonal sets the roll flag, the raw grip
+    // is preserved by Controls so it can be used for a throw instead.
+    if (!attackerInput.grab) {
+      this.stopGrab('released');
+      return;
+    }
     const wasFastAttacking=g.defender.attack?.name==='light';
     if (defenderInput.block || defenderJust.light || wasFastAttacking) {
-      this.stopGrab(defenderJust.light || wasFastAttacking);
+      this.stopGrab(defenderJust.light || wasFastAttacking?'counter':'block');
       return;
     }
 
@@ -449,7 +481,7 @@ export class ArenaScene extends Phaser.Scene {
       // Other regular attacks can hit a reaching opponent before capture.
       this.resolveStrike(g.defender,g.attacker);
       if (g.attacker.stunned>0 || g.attacker.knockedOut) {
-        this.stopGrab(false);
+        this.stopGrab('block');
         return;
       }
       if(g.elapsed>=GRAB_REACH_TIME) {
@@ -463,22 +495,30 @@ export class ArenaScene extends Phaser.Scene {
         }
         g.phase='hold';
         g.elapsed=0;
+        // If back was held before contact, release and press it again.
+        // Otherwise an approach held throughout would auto-throw.
+        g.backWasHeld=this.holdingBack(g.attacker,attackerInput);
         g.attacker.grabPose='hold';
         g.defender.grabPose='held';
-        this.onStatus('ЗАХВАТ! Є час вирватися: тримай A або натисни X.');
+        this.onStatus('СХОПЛЕНО! Тримай A+X та потягни джойстик НАЗАД. ↖/↙ теж працюють; суперник може вирватися A або X.');
         this.combatNotice('CAUGHT!',(g.attacker.x+g.defender.x)/2,255,0xffd4ad);
       }
       return;
     }
 
-    // During the hold both fighters are fixed at close range.
-    // This provides a visible escape window instead of an instant throw.
+    // Both fighters are rooted and upright for the entire hold and throw.
+    // stepGrapple intentionally ignores jump and crouch inputs, allowing
+    // backward+UP and backward+DOWN as two ways to issue the SAME overhead throw.
     g.defender.x=Phaser.Math.Clamp(g.attacker.x+g.attacker.face*47,STAGE_MIN_X+4,STAGE_MAX_X-4);
     g.attacker.stepGrapple(dt,g.defender.x);
     g.defender.stepGrapple(dt,g.attacker.x);
-    if(g.elapsed>=GRAB_HOLD_TIME) {
+
+    const backNow=this.holdingBack(g.attacker,attackerInput);
+    const newPull=backNow && !g.backWasHeld;
+    g.backWasHeld=backNow;
+    if (newPull) {
       const face=g.attacker.face;
-      const throwDamage = g.attacker.throwDamage;
+      const throwDamage=g.attacker.throwDamage;
       g.defender.receiveThrow(throwDamage,face);
       g.attacker.grabPose='throw';
       g.attacker.grabRecovery=.40;
@@ -488,10 +528,12 @@ export class ArenaScene extends Phaser.Scene {
       this.cameras.main.shake(120,.006);
       this.combatNotice('THROW!',g.defender.x,240,0xffd29b);
       this.onStatus(getCharacter(g.attacker.id).name+
-        ' перекидає суперника за спину! -'+throwDamage+' HP.'+
+        ' перекидає суперника через себе! -'+throwDamage+' HP.'+
         (g.defender.knockedOut ? ' Нокаут: суперник не підводиться!' :
         ' Падіння, 0,5 с лежачи й 0,5 с підйому.'));
       this.grapple=null;
+    } else if (g.elapsed >= GRAB_HOLD_TIMEOUT) {
+      this.stopGrab('expired');
     }
   }
 
@@ -510,6 +552,18 @@ export class ArenaScene extends Phaser.Scene {
     const input=emptyInput();
     const distance=Math.abs(this.player1.x-this.player2.x);
     const forward=this.player1.x>this.player2.x?'right':'left';
+    if(this.grapple?.attacker===this.player2) {
+      // CPU must obey the very same two-stage input rule as a human:
+      // keep its grip, then make a NEW backward motion after the catch.
+      input.grab=true;
+      if (this.grapple.phase==='hold' && this.grapple.elapsed>.24) {
+        input[this.player2.face===1?'left':'right']=true;
+        // Occasionally use a diagonal. Throwing remains ground-only.
+        if (this.aiCount%3===0) input.up=true;
+        else if (this.aiCount%3===1) input.down=true;
+      }
+      return input;
+    }
     if(this.grapple?.defender===this.player2) {
       // The CPU sometimes reacts in time, but not on every attempt.
       if (this.grapple.phase==='hold' && this.grapple.elapsed>.22 &&
