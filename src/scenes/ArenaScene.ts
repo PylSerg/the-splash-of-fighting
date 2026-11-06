@@ -430,19 +430,28 @@ export class ArenaScene extends Phaser.Scene {
     this.combatNotice('GRAB!', (attacker.x+defender.x)/2,290,0xd4b3f5);
   }
 
-  private stopGrab(reason: 'block' | 'counter' | 'released' | 'expired'): void {
+  private stopGrab(reason: 'block' | 'counter' | 'released' | 'expired' | 'interrupted'): void {
     const grapple=this.grapple;
     if (!grapple) return;
     grapple.attacker.breakGrab(reason==='counter');
+    if(reason==='block') {
+      // A defender who guards in time sends the grappler backward, while
+      // remaining in place. It is a non-damaging, recoverable shove.
+      grapple.attacker.repelBlockedGrab(grapple.defender.x);
+      this.spawnSparks((grapple.attacker.x+grapple.defender.x)/2,GROUND_Y-95,true);
+    }
     grapple.defender.grabPose=null;
     this.grapple=null;
     const label=reason==='counter'?'COUNTER!':
-      reason==='block'?'BREAK!':reason==='released'?'RELEASE!':'ESCAPE!';
+      reason==='block'?'PUSH BACK!':
+      reason==='interrupted'?'INTERRUPT!':
+      reason==='released'?'RELEASE!':'ESCAPE!';
     this.combatNotice(label,(grapple.attacker.x+grapple.defender.x)/2,260,
       reason==='counter'?0xffd1a4:0x9cf3eb);
     const status:Record<typeof reason,string>={
       counter:'Захват перервано швидким ударом X! Атакувальний втрачає 3 HP.',
-      block:'Захват перервано блоком A!',
+      block:'БЛОК ЗАХВАТУ! Суперник відштовхує атакувального на кілька кроків назад.',
+      interrupted:'Захват перервано ударом суперника.',
       released:'Захват відпущено: для кидка треба продовжувати тримати A+X (або L1).',
       expired:'Час на кидок вийшов. Суперник звільнився із захвату.',
     };
@@ -488,7 +497,8 @@ export class ArenaScene extends Phaser.Scene {
       // Other regular attacks can hit a reaching opponent before capture.
       this.resolveStrike(g.defender,g.attacker);
       if (g.attacker.stunned>0 || g.attacker.knockedOut) {
-        this.stopGrab('block');
+        // A damaging strike is NOT a blocked grab: don't apply an extra push.
+        this.stopGrab('interrupted');
         return;
       }
       if(g.elapsed>=GRAB_REACH_TIME) {

@@ -27,6 +27,15 @@ npm run preview
 - Both the main screen and pause menu now read their release version directly from `package.json` at build time, and the title screen builds its fighter list directly from the live character roster. Future character additions and version bumps no longer require separately editing these labels.
 - No gameplay or fighter mechanics are changed in this patch.
 
+## Alpha 1.8.2 · Guard repels a failed grab
+
+- Pressing/holding **A (guard)** while an enemy reaches for or holds a grab now interrupts it and applies a **short backward recoil to the attacker only**, away from the defending fighter. No HP damage and no throw.
+- Recoil uses the existing decaying impact-velocity system (170 initial px/s, around 37 px of displacement during the normal 0.34 s recovery). Arena bounds continue to clamp movement.
+- The action shows **PUSH BACK!**, a guard-colored contact spark and a Ukrainian status message.
+- Defensive **X counterpunch** still deals its existing 3 HP and recovery, without the new push. Likewise, an ordinary strike that interrupts grab reach is handled separately and no longer mislabeled as a blocked grab.
+- Works for both human players and CPU; the existing grab/throw input, crouching dodge and roll constraints stay unchanged.
+- Added deterministic regression tests for both directions, equal-position orientation and short travel distance.
+
 ## Alpha 1.8.1 · Correct crouching ABXY bindings
 
 - **Down + B** (kick button) executes the low **sweep**. An unblocked hit trips a grounded opponent.

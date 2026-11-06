@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { InputState } from '../input/Controls';
 import { stopsHit, strikeBand, type HitLevel, type GuardStance } from './HitRules';
 import { crouchMoveForPress } from './CrouchRules';
+import { blockedGrabRecoil } from './GrabRules';
 
 export type FighterId = 'evi' | 'runa' | 'lyra' | 'kai';
 export type AttackName = 'light' | 'heavy' | 'kick' | 'special' | 'sweep' | 'crouchMid';
@@ -537,6 +538,11 @@ export class Fighter {
     this.hitFlash=Math.max(0,this.hitFlash-dt);
     this.blockFlash=Math.max(0,this.blockFlash-dt);
     this.draw(dt);
+  }
+
+  /** A successful guard pushes the grappler back without damaging them. */
+  repelBlockedGrab(defenderX: number): void {
+    this.impactVelocity=blockedGrabRecoil(this.x,defenderX,this.face);
   }
 
   /** The defensive A or X command interrupts a grab before its throw phase. */

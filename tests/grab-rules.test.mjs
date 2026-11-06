@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { canBeGrabbed } from '../src/combat/GrabRules.ts';
+import { canBeGrabbed, blockedGrabRecoil } from '../src/combat/GrabRules.ts';
 
 const standing={
   crouching:false, airborne:false, knockedDown:false, knockedOut:false, isRolling:false,
@@ -40,4 +40,26 @@ assert.equal(canBeGrabbed({...standing,crouching:true},
 assert.equal(canBeGrabbed({...standing,airborne:true},
   {...neutral,up:false}),false,'releasing jump must not erase ongoing airtime');
 
-console.log('✓ Grab targets: standing/walking allowed; crouch, jump, rolls and input edges rejected.');
+// A blocked grab pushes the grappler AWAY from their opponent on both sides.
+assert.equal(blockedGrabRecoil(260,340,1),-170,
+  'a defender on the right pushes the attacker left');
+assert.equal(blockedGrabRecoil(760,680,-1),170,
+  'a defender on the left pushes the attacker right');
+assert.equal(blockedGrabRecoil(400,400,1),-170,
+  'identical positions use facing for a deterministic away direction');
+assert.equal(blockedGrabRecoil(400,400,-1),170,
+  'opposite facing at identical positions also pushes away');
+for(const [attacker,defender,face] of [[300,410,1],[700,530,-1]]){
+  const velocity=blockedGrabRecoil(attacker,defender,face);
+  const step=1/60;
+  let traveled=0,v=velocity;
+  // Simulate the game's decaying impact velocity over the 0.34 s recovery.
+  for(let i=0;i<21;i++){
+    traveled+=v*step;
+    v*=Math.pow(.055,step);
+  }
+  assert.ok(Math.abs(traveled)>30 && Math.abs(traveled)<50,
+    'guard recoil should move the attacker a small but visible distance');
+  assert.equal(Math.sign(traveled),Math.sign(velocity));
+}
+console.log('✓ Grab rules + blocked-grab recoil direction and travel: passed.');

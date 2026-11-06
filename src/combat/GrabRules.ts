@@ -20,3 +20,12 @@ export function canBeGrabbed(target: GrabTargetState, intent: GrabTargetIntent):
     !target.knockedDown && !target.knockedOut && !target.isRolling &&
     !intent.down && !intent.up && !intent.jump;
 }
+
+/** Blocking a grab repels only the ATTACKER, away from the defender.
+ * An initial 170 px/s impulse decays in Fighter.step() to a short
+ * approximately 50 px push, rather than a damaging knockdown or throw.
+ */
+export function blockedGrabRecoil(attackerX: number, defenderX: number, facing: 1 | -1): number {
+  const away=attackerX===defenderX ? -facing : attackerX<defenderX ? -1 : 1;
+  return away*170;
+}
