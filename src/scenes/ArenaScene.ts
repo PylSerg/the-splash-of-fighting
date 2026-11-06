@@ -1,6 +1,12 @@
 import Phaser from 'phaser';
 import { Controls, emptyInput, type InputState } from '../input/Controls';
-import { Fighter, ATTACKS, GROUND_Y, STAGE_MIN_X, STAGE_MAX_X, setStageViewportWidth, type FighterId } from '../combat/Fighter';
+import {
+  Fighter, ATTACKS, GROUND_Y, STAGE_MIN_X, STAGE_MAX_X,
+  setStageViewportWidth, type FighterId, type ActiveAttack,
+} from '../combat/Fighter';
+import {
+  isSimultaneousClash, type ClashAttempt, type ClashRect,
+} from '../combat/StrikeClashRules';
 import { getCharacter } from '../characters/Roster';
 import { HIT_LEVEL_NAMES } from '../combat/HitRules';
 import { sweepTrips } from '../combat/CrouchRules';
@@ -444,8 +450,9 @@ export class ArenaScene extends Phaser.Scene {
         this.combatNotice('ROLL!',this.player2.x,GROUND_Y-135,0x95ecff);
       }
       this.preventOverlap();
-      this.resolveStrike(this.player1,this.player2);
-      if(!this.duel) this.resolveStrike(this.player2,this.player1);
+      // Evaluate both live impact frames against the SAME world snapshot.
+      // Neither fighter receives damage before a mutual hit is identified.
+      this.resolveFrameStrikes();
     }
     // Defer duel initiation until AFTER the completed Y swing, including
     // its follow-through. Miss recovery also starts AFTER that animation.
@@ -891,10 +898,52 @@ export class ArenaScene extends Phaser.Scene {
     this.player2.x=Phaser.Math.Clamp(middle+sign*26,STAGE_MIN_X+2,STAGE_MAX_X-2);
   }
 
-  private resolveStrike(attacker: Fighter, target: Fighter): void {
-    const strike=attacker.getActiveStrike();
+  private resolveFrameStrikes(): void {
+    const first=this.player1,second=this.player2;
+    // Capture both before either can clear the rival's attack with hitstun.
+    const strike1=first.getActiveStrike();
+    const strike2=second.getActiveStrike();
+    const box1=strike1?first.strikeBox():null;
+    const box2=strike2?second.strikeBox():null;
+    const attempt1: ClashAttempt | null = strike1 ? {
+      name:strike1.name,strikeBox:box1,rivalBody:second.bodyBox(),
+      rivalKnockedOut:second.knockedOut,rivalKnockedDown:second.knockedDown,
+      rivalRollInvulnerable:second.isRollInvulnerable,
+      rivalAirborne:second.airborne,
+    } : null;
+    const attempt2: ClashAttempt | null = strike2 ? {
+      name:strike2.name,strikeBox:box2,rivalBody:first.bodyBox(),
+      rivalKnockedOut:first.knockedOut,rivalKnockedDown:first.knockedDown,
+      rivalRollInvulnerable:first.isRollInvulnerable,
+      rivalAirborne:first.airborne,
+    } : null;
+    if(strike1 && strike2 && isSimultaneousClash(attempt1,attempt2)) {
+      // Both hitboxes contact their respective hurtboxes on this SAME 60Hz
+      // frame: force two blocks, never deal damage, reward meter or trip.
+      // Even a previously unblockable combo finisher is deflected by the
+      // *other incoming strike*, not by an ordinary A guard.
+      strike1.connected=true;
+      strike2.connected=true;
+      first.deflectSimultaneousStrike(strike2.spec,second.face);
+      second.deflectSimultaneousStrike(strike1.spec,first.face);
+      first.recordComboImpact(strike1,true,true,0);
+      second.recordComboImpact(strike2,true,true,0);
+      const middle=(first.x+second.x)/2;
+      this.spawnSparks(middle,GROUND_Y-98,true);
+      this.combatNotice('CLASH!',middle,GROUND_Y-205,0x88f5f2);
+      this.cameras.main.shake(65,.002);
+      this.onStatus('ЗІТКНЕННЯ УДАРІВ! Обидві атаки заблоковані одночасно: 0 HP, 0 енергії.');
+      return;
+    }
+    // Non-mutual strikes still resolve normally, but both snapshot attacks
+    // are consumed even if the first attack interrupts the second fighter.
+    this.resolveStrike(first,second,strike1,box1);
+    if(!this.duel) this.resolveStrike(second,first,strike2,box2);
+  }
+
+  private resolveStrike(attacker: Fighter,target: Fighter,
+    strike: ActiveAttack | null,box: ClashRect | null): void {
     if(!strike)return;
-    const box=attacker.strikeBox();
     // Consume the one impact frame even if the attack misses. Otherwise a
     // whiff could "hit late" during follow-through and become unavoidable.
     strike.connected=true;

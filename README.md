@@ -27,6 +27,14 @@ npm run preview
 - Both the main screen and pause menu now read their release version directly from `package.json` at build time, and the title screen builds its fighter list directly from the live character roster. Future character additions and version bumps no longer require separately editing these labels.
 - No gameplay or fighter mechanics are changed in this patch.
 
+## Alpha 1.12.0 · Symmetric same-frame strike clashes
+
+- Each 60 Hz combat step now **snapshots both fighters' impact-ready attacks and hitboxes before applying any damage or hitstun**, fixing the previous first-player evaluation priority.
+- When **both** attacks contact their opponents on **the very same simulation frame**, they are both treated as **successful blocks**. The fighters show brief guard-colored flashes, sparks, mild mutual recoil and **CLASH!**. They take **zero HP damage**, gain **zero special meter**, and neither strike is interrupted nor causes sweep knockdown.
+- Collision requires both valid impact-frame hitboxes to touch their respective hurtboxes. A miss, ducked high attack, evasive roll, airborne evasion of a sweep, knocked-down target or knockout does not force a clash. The non-damaging duel starter stays separate.
+- The rule works for all regular, crouching and special attacks, including an unblockable combo finisher meeting another real strike. Ordinary block and attack height rules remain unchanged when no clash occurs.
+- A newly added deterministic regression suite tests symmetry, all six strike types, misses, airborne targets, roll invulnerability, knockdowns and duel exception.
+
 ## Alpha 1.11.2 · Duel only against standing or walking opponents
 
 - A duel starter is eligible **only when the defender is idle upright and grounded, or walking horizontally in either direction**. Walking forward/backward never invalidates the Y-shaped zero-damage challenge.

@@ -926,6 +926,15 @@ export class Fighter {
     return {x:this.x-25,y:GROUND_Y+this.yOffset-(low?73:145),w:50,h:low?72:142};
   }
 
+  /** Both strikes landed in the SAME fixed frame. Apply guard impact to
+   * both fighters without damage, stun, attack interruption or meter gain.
+   * The active attack stays in its follow-through exactly as after a block.
+   */
+  deflectSimultaneousStrike(spec: AttackSpec, attackerFace: 1 | -1): void {
+    this.impactVelocity=attackerFace*spec.push*.43;
+    this.blockFlash=Math.max(this.blockFlash,.18);
+  }
+
   receiveHit(spec: AttackSpec, attackerFace: 1|-1, unblockable = false): {damage:number;blocked:boolean;interrupted:boolean} {
     const blocked=!unblockable && stopsHit(this.guardStance,spec.level);
     const interrupted=!blocked && Boolean(this.attack && !this.attack.connected &&
@@ -1123,7 +1132,9 @@ export class Fighter {
     // A separate world-space shadow stays flat underneath the trajectory.
     this.shadow.setPosition(this.x,GROUND_Y+5);
     this.rig.alpha=this.knockedOut ? .65 : 1;
-    this.guardAura.setVisible(this.blocking);
+    // A clash briefly flashes both guard auras even when neither player
+    // had pressed A: simultaneous attacks behave as two successful blocks.
+    this.guardAura.setVisible(this.blocking || this.blockFlash>0);
     this.guardAura.setAlpha(this.blockFlash>0 ? .90 : .44);
     this.guardAura.setY(this.crouching ? -54 : -78);
     this.guardAura.setScale(this.crouching ? .9 : 1,this.crouching ? .65 : 1);
