@@ -4,6 +4,10 @@ export type DuelChoice = DuelStrike | 'block' | null;
 export type DuelOutcome = 'attacker' | 'defender' | 'guard' | 'tie';
 export const DUEL_DURATION = 2;
 export const DUEL_WHIFF_RECOVERY = .30;
+/** Both hidden selections play as synchronized strikes before damage lands. */
+export const DUEL_RESULT_ANIMATION = .55;
+/** A correct defensive A punishes repeat challenges for half a second. */
+export const DUEL_GUARD_STUN = .50;
 export const DUEL_DAMAGE = 24;
 export const DUEL_RUNA_DAMAGE = 28;
 export const DUEL_TIE_PUSH = 330;

@@ -1,12 +1,19 @@
 import assert from 'node:assert/strict';
 import {
   forwardHeld, resolveDuel, chooseDuelInput, duelDamage,
-  DUEL_DURATION, DUEL_WHIFF_RECOVERY, DUEL_DAMAGE, DUEL_RUNA_DAMAGE,
+  DUEL_DURATION, DUEL_WHIFF_RECOVERY, DUEL_RESULT_ANIMATION, DUEL_GUARD_STUN,
+  DUEL_DAMAGE, DUEL_RUNA_DAMAGE,
   DUEL_TIE_PUSH, DUEL_GUARD_PUSH,
 } from '../src/combat/DuelRules.ts';
 
 assert.equal(DUEL_DURATION,2,'duel selection lasts exactly two seconds');
 assert.equal(DUEL_WHIFF_RECOVERY,.3,'a missing challenge causes 300ms recovery');
+assert.equal(DUEL_RESULT_ANIMATION,.55,
+  'both hidden choices need a full synchronized visual strike before HP changes');
+assert.equal(DUEL_GUARD_STUN,.5,
+  'a successful defensive A stuns the attacker for a full half-second');
+assert.ok(DUEL_RESULT_ANIMATION>DUEL_WHIFF_RECOVERY,
+  'the resolving cinematic should have enough frames to display both attacks');
 assert.ok(DUEL_GUARD_PUSH>DUEL_TIE_PUSH,'defensive block pushes much farther than equal moves');
 assert.equal(duelDamage(false),DUEL_DAMAGE);
 assert.equal(duelDamage(true),DUEL_RUNA_DAMAGE);

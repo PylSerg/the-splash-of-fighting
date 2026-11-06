@@ -10,12 +10,26 @@ import {
 } from '../combat/CombatFeedback';
 import { canBeGrabbed } from '../combat/GrabRules';
 import {
-  DUEL_DURATION, DUEL_TIE_PUSH, DUEL_GUARD_PUSH, chooseDuelInput,
+  DUEL_DURATION, DUEL_RESULT_ANIMATION, DUEL_GUARD_STUN,
+  DUEL_TIE_PUSH, DUEL_GUARD_PUSH, chooseDuelInput,
   resolveDuel, duelDamage, type DuelChoice, type DuelStrike,
 } from '../combat/DuelRules';
 import { getStage, type StageId } from '../stages/Stages';
 
 type GameMode = 'cpu' | 'versus';
+interface DuelPending {
+  attacker: Fighter;
+  defender: Fighter;
+  /** Zero-damage Y starter actually overlapped, ignoring the guard. */
+  connected: boolean;
+}
+interface DuelAftermath {
+  attacker: Fighter;
+  defender: Fighter;
+  attackerChoice: DuelChoice;
+  defenderChoice: DuelChoice;
+  elapsed: number;
+}
 interface DuelSession {
   attacker: Fighter;
   defender: Fighter;
@@ -81,6 +95,8 @@ export class ArenaScene extends Phaser.Scene {
   private frameCount = 0;
   private grapple: Grapple | null = null;
   private duel: DuelSession | null = null;
+  private duelPending: DuelPending | null = null;
+  private duelAftermath: DuelAftermath | null = null;
   private healthTrail1: HealthTrail = makeHealthTrail(100);
   private healthTrail2: HealthTrail = makeHealthTrail(100);
 
@@ -330,6 +346,8 @@ export class ArenaScene extends Phaser.Scene {
     this.readyTime=1.5;this.roundTime=99;this.roundOver=false;
     this.grapple=null;
     this.duel=null;
+    this.duelPending=null;
+    this.duelAftermath=null;
     this.aiCooldown=.85;this.aiCount=0;this.frameCount=0;this.accumulator=0;
     this.centerLabel.setText('READY?').setColor('#fff0c0').setVisible(true);
     this.paintHud();
@@ -347,7 +365,8 @@ export class ArenaScene extends Phaser.Scene {
       frames++;
     }
     // HUD animations advance even after a KO or while fighters are recovering.
-    const visualDt=this.duel?0:Math.min(Math.max(0,delta/1000),.10);
+    const visualDt=(this.duel || this.duelAftermath)?0:
+      Math.min(Math.max(0,delta/1000),.10);
     this.healthTrail1=advanceHealthTrail(this.healthTrail1,this.player1.hp,visualDt);
     this.healthTrail2=advanceHealthTrail(this.healthTrail2,this.player2.hp,visualDt);
     this.paintHud();
@@ -366,6 +385,10 @@ export class ArenaScene extends Phaser.Scene {
     // Only the private button-selection timer is allowed to advance.
     if(this.duel) {
       this.stepDuel(dt);
+      return;
+    }
+    if(this.duelAftermath) {
+      this.stepDuelAftermath(dt);
       return;
     }
     if(this.roundOver) {
@@ -389,7 +412,7 @@ export class ArenaScene extends Phaser.Scene {
     const just2=justPressed(input2,this.prev2);
     this.prev1=input1;this.prev2=input2;
 
-    if (!this.grapple) {
+    if (!this.grapple && !this.duelPending) {
       // A duel opener has priority over its component B/Y attacks, and
       // the forward direction is interpreted relative to each fighter's face.
       const duel1=just1.duel && this.player1.tryBeginDuel(input1);
@@ -424,11 +447,16 @@ export class ArenaScene extends Phaser.Scene {
       this.resolveStrike(this.player1,this.player2);
       if(!this.duel) this.resolveStrike(this.player2,this.player1);
     }
+    // Defer duel initiation until AFTER the completed Y swing, including
+    // its follow-through. Miss recovery also starts AFTER that animation.
+    this.advancePendingDuel();
 
     // If HP reaches zero now, the next fixed step will animate the fall.
     // A timeout can end the round immediately, with the defeated fighter
     // continuing its knockdown in the round-over branch.
-    if (this.roundTime<=0) this.finishRound();
+    if(this.roundTime<=0 && !this.duel && !this.duelPending && !this.duelAftermath) {
+      this.finishRound();
+    }
   }
 
   private advanceFallenFighters(dt: number): void {
@@ -600,6 +628,27 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
+  /** Wait for the entire challenge strike animation, not just its hitbox. */
+  private advancePendingDuel(): void {
+    const pending=this.duelPending;
+    if(!pending)return;
+    if(pending.attacker.takeDuelStarterFinished()) {
+      this.duelPending=null;
+      if(pending.connected && !pending.attacker.knockedOut &&
+         !pending.defender.knockedOut && !pending.attacker.knockedDown &&
+         !pending.defender.knockedDown && pending.attacker.stunned<=0) {
+        this.beginDuel(pending.attacker,pending.defender);
+      } else {
+        pending.attacker.duelStarterMiss();
+        this.combatNotice('DUEL WHIFF!',pending.attacker.x,GROUND_Y-190,0xd6bcff);
+        this.onStatus('Виклик не вдався. Після повного замаху Y нападник відпочиває 0,3 секунди.');
+      }
+    } else if(!pending.attacker.isDuelStarting) {
+      // Interrupting the swing before the full animation forfeits the duel.
+      this.duelPending=null;
+    }
+  }
+
   /** Zero-damage Y-height challenge connected, despite any ordinary guard. */
   private beginDuel(attacker: Fighter, defender: Fighter): void {
     if(this.duel || this.grapple) return;
@@ -644,53 +693,93 @@ export class ArenaScene extends Phaser.Scene {
     if(duel.elapsed>=DUEL_DURATION) this.resolveDuelChoices(duel);
   }
 
+  /** Reveal no selections during the timer. Once it expires, both players
+   * perform their selected strike simultaneously, even when one will lose.
+   * Only at the END of this short cinematic do we apply the winning hit.
+   */
   private resolveDuelChoices(duel: DuelSession): void {
     if(this.duel!==duel)return;
     this.duel=null;
     this.centerLabel.setVisible(false);
     const aIndex=duel.attacker===this.player1?0:1;
-    const dIndex=1-aIndex;
-    const attackChoice=duel.choices[aIndex];
-    const defendChoice=duel.choices[dIndex];
-    const result=resolveDuel(attackChoice,defendChoice);
+    const attackerChoice=duel.choices[aIndex];
+    const defenderChoice=duel.choices[1-aIndex];
+    this.duelAftermath={
+      attacker:duel.attacker,defender:duel.defender,
+      attackerChoice,defenderChoice,elapsed:0,
+    };
+    if(attackerChoice && attackerChoice!=='block') {
+      duel.attacker.showDuelResultStrike(attackerChoice);
+    }
+    if(defenderChoice==='block') duel.defender.showDuelResultGuard();
+    else if(defenderChoice) duel.defender.showDuelResultStrike(defenderChoice);
+    // Decisions become visible through each fighter's animation, NEVER
+    // during the two-second secret selection.
+    this.onStatus('ВИБІР ЗРОБЛЕНО! Бійці виконують удари одночасно…');
+  }
+
+  private stepDuelAftermath(dt: number): void {
+    const result=this.duelAftermath;
+    if(!result)return;
+    result.elapsed=Math.min(DUEL_RESULT_ANIMATION,result.elapsed+dt);
+    // No movement, gravity, special-meter gain or damage while both
+    // selected moves play at the same time.
+    result.attacker.stepDuelResultPose(dt);
+    result.defender.stepDuelResultPose(dt);
+    if(result.elapsed>=DUEL_RESULT_ANIMATION) this.finishDuelAftermath(result);
+  }
+
+  private finishDuelAftermath(aftermath: DuelAftermath): void {
+    if(this.duelAftermath!==aftermath)return;
+    this.duelAftermath=null;
+    aftermath.attacker.endDuelResultPose();
+    aftermath.defender.endDuelResultPose();
+    // Avoid stale edges from secretly held buttons becoming attacks after
+    // the cinematic. The next press must be a NEW button press.
+    this.prev1=this.controls.read(0);
+    this.prev2=this.mode==='cpu'?emptyInput():this.controls.read(1);
+
+    const {attacker,defender,attackerChoice,defenderChoice}=aftermath;
+    const result=resolveDuel(attackerChoice,defenderChoice);
 
     if(result==='guard') {
-      // Defensive A takes precedence over all three strikes and sends
-      // only the attacker flying away, with zero HP or energy transfer.
-      duel.attacker.duelRecoil(duel.defender.x,DUEL_GUARD_PUSH);
-      this.combatNotice('DUEL BLOCK!',duel.attacker.x,GROUND_Y-210,0x95eafb);
-      this.spawnSparks((duel.attacker.x+duel.defender.x)/2,GROUND_Y-105,true);
-      this.onStatus(getCharacter(duel.defender.id).name+
-        ' перемагає захисним блоком! Нападник далеко відлітає без втрати HP.');
+      // Defender A produces both a powerful backward shove and 0.5 s of
+      // true hitstun. Attacker cannot block, attack, move, roll or re-challenge.
+      attacker.duelRecoil(defender.x,DUEL_GUARD_PUSH);
+      attacker.stunFromDuelGuard(DUEL_GUARD_STUN);
+      this.combatNotice('DUEL BLOCK!',attacker.x,GROUND_Y-210,0x95eafb);
+      this.combatNotice('STUN 0.5s!',attacker.x,GROUND_Y-260,0xffb56a);
+      this.spawnSparks((attacker.x+defender.x)/2,GROUND_Y-105,true);
+      this.onStatus(getCharacter(defender.id).name+
+        ' ставить блок у дуелі! Нападника сильно відкинуто й оглушено на 0,5 секунди. HP не змінюється.');
       return;
     }
     if(result==='tie') {
-      duel.attacker.duelRecoil(duel.defender.x,DUEL_TIE_PUSH);
-      duel.defender.duelRecoil(duel.attacker.x,DUEL_TIE_PUSH);
+      attacker.duelRecoil(defender.x,DUEL_TIE_PUSH);
+      defender.duelRecoil(attacker.x,DUEL_TIE_PUSH);
       this.combatNotice('DUEL CLASH!',480,GROUND_Y-230,0xffdcaf);
-      this.spawnSparks((duel.attacker.x+duel.defender.x)/2,GROUND_Y-98,true);
-      this.onStatus('Нічия в дуелі! Однаковий удар або жодного вибору: обох бійців розштовхує.');
+      this.spawnSparks((attacker.x+defender.x)/2,GROUND_Y-98,true);
+      this.onStatus('Нічия в дуелі! Обидві однакові атаки вже зіграли, тепер бійців розштовхує без шкоди.');
       return;
     }
 
-    const winner=result==='attacker'?duel.attacker:duel.defender;
-    const loser=result==='attacker'?duel.defender:duel.attacker;
-    const choice=result==='attacker'?attackChoice:defendChoice;
-    // resolveDuel guarantees a normal strike for the winning participant.
+    const winner=result==='attacker'?attacker:defender;
+    const loser=result==='attacker'?defender:attacker;
+    const choice=result==='attacker'?attackerChoice:defenderChoice;
+    // resolveDuel guarantees an actual strike for the winner.
     const move=(choice==='light'||choice==='heavy'||choice==='kick'?choice:'heavy') as DuelStrike;
     const base=ATTACKS[move];
     const hit=loser.receiveHit({
       ...base,damage:duelDamage(winner.id==='runa'),stun:.5,push:430,
     },winner.face,true);
     winner.rewardDamage(hit.damage);
-    winner.showDuelResultStrike(move);
     this.cameras.main.shake(165,.008);
     this.spawnSparks(loser.x,GROUND_Y-103,false);
     this.combatNotice('DUEL WIN!',loser.x,GROUND_Y-240,0xffd18c);
     this.onStatus(getCharacter(winner.id).name+' виграє дуель ('+
       (move==='heavy'?'Y':move==='light'?'X':'B')+
-      ') і завдає '+hit.damage+' HP! '+
-      (loser.knockedOut?'НОКАУТ!':''));
+      ') і завдає '+hit.damage+' HP! Обидві анімації були показані, але шкоду отримав лише програвший.'+
+      (loser.knockedOut?' НОКАУТ!':''));
   }
 
   private combatNotice(text: string,x: number,y: number,color: number): void {
@@ -805,16 +894,13 @@ export class ArenaScene extends Phaser.Scene {
     // whiff could "hit late" during follow-through and become unavoidable.
     strike.connected=true;
     if(strike.name==='duel') {
-      // This attack is an actual Y-height hitbox with ZERO contact damage.
-      // Guard never stops it. Only spacing, crouch or evasive rolling does.
+      // Zero-damage, unblockable hitbox: contact is recorded here, but
+      // neither the duel nor miss recovery starts before full Y follow-through.
       const connects=Boolean(box && !target.knockedOut && !target.knockedDown &&
         !target.isRollInvulnerable && overlap(box,target.bodyBox()));
-      if(connects) this.beginDuel(attacker,target);
-      else {
-        attacker.duelStarterMiss();
-        this.combatNotice('DUEL WHIFF!',attacker.x,GROUND_Y-190,0xd6bcff);
-        this.onStatus('Виклик промахнувся! Нападник відпочиває 0,3 секунди.');
-      }
+      if(!this.duelPending) this.duelPending={
+        attacker,defender:target,connected:connects,
+      };
       return;
     }
     if(target.knockedOut||target.knockedDown||!box) {

@@ -27,6 +27,15 @@ npm run preview
 - Both the main screen and pause menu now read their release version directly from `package.json` at build time, and the title screen builds its fighter list directly from the live character roster. Future character additions and version bumps no longer require separately editing these labels.
 - No gameplay or fighter mechanics are changed in this patch.
 
+## Alpha 1.11.1 · Full challenge wind-up, simultaneous duel strikes and guard stun
+
+- The Y-shaped, **zero-damage duel challenge now completes its entire wind-up AND follow-through before the two-second selection window starts**. At the impact frame, the engine merely remembers whether its unblockable high hitbox overlapped. It waits for the normal attack animation to finish to start a duel or the **0.3 s miss recovery**, which now begins after the animation.
+- If the challenge is interrupted before animation completion, the pending duel is discarded. The initial challenge remains an actual high hitbox that can miss a crouching or rolling defender.
+- Once the 2-second hidden decision timer finishes, a new **0.55 s simultaneous resolution animation** plays the two fighters' chosen X/B/Y strikes side by side, including **the losing fighter's attack**. Both strikes are visual-only, and HP damage is applied exactly once **after** the cinematic finishes, to the loser only. Matching attacks are also animated together before both fighters recoil with no damage.
+- If the defender chose **A**, their defensive pose is displayed during the cinematic. Afterward, the attacker takes the existing strong knockback **and 0.5 s of genuine stun**, during which movement, block, roll, attacks and new duel commands are unavailable. Defensive A still deals no HP damage and does not charge special energy.
+- The arena and match clock do not advance during the two-second selection or the 0.55 s resolution; damage/energy feedback stays aligned with the moment of the actual finishing hit. An in-progress duel isn't pre-empted by the round timer.
+- Expanded duel tests cover the animation window and the exact half-second block stun.
+
 ## Alpha 1.11.0 · Frozen secret-choice duels
 
 - New command **Forward+B+Y** (touch/keyboard) or **Forward+R1** (gamepad) starts an **unblockable, zero-damage Y-height challenge swing**. It must truly overlap the target's hurtbox, so a crouched fighter can duck under it and a roll can avoid it. If it misses, the attacker has **0.3 s** of attack/movement/guard recovery.

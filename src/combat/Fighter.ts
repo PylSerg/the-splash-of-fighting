@@ -4,7 +4,9 @@ import { stopsHit, strikeBand, type HitLevel, type GuardStance } from './HitRule
 import { crouchMoveForPress } from './CrouchRules';
 import { blockedGrabRecoil } from './GrabRules';
 import { earnSpecialMeter, SPECIAL_METER_COST } from './CombatFeedback';
-import { DUEL_WHIFF_RECOVERY, forwardHeld, type DuelStrike } from './DuelRules';
+import {
+  DUEL_WHIFF_RECOVERY, DUEL_RESULT_ANIMATION, forwardHeld, type DuelStrike,
+} from './DuelRules';
 import {
   COMBO_LINK_WINDOW, COMBO_FINISH_RECOVERY, comboAllows,
   comboFinisherUnblockable, comboIsCleanHit, type ComboMove,
@@ -113,6 +115,8 @@ export class Fighter {
   private comboLinkRemaining = 0;
   private comboRecovery = 0;
   private duelWhiffRecovery = 0;
+  /** True only AFTER the entire Y challenge animation has finished. */
+  private duelStarterFinished = false;
   private time = 0;
 
   readonly rig: Phaser.GameObjects.Container;
@@ -321,14 +325,22 @@ export class Fighter {
   tryBeginDuel(input: InputState): boolean {
     if(!input.duel || input.special || !forwardHeld(this.face,input.left,input.right) ||
        !this.canStartDuel()) return false;
+    this.duelStarterFinished=false;
     this.clearCombo();
     this.queuedSolo=null;this.queuedSpecial=0;
     this.begin('duel');
     this.blocking=false;this.walking=false;
     return true;
   }
+  /** Consume completion only after the entire wind-up AND follow-through. */
+  takeDuelStarterFinished(): boolean {
+    const finished=this.duelStarterFinished;
+    this.duelStarterFinished=false;
+    return finished;
+  }
   duelStarterMiss(): void {
-    if(this.attack?.name!=='duel') return;
+    // Called after animation completion, not at the hitbox impact frame.
+    this.duelStarterFinished=false;
     this.attack=null;
     this.duelWhiffRecovery=DUEL_WHIFF_RECOVERY;
     this.clearCombo();
@@ -336,8 +348,9 @@ export class Fighter {
     this.blocking=false;this.walking=false;
   }
   duelStarterConnected(): void {
-    // Freeze begins with a clean state on BOTH fighters. Any partially
-    // prepared strike is discarded, not replayed after the duel.
+    // Called ONLY after the starter's full Y animation finishes.
+    // The rival's pending attack cannot replay after the frozen selection.
+    this.duelStarterFinished=false;
     this.attack=null;
     this.clearCombo();
     this.queuedSolo=null;this.queuedSpecial=0;
@@ -349,12 +362,47 @@ export class Fighter {
     this.impactVelocity=direction*speed;
     this.blocking=false;
   }
-  /** One visual attack on resolution, with collision already consumed. */
+  /** Preview each secret duel choice, including the losing fighter's attack.
+   * These poses are VISUAL ONLY: never feed them to normal strike resolution.
+   */
   showDuelResultStrike(move: DuelStrike): void {
     const spec=this.id==='runa'?RUNA_ATTACKS[move]:ATTACKS[move];
     this.clearCombo();
-    this.attack={name:move,spec,elapsed:spec.duration,connected:true,comboStage:0};
-    this.blocking=false;this.crouching=false;
+    this.attack={name:move,spec,elapsed:0,connected:true,comboStage:0};
+    this.blocking=false;this.crouching=false;this.walking=false;
+    this.draw(0);
+  }
+  showDuelResultGuard(): void {
+    this.attack=null;
+    this.clearCombo();
+    this.blocking=true;this.crouching=false;this.walking=false;
+    this.blockFlash=.3;
+    this.draw(0);
+  }
+  /** The two characters animate simultaneously in a locked cinematic stage. */
+  stepDuelResultPose(dt: number): void {
+    this.time+=dt;
+    if(this.attack) {
+      this.attack.elapsed=Math.min(this.attack.spec.duration,
+        this.attack.elapsed+dt*this.attack.spec.duration/DUEL_RESULT_ANIMATION);
+    }
+    this.draw(dt);
+  }
+  endDuelResultPose(): void {
+    this.attack=null;
+    this.blocking=false;
+    this.walking=false;
+    this.draw(0);
+  }
+  /** Defensive A punishes the attacker after the large knockback. */
+  stunFromDuelGuard(duration: number): void {
+    this.attack=null;
+    this.clearCombo();
+    this.queuedSolo=null;
+    this.queuedSpecial=0;
+    this.stunned=Math.max(this.stunned,duration);
+    this.blocking=false;this.crouching=false;this.walking=false;
+    this.hitFlash=Math.max(this.hitFlash,.18);
     this.draw(0);
   }
   /** Only valid next strikes are exposed to the CPU and training UI. */
@@ -421,6 +469,7 @@ export class Fighter {
     this.hitFlash=0; this.blockFlash=0; this.impactVelocity=0; this.time=0;
     this.queuedSolo=null; this.queuedSpecial=0;
     this.clearCombo();this.comboRecovery=0;this.duelWhiffRecovery=0;
+    this.duelStarterFinished=false;
     this.grabPose=null; this.grabRecovery=0;
     this.rollElapsed=-1; this.rollDirection=1; this.rollCooldown=0;
     this.knockdownPhase=null;this.knockdownTimer=0;this.knockdownFlightAge=0;
@@ -504,7 +553,15 @@ export class Fighter {
       this.attack.elapsed += dt;
       if (this.attack.elapsed >= this.attack.spec.duration + ATTACK_RECOVERY) {
         const justFinishedCombo=this.attack.comboStage===3;
+        const justFinishedDuel=this.attack.name==='duel';
         this.attack=null;
+        if(justFinishedDuel) {
+          // Arena will only open the choice overlay AFTER this event.
+          this.duelStarterFinished=true;
+          this.blocking=false;this.walking=false;
+          this.advanceGravity(dt);this.draw(dt);
+          return;
+        }
         if(justFinishedCombo) {
           this.comboRecovery=COMBO_FINISH_RECOVERY;
           this.clearCombo();
@@ -542,7 +599,9 @@ export class Fighter {
     // Guarding or taking a different stance breaks a previously hit chain.
     if(this.blocking || (this.crouching && !crouchAttack)) this.clearCombo();
     let move = Number(input.right)-Number(input.left);
-    if (this.crouching || this.stunned>0) move=0;
+    // The challenge Y is a committed attack: neither moving nor jumping
+    // can truncate the full animation before the duel starts.
+    if (this.crouching || this.stunned>0 || this.attack?.name==='duel') move=0;
 
     // A stick is a held direction, not a one-frame button press.
     // Reading only just.up loses jumps if the fighter was stunned or airborne
@@ -551,7 +610,8 @@ export class Fighter {
     // A held upward direction will naturally trigger the next jump on landing.
     // The optional keyboard/gamepad jump key still uses a press edge.
     const wantsJump = input.up || just.jump;
-    if (this.stunned<=0 && wantsJump && !this.airborne && !this.crouching) {
+    if (this.stunned<=0 && wantsJump && !this.airborne && !this.crouching &&
+        this.attack?.name!=='duel') {
       this.vy=-490;
       this.yOffset=-.2;
     }
