@@ -13,6 +13,34 @@ export const DUEL_RUNA_DAMAGE = 28;
 export const DUEL_TIE_PUSH = 330;
 export const DUEL_GUARD_PUSH = 630;
 
+/** The challenge may catch ONLY an idle upright opponent or one walking
+ * left/right. Walking is intentionally not a restriction: it is a valid state.
+ * Active guard is a separate defensive stance, not an idle/walking target.
+ */
+export interface DuelTargetState {
+  airborne: boolean;
+  crouching: boolean;
+  isRolling: boolean;
+  knockedDown: boolean;
+  knockedOut: boolean;
+  blocking: boolean;
+  attackActive: boolean;
+  grabActive: boolean;
+  stunned: number;
+  grabRecovery: number;
+  comboRecovering: boolean;
+  duelRecovering: boolean;
+  recoiling: boolean;
+  walking: boolean;
+}
+export function canDuelCatchTarget(target: DuelTargetState): boolean {
+  return !target.airborne && !target.crouching && !target.isRolling &&
+    !target.knockedDown && !target.knockedOut && !target.blocking &&
+    !target.attackActive && !target.grabActive && target.stunned<=0 &&
+    target.grabRecovery<=0 && !target.comboRecovering &&
+    !target.duelRecovering && !target.recoiling;
+}
+
 export function forwardHeld(face: 1 | -1, left: boolean, right: boolean): boolean {
   return face===1 ? right && !left : left && !right;
 }

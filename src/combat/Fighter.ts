@@ -5,7 +5,8 @@ import { crouchMoveForPress } from './CrouchRules';
 import { blockedGrabRecoil } from './GrabRules';
 import { earnSpecialMeter, SPECIAL_METER_COST } from './CombatFeedback';
 import {
-  DUEL_WHIFF_RECOVERY, DUEL_RESULT_ANIMATION, forwardHeld, type DuelStrike,
+  DUEL_WHIFF_RECOVERY, DUEL_RESULT_ANIMATION, forwardHeld,
+  canDuelCatchTarget, type DuelStrike,
 } from './DuelRules';
 import {
   COMBO_LINK_WINDOW, COMBO_FINISH_RECOVERY, comboAllows,
@@ -308,6 +309,23 @@ export class Fighter {
   get isComboRecovering(): boolean { return this.comboRecovery > 0; }
   get isDuelRecovering(): boolean { return this.duelWhiffRecovery > 0; }
   get isDuelStarting(): boolean { return this.attack?.name==='duel'; }
+  /** Only an idle, upright opponent or an ordinary walker can be challenged.
+   * A high hitbox overlap by itself must never start a duel during any
+   * attack, block, roll, crouch, jump, grapple, stun or knockback state.
+   */
+  get isDuelTargetEligible(): boolean {
+    return canDuelCatchTarget({
+      airborne:this.airborne, crouching:this.crouching, isRolling:this.isRolling,
+      knockedDown:this.knockedDown, knockedOut:this.knockedOut,
+      blocking:this.blocking, attackActive:this.attack!==null,
+      grabActive:this.grabPose!==null, stunned:this.stunned,
+      grabRecovery:this.grabRecovery,
+      comboRecovering:this.isComboRecovering,
+      duelRecovering:this.isDuelRecovering,
+      recoiling:Math.abs(this.impactVelocity)>1,
+      walking:this.walking,
+    });
+  }
   canStartDuel(): boolean {
     // Two fingers or a swipe may register B first, then Y about a tenth
     // of a second later. Cancel ONLY the pre-impact startup of that

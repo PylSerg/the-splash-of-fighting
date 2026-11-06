@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {
-  forwardHeld, resolveDuel, chooseDuelInput, duelDamage,
+  forwardHeld, resolveDuel, chooseDuelInput, duelDamage, canDuelCatchTarget,
   DUEL_DURATION, DUEL_WHIFF_RECOVERY, DUEL_RESULT_ANIMATION, DUEL_GUARD_STUN,
   DUEL_DAMAGE, DUEL_RUNA_DAMAGE,
   DUEL_TIE_PUSH, DUEL_GUARD_PUSH,
@@ -56,4 +56,54 @@ assert.equal(chooseDuelInput({...keys,block:false,light:true},true),'light');
 assert.equal(chooseDuelInput({...keys,block:false,kick:true},false),'kick');
 assert.equal(chooseDuelInput({...keys,block:false},true),null,
   'unselected input stays private until resolution');
+// A duel opener is a non-damaging high challenge, not an automatic
+// cutscene. Only a standing IDLE or ordinary horizontal walking target
+// may be challenged. Every other combat state must count as a MISS.
+const upright={
+  airborne:false,crouching:false,isRolling:false,
+  knockedDown:false,knockedOut:false,blocking:false,
+  attackActive:false,grabActive:false,stunned:0,grabRecovery:0,
+  comboRecovering:false,duelRecovering:false,recoiling:false,
+  walking:false,
+};
+assert.equal(canDuelCatchTarget(upright),true,'idle grounded defender is duel eligible');
+for(const side of ['forward','backward']){
+  assert.equal(canDuelCatchTarget({...upright,walking:true,direction:side}),true,
+    `walking ${side} never prevents a duel`);
+}
+// An already raised guard is NOT standing idle: A must be picked INSIDE
+// the duel, not held before the zero-damage challenge connects.
+for(const [description,patch] of [
+  ['crouching',{crouching:true}],
+  ['jumping',{airborne:true}],
+  ['rolling',{isRolling:true}],
+  ['knocked down',{knockedDown:true}],
+  ['knocked out',{knockedOut:true}],
+  ['standing block',{blocking:true}],
+  ['regular attack',{attackActive:true}],
+  ['special attack',{attackActive:true,walking:true}],
+  ['crouch attack',{attackActive:true,crouching:true}],
+  ['opponent duel starter',{attackActive:true}],
+  ['grabbing or grabbed',{grabActive:true}],
+  ['stunned',{stunned:.15}],
+  ['grab recovery',{grabRecovery:.30}],
+  ['three-hit combo recovery',{comboRecovering:true}],
+  ['duel miss recovery',{duelRecovering:true}],
+  ['still being pushed back',{recoiling:true}],
+]){
+  assert.equal(canDuelCatchTarget({...upright,...patch}),false,
+    `${description} must count as missed duel`);
+}
+// Contact evaluation and full-animation completion BOTH use the same rule.
+// Invalidating once must persist, even if the target returns to idle.
+let challengeContact=canDuelCatchTarget({...upright,walking:true});
+challengeContact=challengeContact && canDuelCatchTarget({...upright,airborne:true});
+challengeContact=challengeContact && canDuelCatchTarget(upright);
+assert.equal(challengeContact,false,'jump during follow-through permanently forfeits duel');
+challengeContact=canDuelCatchTarget(upright);
+challengeContact=challengeContact && canDuelCatchTarget({...upright,crouching:true});
+challengeContact=challengeContact && canDuelCatchTarget({...upright,walking:true});
+assert.equal(challengeContact,false,'crouch then stand cannot restore a missed duel');
+
+console.log('✓ Duel target eligibility: standing/walking only; all other states miss.');
 console.log('✓ Duel triangle, defensive A, input timing and mirrored forward direction: passed.');

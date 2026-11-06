@@ -27,6 +27,15 @@ npm run preview
 - Both the main screen and pause menu now read their release version directly from `package.json` at build time, and the title screen builds its fighter list directly from the live character roster. Future character additions and version bumps no longer require separately editing these labels.
 - No gameplay or fighter mechanics are changed in this patch.
 
+## Alpha 1.11.2 · Duel only against standing or walking opponents
+
+- A duel starter is eligible **only when the defender is idle upright and grounded, or walking horizontally in either direction**. Walking forward/backward never invalidates the Y-shaped zero-damage challenge.
+- **Every other combat state counts as a complete miss**, even if the Y hitbox overlaps the rival: crouch, jump, roll, block held before challenge, attack/special/crouch attack, grab/being grabbed, knockdown/KO, hitstun, post-combo/throw/duel recovery and knockback.
+- Eligibility is checked at the **actual Y impact frame** and **continuously through the remaining Y follow-through**. If the target crouches/jumps/blocks/attacks during the wind-down, the already recorded contact is permanently invalidated. The fighter cannot switch back to idle to recover the duel.
+- The full Y animation still completes. A miss enters the existing **0.3-second non-actionable recovery** with no damage, secret choice timer, or duel outcome.
+- The actual 2-second duel, three-strike triangle, 0.55-second twin strike animation, A guard punishment and special-meter economy are unchanged for successful challenges.
+- Expanded deterministic tests check idle, walking in both directions, all excluded combat states, and transient evasive states during follow-through.
+
 ## Alpha 1.11.1 · Full challenge wind-up, simultaneous duel strikes and guard stun
 
 - The Y-shaped, **zero-damage duel challenge now completes its entire wind-up AND follow-through before the two-second selection window starts**. At the impact frame, the engine merely remembers whether its unblockable high hitbox overlapped. It waits for the normal attack animation to finish to start a duel or the **0.3 s miss recovery**, which now begins after the animation.

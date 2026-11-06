@@ -632,6 +632,11 @@ export class ArenaScene extends Phaser.Scene {
   private advancePendingDuel(): void {
     const pending=this.duelPending;
     if(!pending)return;
+    // Contact is not enough: target must remain standing or walking
+    // throughout the follow-through. Any crouch, jump, block, strike, roll,
+    // grab, stun or knockdown turns this pending duel into a true miss.
+    // Once invalidated it cannot magically reconnect on a later frame.
+    pending.connected=pending.connected && pending.defender.isDuelTargetEligible;
     if(pending.attacker.takeDuelStarterFinished()) {
       this.duelPending=null;
       if(pending.connected && !pending.attacker.knockedOut &&
@@ -896,7 +901,7 @@ export class ArenaScene extends Phaser.Scene {
     if(strike.name==='duel') {
       // Zero-damage, unblockable hitbox: contact is recorded here, but
       // neither the duel nor miss recovery starts before full Y follow-through.
-      const connects=Boolean(box && !target.knockedOut && !target.knockedDown &&
+      const connects=Boolean(box && target.isDuelTargetEligible &&
         !target.isRollInvulnerable && overlap(box,target.bodyBox()));
       if(!this.duelPending) this.duelPending={
         attacker,defender:target,connected:connects,
