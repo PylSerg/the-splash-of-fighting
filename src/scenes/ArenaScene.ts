@@ -942,7 +942,8 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private resolveStrike(attacker: Fighter,target: Fighter,
-    strike: ActiveAttack | null,box: ClashRect | null): void {
+    strike: ActiveAttack | null = attacker.getActiveStrike(),
+    box: ClashRect | null = attacker.strikeBox()): void {
     if(!strike)return;
     // Consume the one impact frame even if the attack misses. Otherwise a
     // whiff could "hit late" during follow-through and become unavoidable.
