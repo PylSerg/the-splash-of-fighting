@@ -27,6 +27,14 @@ npm run preview
 - Both the main screen and pause menu now read their release version directly from `package.json` at build time, and the title screen builds its fighter list directly from the live character roster. Future character additions and version bumps no longer require separately editing these labels.
 - No gameplay or fighter mechanics are changed in this patch.
 
+## Alpha 1.7.1 · Grabs require a standing or walking defender
+
+- A standing grab may **start only against a grounded, upright opponent**. Walking toward or away from the attacker stays grab-eligible.
+- A **crouching or airborne** opponent cannot be caught, including when Down or Up/jump is pressed on the same simulation frame as the grab attempt.
+- Check target eligibility **again at the end of the reach animation**, so crouching or jumping away during the wind-up avoids the grab. Existing roll/knockdown restrictions remain.
+- Rejected grabs cannot enter the caught/throw phase; no forced standing poses. The manual A+X + backward throw sequence remains unchanged after a legitimate catch.
+- Added regression tests for standing, walking, crouching, jumping, early input frames, roll and knockdown, alongside existing high/mid/low hit-level tests.
+
 ## Alpha 1.7.0 · Three height lanes and tactical guarding
 
 - **High Y / heavy**: 11 HP (Runa: 14 HP), slower overhead attack that physically passes **over crouching** opponents, even if they are not guarding.

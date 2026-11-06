@@ -3,6 +3,7 @@ import { Controls, emptyInput, type InputState } from '../input/Controls';
 import { Fighter, GROUND_Y, STAGE_MIN_X, STAGE_MAX_X, setStageViewportWidth, type FighterId } from '../combat/Fighter';
 import { getCharacter } from '../characters/Roster';
 import { HIT_LEVEL_NAMES } from '../combat/HitRules';
+import { canBeGrabbed } from '../combat/GrabRules';
 import { getStage, type StageId } from '../stages/Stages';
 
 type GameMode = 'cpu' | 'versus';
@@ -358,9 +359,9 @@ export class ArenaScene extends Phaser.Scene {
     if (!this.grapple) {
       // The crouched or rolling X+A chord is NOT a standing grab.
       const p1CanGrab = just1.grab &&
-        this.canBeginGrab(this.player1,this.player2,input1);
+        this.canBeginGrab(this.player1,this.player2,input1,input2,just2);
       const p2CanGrab = just2.grab &&
-        this.canBeginGrab(this.player2,this.player1,input2);
+        this.canBeginGrab(this.player2,this.player1,input2,input1,just1);
       if (p1CanGrab && p2CanGrab) {
         // Simultaneous grabs clash; neither fighter gets a free throw.
         this.player1.grabRecovery=.24;this.player2.grabRecovery=.24;
@@ -399,18 +400,22 @@ export class ArenaScene extends Phaser.Scene {
     this.paintHud();
   }
 
-  private canBeginGrab(attacker: Fighter, defender: Fighter, input: InputState): boolean {
-    // Must start upright, grounded and not performing a dodge/roll.
-    // Up and down are allowed only AFTER the opponent is actually caught,
-    // as part of a backward diagonal throw command.
-    return !input.down && !input.up && !input.jump && !input.roll &&
-      !attacker.crouching && !attacker.knockedOut && !defender.knockedOut &&
+  private canBeginGrab(
+    attacker: Fighter, defender: Fighter,
+    attackerInput: InputState, defenderInput: InputState, defenderJust: InputState,
+  ): boolean {
+    // The attacker must start upright. The target must be standing or walking:
+    // crouches and jumps evade a grab, even on their first input frame.
+    // Horizontal input never excludes a defender who is simply walking.
+    return !attackerInput.down && !attackerInput.up && !attackerInput.jump &&
+      !attackerInput.roll && !attacker.crouching && !attacker.knockedOut &&
       attacker.stunned<=0 && defender.stunned<=0 &&
-      !attacker.airborne && !defender.airborne &&
-      !attacker.knockedDown && !defender.knockedDown &&
-      !attacker.isRolling && !defender.isRolling &&
+      !attacker.airborne && !attacker.knockedDown && !attacker.isRolling &&
       !attacker.grabPose && attacker.grabRecovery<=0 &&
       attacker.attack?.name!=='special' &&
+      canBeGrabbed(defender, {
+        down: defenderInput.down, up: defenderInput.up, jump: defenderJust.jump,
+      }) &&
       Math.abs(attacker.x-defender.x)<=GRAB_MAX_START;
   }
 
@@ -486,12 +491,17 @@ export class ArenaScene extends Phaser.Scene {
         return;
       }
       if(g.elapsed>=GRAB_REACH_TIME) {
+        const targetUpright=canBeGrabbed(g.defender,{
+          down:defenderInput.down,up:defenderInput.up,jump:defenderJust.jump,
+        });
         if(Math.abs(g.attacker.x-g.defender.x)>GRAB_CATCH_RANGE ||
-           g.defender.airborne || g.defender.knockedOut ||
-           g.defender.isRolling) {
+           !targetUpright) {
+          // No forced stand-up: crouching/jumping away really avoids capture.
           g.attacker.breakGrab(false);
           this.grapple=null;
-          this.onStatus('Захват не вдався: суперник відійшов від рук.');
+          this.onStatus(targetUpright
+            ? 'Захват не вдався: суперник відійшов від рук.'
+            : 'Захват не вдався: присідання або стрибок дозволили уникнути захоплення.');
           return;
         }
         g.phase='hold';
