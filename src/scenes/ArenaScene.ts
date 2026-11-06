@@ -425,6 +425,7 @@ export class ArenaScene extends Phaser.Scene {
       attacker.stunned<=0 && defender.stunned<=0 &&
       !attacker.airborne && !attacker.knockedDown && !attacker.isRolling &&
       !attacker.grabPose && attacker.grabRecovery<=0 &&
+      !attacker.isComboRecovering && attacker.attack?.comboStage!==3 &&
       attacker.attack?.name!=='special' &&
       canBeGrabbed(defender, {
         down: defenderInput.down, up: defenderInput.up, jump: defenderJust.jump,
@@ -435,6 +436,7 @@ export class ArenaScene extends Phaser.Scene {
   private beginGrab(attacker: Fighter, defender: Fighter): void {
     // The short windup is visible and still allows the defender to react.
     attacker.attack=null;
+    attacker.clearCombo();
     attacker.grabPose='reach';
     this.grapple={attacker,defender,phase:'reach',elapsed:0,backWasHeld:false};
     this.onStatus(getCharacter(attacker.id).name+
@@ -605,7 +607,15 @@ export class ArenaScene extends Phaser.Scene {
           this.aiCount%3!==0) input.block=true;
       return input;
     }
-    if(this.player2.stunned>0||this.player2.knockedOut||this.player2.knockedDown)return input;
+    if(this.player2.stunned>0||this.player2.knockedOut||this.player2.knockedDown ||
+       this.player2.isComboRecovering)return input;
+    // CPU occasionally links a completed hit into a valid X/B/Y chain.
+    // Read options only after impact; inputs remain single-frame presses.
+    const followUps=this.player2.comboOptions;
+    if(followUps.length>0 && distance<185 && this.aiCount%3!==1) {
+      input[followUps[this.aiCount%followUps.length]]=true;
+      return input;
+    }
     if(distance>130)input[forward]=true;
     else if(distance<75 && this.aiCount%5===0)input.block=true;
     if(distance<160 && this.player1.attack && this.aiCount%4===0) {
@@ -668,11 +678,18 @@ export class ArenaScene extends Phaser.Scene {
     // Consume the one impact frame even if the attack misses. Otherwise a
     // whiff could "hit late" during follow-through and become unavoidable.
     strike.connected=true;
-    if(target.knockedOut||target.knockedDown||!box)return;
+    if(target.knockedOut||target.knockedDown||!box) {
+      attacker.recordComboImpact(strike,false,false,0);
+      return;
+    }
     // A ground-level leg sweep cannot trip an airborne opponent.
-    if(strike.name==='sweep' && target.airborne)return;
+    if(strike.name==='sweep' && target.airborne) {
+      attacker.recordComboImpact(strike,false,false,0);
+      return;
+    }
     const hurt=target.bodyBox();
     if(!overlap(box,hurt)) {
+      attacker.recordComboImpact(strike,false,false,0);
       // The high hitbox ends ABOVE crouching hurtboxes. Even an unguarded
       // crouch slips beneath Y, so this is a true miss, not a blocked hit.
       if(strike.spec.level==='high' && target.crouching &&
@@ -683,11 +700,16 @@ export class ArenaScene extends Phaser.Scene {
       return;
     }
     if(target.isRollInvulnerable) {
+      attacker.recordComboImpact(strike,false,false,0);
       this.combatNotice('DODGE!',target.x,GROUND_Y-152,0x9aeefb);
       return; // No damage or energy reward during the roll's evasion window.
     }
+    // Only a third strike PREPARED by two successful unblocked hits
+    // ignores guard. It must still genuinely overlap the target's hurtbox.
+    const unblockable=attacker.isUnblockableFinisher(strike);
     const failedHighGuard=target.guardStance==='standing' && strike.spec.level==='low';
-    const hit=target.receiveHit(strike.spec,attacker.face);
+    const hit=target.receiveHit(strike.spec,attacker.face,unblockable);
+    const comboHits=attacker.recordComboImpact(strike,true,hit.blocked,hit.damage);
     const sweepLanded=sweepTrips(strike.name,hit.blocked,target.airborne,target.knockedOut);
     if(sweepLanded) {
       // Only a real low hit trips: crouch block, roll invulnerability,
@@ -696,6 +718,14 @@ export class ArenaScene extends Phaser.Scene {
       this.combatNotice('SWEEP!',target.x,GROUND_Y-143,0xffd596);
     }
     attacker.rewardDamage(hit.damage);
+    if(comboHits===2) {
+      this.combatNotice('2 HIT!',target.x,GROUND_Y-206,0x8ce9fa);
+    } else if(comboHits===3) {
+      this.combatNotice('3 HIT COMBO!',target.x,GROUND_Y-206,0xffce77);
+    }
+    if(unblockable && hit.damage>0) {
+      this.combatNotice('UNBLOCKABLE!',target.x,GROUND_Y-252,0xff9fab);
+    }
     this.spawnSparks(target.x,GROUND_Y+target.yOffset-(strike.spec.level==='low'?37:85),hit.blocked);
     if(hit.interrupted) {
       this.combatNotice('INTERRUPT!',target.x,GROUND_Y+target.yOffset-173,0xffd898);
@@ -705,8 +735,10 @@ export class ArenaScene extends Phaser.Scene {
     }
     if(!hit.blocked)this.cameras.main.shake(sweepLanded?105:75,sweepLanded?.004:.003);
     const level=HIT_LEVEL_NAMES[strike.spec.level];
-    this.onStatus(hit.blocked
-      ? getCharacter(target.id).name+' блокує '+level+' атаку! Шкоди немає.'
+    this.onStatus(comboHits===3
+      ? getCharacter(attacker.id).name+' завершує 3-ударне комбо! Третій удар неможливо заблокувати. -'+hit.damage+' HP.'
+      :hit.blocked
+        ? getCharacter(target.id).name+' блокує '+level+' атаку! Шкоди немає.'
       :sweepLanded
         ? getCharacter(attacker.id).name+' виконує підсічку! -'+hit.damage+
           ' HP, '+getCharacter(target.id).name+' падає на землю.'

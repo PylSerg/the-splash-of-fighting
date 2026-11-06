@@ -27,6 +27,15 @@ npm run preview
 - Both the main screen and pause menu now read their release version directly from `package.json` at build time, and the title screen builds its fighter list directly from the live character roster. Future character additions and version bumps no longer require separately editing these labels.
 - No gameplay or fighter mechanics are changed in this patch.
 
+## Alpha 1.10.0 · Three-hit combo routes and unblockable third hit
+
+- Added **six distinct three-attack combinations**, using standing X/B/Y in different orders: **X → B → Y**, **X → Y → B**, **B → X → Y**, **B → Y → X**, **Y → X → B** and **Y → B → X**. Press each separately after the previous strike contacts the opponent. The next input must arrive within **0.80 s** of its previous impact; buttons are not auto-repeated.
+- The engine permits the next move to cancel **post-impact recovery** of the preceding strike, so timing feels like an actual fighting-game combo rather than three unrelated full animations. Both players and the CPU share the same rules.
+- If **both the first and second strikes land and deal unblocked HP damage**, the third becomes **unblockable**, ignoring either standing or crouching guard on collision. If any earlier attack was blocked, missed or dodged, the finisher has no unblockable privilege. A finisher still needs to reach the opponent: real hitboxes, ducking a high hit and evasive rolls are not overridden.
+- After any third attack in a correctly entered route **finishes its animation** (hit, block or whiff), its fighter must endure **0.42 s of total movement, block, attack, grab and roll recovery**. Finisher cancellation via block/roll/special/grab is disabled so this risk cannot be skipped. Interruption by a rival's hit remains possible.
+- On clean chains, the arena displays **2 HIT!**, **3 HIT COMBO!**, and **UNBLOCKABLE!** when appropriate. Normal damage and meter gain are unchanged: special energy is awarded only for HP actually removed.
+- New deterministic tests verify all six routes, prefix validity, clean-vs-blocked preconditions and the recovery window. Repeated button spam does not create an infinite combo.
+
 ## Alpha 1.9.0 · Damage-only special energy and delayed red HP feedback
 
 - Special meter starts at **0** at the beginning of every round instead of 50.

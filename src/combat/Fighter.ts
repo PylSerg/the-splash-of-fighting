@@ -4,6 +4,10 @@ import { stopsHit, strikeBand, type HitLevel, type GuardStance } from './HitRule
 import { crouchMoveForPress } from './CrouchRules';
 import { blockedGrabRecoil } from './GrabRules';
 import { earnSpecialMeter, SPECIAL_METER_COST } from './CombatFeedback';
+import {
+  COMBO_LINK_WINDOW, COMBO_FINISH_RECOVERY, comboAllows,
+  comboFinisherUnblockable, comboIsCleanHit, type ComboMove,
+} from './ComboRules';
 
 export type FighterId = 'evi' | 'runa' | 'lyra' | 'kai';
 export type AttackName = 'light' | 'heavy' | 'kick' | 'special' | 'sweep' | 'crouchMid';
@@ -18,7 +22,14 @@ export interface AttackSpec {
   push: number;
   gain: number;
 }
-export interface ActiveAttack { name: AttackName; spec: AttackSpec; elapsed: number; connected: boolean; }
+export interface ActiveAttack {
+  name: AttackName;
+  spec: AttackSpec;
+  elapsed: number;
+  connected: boolean;
+  /** 1=opening, 2=linked strike, 3=finisher; 0=non-combo attack. */
+  comboStage: number;
+}
 export const GROUND_Y = 443;
 export let STAGE_MIN_X = 60;
 export let STAGE_MAX_X = 900;
@@ -93,6 +104,10 @@ export class Fighter {
   // kick/heavy attacks when the player presses them nearly together.
   private queuedSolo: { name: 'kick' | 'heavy'; remaining: number } | null = null;
   private queuedSpecial = 0;
+  private comboHistory: ComboMove[] = [];
+  private comboClean = true;
+  private comboLinkRemaining = 0;
+  private comboRecovery = 0;
   private time = 0;
 
   readonly rig: Phaser.GameObjects.Container;
@@ -281,6 +296,63 @@ export class Fighter {
   }
   get knockedDown(): boolean { return this.knockdownPhase !== null; }
   get knockoutSettled(): boolean { return this.knockedOut && this.knockdownPhase === 'ko'; }
+  get isComboRecovering(): boolean { return this.comboRecovery > 0; }
+  /** Only valid next strikes are exposed to the CPU and training UI. */
+  get comboOptions(): ComboMove[] {
+    return this.comboLinkRemaining>0 && !this.comboRecovery
+      ? (['light','kick','heavy'] as ComboMove[]).filter(
+          move=>comboAllows(this.comboHistory,move))
+      : [];
+  }
+
+  /** Drop the chain when the fighter rolls, grapples or gets interrupted. */
+  clearCombo(): void {
+    this.comboHistory=[];
+    this.comboClean=true;
+    this.comboLinkRemaining=0;
+  }
+
+  /** Guard cannot stop a properly prepared third strike, though real
+   * spacing, crouching beneath a high hitbox, and rolling can still dodge.
+   */
+  isUnblockableFinisher(strike: ActiveAttack): boolean {
+    return comboFinisherUnblockable(strike.comboStage,
+      this.comboHistory.length===2 && this.comboClean);
+  }
+
+  /** Called exactly once at impact, including a MISS. All three steps
+   * must be real contacts; only two clean hits guarantee the finisher.
+   * Return a clean 1/2/3 hit counter for arcade feedback.
+   */
+  recordComboImpact(strike: ActiveAttack, contact: boolean, blocked: boolean, damage: number): number {
+    if(strike.comboStage===0) return 0;
+    if(!contact) {
+      this.clearCombo();
+      return 0;
+    }
+    const clean=comboIsCleanHit(blocked,damage);
+    if(strike.comboStage===1) {
+      this.comboHistory=[strike.name as ComboMove];
+      this.comboClean=clean;
+      this.comboLinkRemaining=COMBO_LINK_WINDOW;
+      return clean?1:0;
+    }
+    if(strike.comboStage===2 && this.comboHistory.length===1 &&
+       comboAllows(this.comboHistory,strike.name as ComboMove)) {
+      this.comboHistory.push(strike.name as ComboMove);
+      this.comboClean &&= clean;
+      this.comboLinkRemaining=COMBO_LINK_WINDOW;
+      return this.comboClean?2:0;
+    }
+    if(strike.comboStage===3 && this.comboHistory.length===2 &&
+       comboAllows(this.comboHistory,strike.name as ComboMove)) {
+      const fullCleanCombo=this.comboClean && clean;
+      this.clearCombo();
+      return fullCleanCombo?3:0;
+    }
+    this.clearCombo();
+    return 0;
+  }
 
   reset(x: number, face: 1 | -1): void {
     this.x=x; this.face=face; this.hp=100; this.energy=0;
@@ -288,6 +360,7 @@ export class Fighter {
     this.crouching=false; this.walking=false; this.attack=null;
     this.hitFlash=0; this.blockFlash=0; this.impactVelocity=0; this.time=0;
     this.queuedSolo=null; this.queuedSpecial=0;
+    this.clearCombo();this.comboRecovery=0;
     this.grabPose=null; this.grabRecovery=0;
     this.rollElapsed=-1; this.rollDirection=1; this.rollCooldown=0;
     this.knockdownPhase=null;this.knockdownTimer=0;this.knockdownFlightAge=0;
@@ -315,6 +388,19 @@ export class Fighter {
     }
     if (this.knockedOut) { this.draw(dt); return; }
     if (this.stunned>0) this.stunned=Math.max(0,this.stunned-dt);
+    if(this.comboLinkRemaining>0) {
+      this.comboLinkRemaining=Math.max(0,this.comboLinkRemaining-dt);
+      if(this.comboLinkRemaining===0) this.clearCombo();
+    }
+    // The third strike has a deliberate punishable recovery window.
+    // Ignore all movement, guard and attack inputs, including rolls.
+    if(this.comboRecovery>0) {
+      this.comboRecovery=Math.max(0,this.comboRecovery-dt);
+      this.blocking=false;this.crouching=false;this.walking=false;
+      this.advanceGravity(dt);
+      this.draw(dt);
+      return;
+    }
 
     // The roll has priority over its X+A components, and occupies the whole
     // fighter until its recovery completes. It cannot cancel heavy/special.
@@ -326,7 +412,7 @@ export class Fighter {
     const horizontal = Number(input.right) - Number(input.left);
     const canCancelEarlyLight = this.attack?.name === 'light' &&
       this.attack.elapsed < .13;
-    if (just.roll && horizontal !== 0 && !this.airborne &&
+    if (just.roll && horizontal !== 0 && this.attack?.comboStage!==3 && !this.airborne &&
         this.stunned <= 0 && this.grabRecovery <= 0 &&
         !this.grabPose && this.rollCooldown <= 0 &&
         (!this.attack || canCancelEarlyLight)) {
@@ -348,7 +434,18 @@ export class Fighter {
 
     if (this.attack) {
       this.attack.elapsed += dt;
-      if (this.attack.elapsed >= this.attack.spec.duration + ATTACK_RECOVERY) this.attack=null;
+      if (this.attack.elapsed >= this.attack.spec.duration + ATTACK_RECOVERY) {
+        const justFinishedCombo=this.attack.comboStage===3;
+        this.attack=null;
+        if(justFinishedCombo) {
+          this.comboRecovery=COMBO_FINISH_RECOVERY;
+          this.clearCombo();
+          this.blocking=false;this.crouching=false;this.walking=false;
+          this.advanceGravity(dt);
+          this.draw(dt);
+          return;
+        }
+      }
     }
 
     // Standing A guards high/mid; crouching Down+A guards mid/low.
@@ -360,7 +457,10 @@ export class Fighter {
       (input.down || neutral || backward);
     const canRaiseGuard = input.block && validGuardStance && this.stunned<=0;
     // A valid guard cancels a normal attack, but not a committed special.
-    if (canRaiseGuard && this.attack?.name !== 'special') {
+    // Finisher animation is committed, so guard cannot cancel away its
+    // mandatory recovery (other normal strikes can still cancel to guard).
+    if (canRaiseGuard && this.attack?.name !== 'special' &&
+        this.attack?.comboStage !== 3) {
       this.attack=null;
       this.queuedSolo=null;
       this.queuedSpecial=0;
@@ -371,6 +471,8 @@ export class Fighter {
     this.crouching = Boolean(!this.airborne && this.stunned<=0 &&
       (crouchAttack || (input.down && !this.attack)));
     this.blocking = Boolean(canRaiseGuard && !this.attack);
+    // Guarding or taking a different stance breaks a previously hit chain.
+    if(this.blocking || (this.crouching && !crouchAttack)) this.clearCombo();
     let move = Number(input.right)-Number(input.left);
     if (this.crouching || this.stunned>0) move=0;
 
@@ -391,7 +493,8 @@ export class Fighter {
     // Supers are standing-only. A B+Y chord held while crouching
     // must not secretly fire when the character stands up again.
     if (this.crouching) this.queuedSpecial=0;
-    if (just.special && !this.crouching) {
+    if (this.attack?.comboStage===3) this.queuedSpecial=0;
+    if (just.special && !this.crouching && this.attack?.comboStage!==3) {
       this.queuedSpecial=.55;
       this.queuedSolo=null;
     }
@@ -412,18 +515,38 @@ export class Fighter {
     const canAct=this.stunned<=0 && !this.crouching && !this.blocking;
     if (!canAct) this.queuedSolo=null;
 
+    // Once the previous strike has CONNECTED, a fresh different button can
+    // cancel its recovery into one of six explicitly allowed X/B/Y routes.
+    // No automatic repeats, crouch strikes, grabs or B+Y shortcuts.
+    const comboNext: ComboMove | null =
+      just.light && !just.kick && !just.heavy ? 'light' :
+      just.kick && !just.light && !just.heavy ? 'kick' :
+      just.heavy && !just.light && !just.kick ? 'heavy' : null;
+    const canLinkCombo=Boolean(canAct && !this.airborne &&
+      !input.special && !input.grab && !input.roll &&
+      !input.down && !input.up && !input.block &&
+      this.queuedSpecial<=0 && this.comboLinkRemaining>0 &&
+      comboNext && comboAllows(this.comboHistory,comboNext) &&
+      (!this.attack || this.attack.connected));
+    if(canLinkCombo && comboNext) {
+      const stage=this.comboHistory.length+1;
+      this.comboLinkRemaining=0;
+      this.queuedSolo=null;
+      this.begin(comboNext,stage);
+    }
+
     const canCancelForChord=Boolean(
-      this.attack &&
+      this.attack && this.attack.comboStage!==3 &&
       (this.attack.name==='kick' || this.attack.name==='heavy')
     );
-    if (canAct && this.queuedSpecial>0 && this.energy>=SPECIAL_METER_COST &&
+    if (!canLinkCombo && canAct && this.queuedSpecial>0 && this.energy>=SPECIAL_METER_COST &&
         (!this.attack || canCancelForChord)) {
       this.energy-=SPECIAL_METER_COST;
       this.attack=null;
       this.queuedSolo=null;
       this.queuedSpecial=0;
       this.begin('special');
-    } else if (canAct && !this.attack) {
+    } else if (!canLinkCombo && canAct && !this.attack) {
       if (just.light) {
         this.queuedSolo=null;
         this.begin('light');
@@ -461,6 +584,7 @@ export class Fighter {
     this.attack = null;
     this.queuedSolo = null;
     this.queuedSpecial = 0;
+    this.clearCombo();
     this.blocking = false;
     this.crouching = false;
     this.walking = false;
@@ -548,6 +672,7 @@ export class Fighter {
 
   /** The defensive A or X command interrupts a grab before its throw phase. */
   breakGrab(counterPunch: boolean): number {
+    this.clearCombo();
     const beforeHp=this.hp;
     this.grabPose=null;
     this.attack=null;
@@ -569,6 +694,7 @@ export class Fighter {
    */
   receiveSweep(attackerFace: 1 | -1): void {
     if (this.knockedDown || this.knockedOut) return;
+    this.clearCombo();
     this.attack=null;
     this.queuedSolo=null;
     this.queuedSpecial=0;
@@ -589,6 +715,7 @@ export class Fighter {
   }
 
   receiveThrow(damage: number, attackerFace: 1 | -1): number {
+    this.clearCombo();
     const hpBefore=this.hp;
     this.grabPose=null;
     this.attack=null;
@@ -614,9 +741,12 @@ export class Fighter {
   }
 
   /** Unique spec is selected at wind-up; the shared engine still resolves hits. */
-  private begin(name: AttackName): void {
+  private begin(name: AttackName, linkedStage = 0): void {
     const spec = this.id === 'runa' ? RUNA_ATTACKS[name] : ATTACKS[name];
-    this.attack={name,spec,elapsed:0,connected:false};
+    const regular=name==='light'||name==='kick'||name==='heavy';
+    if(linkedStage===0) this.clearCombo();
+    this.attack={name,spec,elapsed:0,connected:false,
+      comboStage:regular ? linkedStage || 1 : 0};
   }
 
   /** A successful grappler throw should be rewarding, but still escapable. */
@@ -647,8 +777,8 @@ export class Fighter {
     return {x:this.x-25,y:GROUND_Y+this.yOffset-(low?73:145),w:50,h:low?72:142};
   }
 
-  receiveHit(spec: AttackSpec, attackerFace: 1|-1): {damage:number;blocked:boolean;interrupted:boolean} {
-    const blocked=stopsHit(this.guardStance,spec.level);
+  receiveHit(spec: AttackSpec, attackerFace: 1|-1, unblockable = false): {damage:number;blocked:boolean;interrupted:boolean} {
+    const blocked=!unblockable && stopsHit(this.guardStance,spec.level);
     const interrupted=!blocked && Boolean(this.attack && !this.attack.connected &&
       this.attack.elapsed < this.attack.spec.duration);
     // A correct guard negates the entire hit. A low attack beats standing A;
@@ -659,6 +789,7 @@ export class Fighter {
     this.hp=Math.max(0,this.hp-damage);
     this.impactVelocity=attackerFace*spec.push*(blocked?.43:1);
     if(!blocked) {
+      this.clearCombo();
       // Startup/recovery hits interrupt the roll; invulnerable frames
       // are checked before receiveHit() in ArenaScene.resolveStrike().
       this.rollElapsed=-1;
@@ -696,6 +827,8 @@ export class Fighter {
     this.rollElapsed=-1;
     this.queuedSolo=null;
     this.queuedSpecial=0;
+    this.clearCombo();
+    this.comboRecovery=0;
     this.blocking=false;
     this.crouching=false;
     this.stunned=0;
