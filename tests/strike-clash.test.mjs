@@ -22,7 +22,7 @@ assert.equal(isSimultaneousClash(null,null),false);
 assert.equal(isSimultaneousClash(a,{...b,strikeBox:null}),false,
   'an attack without an active impact frame does not clash');
 assert.equal(isSimultaneousClash(a,make('heavy',{x:275,y:310,w:80,h:55})),false,
-  'one fighter missing the opposing hurtbox cannot block the other's hit');
+  'one fighter missing the opposing hurtbox cannot block the rival attack');
 assert.equal(isSimultaneousClash(a,make('heavy',{x:150,y:210,w:125,h:65})),false,
   'high attack whiff above a crouching hurtbox is not an attack collision');
 assert.equal(isSimultaneousClash({...a,rivalRollInvulnerable:true},b),false,
