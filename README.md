@@ -27,6 +27,16 @@ npm run preview
 - Both the main screen and pause menu now read their release version directly from `package.json` at build time, and the title screen builds its fighter list directly from the live character roster. Future character additions and version bumps no longer require separately editing these labels.
 - No gameplay or fighter mechanics are changed in this patch.
 
+## Alpha 1.9.0 · Damage-only special energy and delayed red HP feedback
+
+- Special meter starts at **0** at the beginning of every round instead of 50.
+- Only **actual HP damage dealt** fills the attacker's special meter, at **0.6 energy per 1 HP**, capped at 100. The 40-energy special therefore takes about **67 HP of successful damage** to earn. Successful normal, crouch, special, grab throw, and counter-grab attacks all follow the same rule.
+- Missed/dodged attacks, successful blocks, attacks completely negated by guard, damage received, blocked grabs and other non-damaging actions **grant no meter**. Overkill is clamped to the defender's real lost HP. Special attacks still **cost 40 energy**.
+- The defender's meter no longer rises when hit, blocking or being thrown. Successful throws grant meter to the **thrower**, based on real damage, and X-grab counters do the same for the defender who counterattacks.
+- A red **lagging damage bar** is drawn underneath each fighter's live colored health bar. The health bar shrinks immediately; red stays at the previous HP for **0.35 seconds**, then slides to the real health over **0.15 seconds**, disappearing after **0.5 seconds** total.
+- The mirrored health HUD for player two places its red loss segment on the **left**, player one on the **right**. Repeated damage refreshes the trailing effect; round resets have no ghost bar.
+- Added automated deterministic tests for meter gain/caps and for both mirrored HUD bars, timing and consecutive hits.
+
 ## Alpha 1.8.2 · Guard repels a failed grab
 
 - Pressing/holding **A (guard)** while an enemy reaches for or holds a grab now interrupts it and applies a **short backward recoil to the attacker only**, away from the defending fighter. No HP damage and no throw.

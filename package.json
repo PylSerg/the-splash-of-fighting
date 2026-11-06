@@ -1,14 +1,14 @@
 {
   "name": "the-splash-of-fighting",
   "private": true,
-  "version": "1.8.2",
+  "version": "1.9.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "check": "tsc --noEmit",
     "build": "npm run test:combat && tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test:combat": "node --experimental-strip-types tests/hit-rules.test.mjs && node --experimental-strip-types tests/grab-rules.test.mjs && node --experimental-strip-types tests/crouch-rules.test.mjs"
+    "test:combat": "node --experimental-strip-types tests/hit-rules.test.mjs && node --experimental-strip-types tests/grab-rules.test.mjs && node --experimental-strip-types tests/crouch-rules.test.mjs && node --experimental-strip-types tests/combat-feedback.test.mjs"
   },
   "dependencies": {
     "phaser": "4.2.1"

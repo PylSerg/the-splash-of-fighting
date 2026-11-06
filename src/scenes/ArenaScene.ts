@@ -4,6 +4,10 @@ import { Fighter, GROUND_Y, STAGE_MIN_X, STAGE_MAX_X, setStageViewportWidth, typ
 import { getCharacter } from '../characters/Roster';
 import { HIT_LEVEL_NAMES } from '../combat/HitRules';
 import { sweepTrips } from '../combat/CrouchRules';
+import {
+  advanceHealthTrail, healthFillRect, makeHealthTrail,
+  type HealthTrail, SPECIAL_METER_COST,
+} from '../combat/CombatFeedback';
 import { canBeGrabbed } from '../combat/GrabRules';
 import { getStage, type StageId } from '../stages/Stages';
 
@@ -64,6 +68,8 @@ export class ArenaScene extends Phaser.Scene {
   private aiCount = 0;
   private frameCount = 0;
   private grapple: Grapple | null = null;
+  private healthTrail1: HealthTrail = makeHealthTrail(100);
+  private healthTrail2: HealthTrail = makeHealthTrail(100);
 
   constructor(controls: Controls, onStatus: (message: string) => void) {
     super({ key: 'Arena' });
@@ -305,6 +311,8 @@ export class ArenaScene extends Phaser.Scene {
     this.controls.clear();
     this.player1.reset(250,1);
     this.player2.reset(710,-1);
+    this.healthTrail1=makeHealthTrail(this.player1.hp);
+    this.healthTrail2=makeHealthTrail(this.player2.hp);
     this.prev1=ZERO();this.prev2=ZERO();
     this.readyTime=1.5;this.roundTime=99;this.roundOver=false;
     this.grapple=null;
@@ -324,6 +332,10 @@ export class ArenaScene extends Phaser.Scene {
       this.accumulator-=STEP;
       frames++;
     }
+    // HUD animations advance even after a KO or while fighters are recovering.
+    const visualDt=Math.min(Math.max(0,delta/1000),.10);
+    this.healthTrail1=advanceHealthTrail(this.healthTrail1,this.player1.hp,visualDt);
+    this.healthTrail2=advanceHealthTrail(this.healthTrail2,this.player2.hp,visualDt);
     this.paintHud();
     this.paintDebug();
   }
@@ -433,7 +445,8 @@ export class ArenaScene extends Phaser.Scene {
   private stopGrab(reason: 'block' | 'counter' | 'released' | 'expired' | 'interrupted'): void {
     const grapple=this.grapple;
     if (!grapple) return;
-    grapple.attacker.breakGrab(reason==='counter');
+    const counterDamage=grapple.attacker.breakGrab(reason==='counter');
+    if(counterDamage>0) grapple.defender.rewardDamage(counterDamage);
     if(reason==='block') {
       // A defender who guards in time sends the grappler backward, while
       // remaining in place. It is a non-damaging, recoverable shove.
@@ -541,11 +554,11 @@ export class ArenaScene extends Phaser.Scene {
     if (newPull) {
       const face=g.attacker.face;
       const throwDamage=g.attacker.throwDamage;
-      g.defender.receiveThrow(throwDamage,face);
+      const actualDamage=g.defender.receiveThrow(throwDamage,face);
+      g.attacker.rewardDamage(actualDamage);
       g.attacker.grabPose='throw';
       g.attacker.grabRecovery=.40;
       g.defender.grabPose=null;
-      g.attacker.energy=Math.min(100,g.attacker.energy+12);
       this.spawnSparks(g.defender.x,GROUND_Y-110,false);
       this.cameras.main.shake(120,.006);
       this.combatNotice('THROW!',g.defender.x,240,0xffd29b);
@@ -682,7 +695,7 @@ export class ArenaScene extends Phaser.Scene {
       target.receiveSweep(attacker.face);
       this.combatNotice('SWEEP!',target.x,GROUND_Y-143,0xffd596);
     }
-    attacker.rewardHit(strike.spec);
+    attacker.rewardDamage(hit.damage);
     this.spawnSparks(target.x,GROUND_Y+target.yOffset-(strike.spec.level==='low'?37:85),hit.blocked);
     if(hit.interrupted) {
       this.combatNotice('INTERRUPT!',target.x,GROUND_Y+target.yOffset-173,0xffd898);
@@ -739,29 +752,34 @@ export class ArenaScene extends Phaser.Scene {
     const left=112-this.extraHalf;
     const right=548+this.extraHalf;
     // Each roster fighter contributes their own HUD color, including Lyra.
-    this.drawHealth(left,55,this.player1.hp,
+    this.drawHealth(left,55,this.player1.hp,this.healthTrail1.displayed,
       Number.parseInt(getCharacter(this.player1.id).color.slice(1),16),false);
-    this.drawHealth(right,55,this.player2.hp,
+    this.drawHealth(right,55,this.player2.hp,this.healthTrail2.displayed,
       Number.parseInt(getCharacter(this.player2.id).color.slice(1),16),true);
     this.drawEnergy(left,82,this.player1.energy,0xa18afa);
     this.drawEnergy(right,82,this.player2.energy,0xa18afa);
     this.timeLabel.setText(String(Math.ceil(this.roundTime)));
   }
 
-  private drawHealth(x:number,y:number,hp:number,color:number,right:boolean): void {
+  private drawHealth(x:number,y:number,hp:number,trailHp:number,color:number,right:boolean): void {
     const w=300,h=19;
     this.hud.fillStyle(0x111326,.94).fillRoundedRect(x-4,y-4,w+8,h+8,6);
     this.hud.fillStyle(0x4d314f).fillRect(x,y,w,h);
-    const fill=Math.max(0,w*hp/100);
-    this.hud.fillStyle(color).fillRect(right?x+w-fill:x,y,fill,h);
-    this.hud.fillStyle(0xffffff,.2).fillRect(right?x+w-fill:x,y,fill,4);
+    // Two physical layers: red = health BEFORE the latest hit; the live
+    // fighter-colored bar covers its surviving portion. Both use the same
+    // anchor, so P1 shows lost health on its right, P2 on its left.
+    const trail=healthFillRect(x,w,trailHp,right);
+    this.hud.fillStyle(0xf34b55,.95).fillRect(trail.x,y,trail.width,h);
+    const live=healthFillRect(x,w,hp,right);
+    this.hud.fillStyle(color).fillRect(live.x,y,live.width,h);
+    this.hud.fillStyle(0xffffff,.2).fillRect(live.x,y,live.width,4);
     this.hud.lineStyle(2,0xc7abc1,.7).strokeRoundedRect(x-4,y-4,w+8,h+8,6);
   }
   private drawEnergy(x:number,y:number,power:number,color:number): void {
     const w=300;
     this.hud.fillStyle(0x14162a).fillRect(x,y,w,8);
     this.hud.fillStyle(color).fillRect(x,y,w*Math.min(100,power)/100,8);
-    this.hud.fillStyle(0xd6cbff).fillRect(x+w*.4-1,y,2,8);
+    this.hud.fillStyle(0xd6cbff).fillRect(x+w*SPECIAL_METER_COST/100-1,y,2,8);
     this.hud.lineStyle(1,0x827caa).strokeRect(x,y,w,8);
   }
 

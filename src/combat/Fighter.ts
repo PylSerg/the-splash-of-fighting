@@ -3,6 +3,7 @@ import type { InputState } from '../input/Controls';
 import { stopsHit, strikeBand, type HitLevel, type GuardStance } from './HitRules';
 import { crouchMoveForPress } from './CrouchRules';
 import { blockedGrabRecoil } from './GrabRules';
+import { earnSpecialMeter, SPECIAL_METER_COST } from './CombatFeedback';
 
 export type FighterId = 'evi' | 'runa' | 'lyra' | 'kai';
 export type AttackName = 'light' | 'heavy' | 'kick' | 'special' | 'sweep' | 'crouchMid';
@@ -67,7 +68,7 @@ export class Fighter {
   vy = 0;
   face: 1 | -1;
   hp = 100;
-  energy = 50;
+  energy = 0;
   stunned = 0;
   blocking = false;
   crouching = false;
@@ -282,7 +283,7 @@ export class Fighter {
   get knockoutSettled(): boolean { return this.knockedOut && this.knockdownPhase === 'ko'; }
 
   reset(x: number, face: 1 | -1): void {
-    this.x=x; this.face=face; this.hp=100; this.energy=50;
+    this.x=x; this.face=face; this.hp=100; this.energy=0;
     this.yOffset=0; this.vy=0; this.stunned=0; this.blocking=false;
     this.crouching=false; this.walking=false; this.attack=null;
     this.hitFlash=0; this.blockFlash=0; this.impactVelocity=0; this.time=0;
@@ -415,9 +416,9 @@ export class Fighter {
       this.attack &&
       (this.attack.name==='kick' || this.attack.name==='heavy')
     );
-    if (canAct && this.queuedSpecial>0 && this.energy>=40 &&
+    if (canAct && this.queuedSpecial>0 && this.energy>=SPECIAL_METER_COST &&
         (!this.attack || canCancelForChord)) {
-      this.energy-=40;
+      this.energy-=SPECIAL_METER_COST;
       this.attack=null;
       this.queuedSolo=null;
       this.queuedSpecial=0;
@@ -546,7 +547,8 @@ export class Fighter {
   }
 
   /** The defensive A or X command interrupts a grab before its throw phase. */
-  breakGrab(counterPunch: boolean): void {
+  breakGrab(counterPunch: boolean): number {
+    const beforeHp=this.hp;
     this.grabPose=null;
     this.attack=null;
     this.queuedSolo=null;
@@ -559,6 +561,7 @@ export class Fighter {
       this.hitFlash=.18;
       if(this.knockedOut) this.startKnockout(this.face===1 ? -1 : 1);
     }
+    return beforeHp-this.hp;
   }
 
   /** A grounded, unguarded crouching B trips the rival without throwing
@@ -585,7 +588,8 @@ export class Fighter {
     this.hitFlash=.18;
   }
 
-  receiveThrow(damage: number, attackerFace: 1 | -1): void {
+  receiveThrow(damage: number, attackerFace: 1 | -1): number {
+    const hpBefore=this.hp;
     this.grabPose=null;
     this.attack=null;
     this.blocking=false;
@@ -593,7 +597,6 @@ export class Fighter {
     this.queuedSolo=null;
     this.queuedSpecial=0;
     this.hp=Math.max(0,this.hp-damage);
-    this.energy=Math.min(100,this.energy+12);
     this.knockoutForever=this.knockoutForever || this.knockedOut;
     // Send the victim BEHIND the thrower, with much greater travel.
     // Facing is frozen throughout the tumble and restored on recovery.
@@ -607,6 +610,7 @@ export class Fighter {
     this.knockdownFlightAge=0;
     this.grabRecovery=0;
     this.hitFlash=.18;
+    return hpBefore-this.hp;
   }
 
   /** Unique spec is selected at wind-up; the shared engine still resolves hits. */
@@ -649,9 +653,10 @@ export class Fighter {
       this.attack.elapsed < this.attack.spec.duration);
     // A correct guard negates the entire hit. A low attack beats standing A;
     // middle attacks are covered by both A and Down+A.
-    const damage=blocked ? 0 : spec.damage;
+    const attemptedDamage=blocked ? 0 : spec.damage;
+    // Meter and damage notifications use HP actually removed, not overkill.
+    const damage=Math.min(this.hp,attemptedDamage);
     this.hp=Math.max(0,this.hp-damage);
-    this.energy=Math.min(100,this.energy+(blocked?3:9));
     this.impactVelocity=attackerFace*spec.push*(blocked?.43:1);
     if(!blocked) {
       // Startup/recovery hits interrupt the roll; invulnerable frames
@@ -700,8 +705,11 @@ export class Fighter {
     this.hitFlash=.23;
   }
 
-  rewardHit(spec: AttackSpec): void {
-    this.energy=Math.min(100,this.energy+spec.gain);
+  /** Only damaging, successfully landed attacks (including throws and
+   * counters) earn meter. Receiving a hit or blocking never earns meter.
+   */
+  rewardDamage(actualDamage: number): void {
+    this.energy=earnSpecialMeter(this.energy,actualDamage);
   }
 
   private draw(_dt: number): void {
