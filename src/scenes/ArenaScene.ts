@@ -87,7 +87,7 @@ export class ArenaScene extends Phaser.Scene {
     }).setOrigin(.5).setDepth(10);
     this.resizeViewport(this.scale.width);
     this.paintHud();
-    this.onStatus('Готово! ABXY · захват X+A (G), вихід із захвату A або X.');
+    this.onStatus('Готово! X+A = захват. Вниз + напрямок + X+A або напрямок + L2 = перекат.');
   }
 
   /** Extend the camera horizontally instead of distorting/cropping 16:9 fighters. */
@@ -364,8 +364,16 @@ export class ArenaScene extends Phaser.Scene {
     if (this.grapple) {
       this.progressGrab(dt,input1,input2,just1,just2);
     } else {
+      const p1WasRolling = this.player1.isRolling;
+      const p2WasRolling = this.player2.isRolling;
       this.player1.step(dt,input1,just1,this.player2.x);
       this.player2.step(dt,input2,just2,this.player1.x);
+      if (!p1WasRolling && this.player1.isRolling) {
+        this.combatNotice('ROLL!',this.player1.x,GROUND_Y-135,0x95ecff);
+      }
+      if (!p2WasRolling && this.player2.isRolling) {
+        this.combatNotice('ROLL!',this.player2.x,GROUND_Y-135,0x95ecff);
+      }
       this.preventOverlap();
       this.resolveStrike(this.player1,this.player2);
       this.resolveStrike(this.player2,this.player1);
@@ -389,6 +397,7 @@ export class ArenaScene extends Phaser.Scene {
       attacker.stunned<=0 && defender.stunned<=0 &&
       !attacker.airborne && !defender.airborne &&
       !attacker.knockedDown && !defender.knockedDown &&
+      !attacker.isRolling && !defender.isRolling &&
       attacker.grabRecovery<=0 &&
       attacker.attack?.name!=='special' &&
       Math.abs(attacker.x-defender.x)<=GRAB_MAX_START;
@@ -445,7 +454,8 @@ export class ArenaScene extends Phaser.Scene {
       }
       if(g.elapsed>=GRAB_REACH_TIME) {
         if(Math.abs(g.attacker.x-g.defender.x)>GRAB_CATCH_RANGE ||
-           g.defender.airborne || g.defender.knockedOut) {
+           g.defender.airborne || g.defender.knockedOut ||
+           g.defender.isRolling) {
           g.attacker.breakGrab(false);
           this.grapple=null;
           this.onStatus('Захват не вдався: суперник відійшов від рук.');
@@ -537,7 +547,8 @@ export class ArenaScene extends Phaser.Scene {
     // A thrown fighter must be able to pass THROUGH the thrower to land
     // behind them. Ordinary overlap resolution would push the victim back
     // to the original side on every frame, cancelling the reversed throw.
-    if (this.player1.knockedDown || this.player2.knockedDown) return;
+    if (this.player1.knockedDown || this.player2.knockedDown ||
+        this.player1.isRolling || this.player2.isRolling) return;
     const dx=this.player2.x-this.player1.x;
     if(Math.abs(dx)>=51)return;
     const sign=dx>=0?1:-1;
@@ -554,6 +565,10 @@ export class ArenaScene extends Phaser.Scene {
     // whiff could "hit late" during follow-through and become unavoidable.
     strike.connected=true;
     if(target.knockedOut||target.knockedDown||!box||!overlap(box,target.bodyBox()))return;
+    if(target.isRollInvulnerable) {
+      this.combatNotice('DODGE!',target.x,GROUND_Y-152,0x9aeefb);
+      return; // No damage or energy reward during the roll's evasion window.
+    }
     const hit=target.receiveHit(strike.spec,attacker.face,strike.name);
     attacker.rewardHit(strike.spec);
     this.spawnSparks(target.x,GROUND_Y+target.yOffset-85,hit.blocked);

@@ -1,16 +1,17 @@
-export type Action = 'left' | 'right' | 'up' | 'down' | 'jump' | 'light' | 'heavy' | 'kick' | 'block' | 'grab' | 'special';
+export type Action = 'left' | 'right' | 'up' | 'down' | 'jump' | 'light' | 'heavy' | 'kick' | 'block' | 'grab' | 'special' | 'roll';
 export type InputState = Record<Action, boolean>;
 type Direction = 'left' | 'right' | 'up' | 'down';
 
-const ACTIONS: Action[] = ['left', 'right', 'up', 'down', 'jump', 'light', 'heavy', 'kick', 'block', 'grab', 'special'];
+const ACTIONS: Action[] = ['left', 'right', 'up', 'down', 'jump', 'light', 'heavy', 'kick', 'block', 'grab', 'special', 'roll'];
 const DIRECTIONS: Direction[] = ['left', 'right', 'up', 'down'];
 
 export const emptyInput = (): InputState => ({
   left: false, right: false, up: false, down: false, jump: false,
-  light: false, heavy: false, kick: false, block: false, grab: false, special: false,
+  light: false, heavy: false, kick: false, block: false, grab: false, special: false, roll: false,
 });
 
-const KEYMAPS: Record<Action, string>[] = [
+// Roll has no dedicated keyboard key: down+direction+block+light is its chord.
+const KEYMAPS: Record<Exclude<Action,'roll'>, string>[] = [
   {
     left: 'KeyA', right: 'KeyD', up: 'KeyW', down: 'KeyS', jump: 'Space',
     light: 'KeyJ', heavy: 'KeyK', kick: 'KeyL', block: 'KeyH', grab: 'KeyG', special: 'KeyI',
@@ -42,6 +43,9 @@ function gamepadInput(pad: Gamepad | null): InputState {
   // L1/LB (button 4) is an independent grab shortcut.
   // X+A still triggers the same grab as before.
   state.grab = held(4) || (state.light && state.block);
+  // L2 / LT is the direct roll shortcut. Direction is required in read().
+  // Use the pressed bit OR analog value for browser/gamepad compatibility.
+  state.roll = held(6) || (pad.buttons[6]?.value ?? 0) > .5;
   // Jump stays on stick-up / D-pad up; L1 no longer jumps.
   return state;
 }
@@ -259,6 +263,7 @@ export class Controls {
     const map = KEYMAPS[player];
     const touched = player === 0 ? new Set(this.touches.values()) : null;
     for (const action of ACTIONS) {
+      if (action === 'roll') continue;
       state[action] = this.keys.has(map[action]) || Boolean(touched?.has(action));
     }
     if (player === 0) {
@@ -274,16 +279,23 @@ export class Controls {
     for (const action of ACTIONS) {
       state[action] ||= pad[action];
     }
-    // Touchscreen: a single thumb swipe B<->Y produces the same special
-    // signal as the two-finger chord. No additional visible button is needed.
+    // Two-finger or one-finger swipe chords work beside an independent joystick.
     state.special ||= state.kick && state.heavy;
-    state.grab ||= state.light && state.block;
-    if (player === 0) {
-      if (this.comboSwipePointers.size > 0 ||
-          performance.now() < this.comboSwipePulseUntil) state.special = true;
-      if (this.grabSwipePointers.size > 0 ||
-          performance.now() < this.grabSwipePulseUntil) state.grab = true;
-    }
+    const touchGrabSwipe = player === 0 &&
+      (this.grabSwipePointers.size > 0 ||
+       performance.now() < this.grabSwipePulseUntil);
+    state.grab ||= state.light && state.block || touchGrabSwipe;
+
+    // Roll has priority over grab only with an explicit horizontal direction:
+    // down+left/right+X+A, or left/right+L2/LT (gamepad button 6).
+    // A neutral X+A / L1 stays a grab; held L2 without a direction is inert.
+    const horizontal = state.left !== state.right;
+    const chordRoll = state.down && (state.light && state.block || touchGrabSwipe);
+    state.roll = horizontal && (state.roll || chordRoll);
+    if (state.roll) state.grab = false;
+    if (player === 0 &&
+        (this.comboSwipePointers.size > 0 ||
+         performance.now() < this.comboSwipePulseUntil)) state.special = true;
     return state;
   }
 }

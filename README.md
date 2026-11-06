@@ -27,6 +27,15 @@ npm run preview
 - Both the main screen and pause menu now read their release version directly from `package.json` at build time, and the title screen builds its fighter list directly from the live character roster. Future character additions and version bumps no longer require separately editing these labels.
 - No gameplay or fighter mechanics are changed in this patch.
 
+## Alpha 1.5.0 · Ground rolls and evasive movement
+
+- **Down + left/right + A + X** rolls in the chosen direction. On the touchscreen, hold a downward diagonal on the virtual stick and press X+A (including the existing one-finger X↔A swipe). The neutral X+A chord and L1 continue to grab.
+- **Left/right + L2/LT** (standard gamepad button 6, including analog trigger activation) also rolls, with no need to press down.
+- A roll lasts **0.46 s**, covering approximately **178 arena units** (Runa: 84% of that distance). It has vulnerable startup and recovery, and an invulnerable middle from **0.095 s to 0.31 s**. Hits during the vulnerable window interrupt the roll; attacks during evasion show **DODGE!** without dealing damage.
+- A **0.88 s** cooldown (measured from starting the roll) and no attack/grab cancellations except a very early light-attack input keep this defensive move fair.
+- Rolls can slip past opponents. Grabs cannot start while either fighter is already rolling; reaching grabs miss a rolling opponent. Both PvP players use identical inputs and mechanics.
+- Uses a temporary procedural full-body somersault until pixel-art roll sprites arrive; no character art is permanently changed.
+
 ## Alpha 1.4.0 · Character stories and deliberate arena selection
 
 - Tap a focused fighter in either carousel to read their **original story, weapon and combat style** in an accessible, fullscreen portrait dialog. Tap an adjacent fighter to select them. Tapping a fighter **never starts the match**.

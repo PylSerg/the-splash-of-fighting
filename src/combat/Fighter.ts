@@ -25,6 +25,14 @@ export function setStageViewportWidth(width: number): void {
 
 // A short non-damaging recovery after the impact frame prevents animation snaps.
 const ATTACK_RECOVERY = .12;
+
+// A roll travels at floor level. Only its middle frames evade attacks;
+// the beginning and end can be punished by a well-timed strike.
+const ROLL_DURATION = .46;
+const ROLL_DISTANCE = 178;
+const ROLL_COOLDOWN = .88;
+const ROLL_IFRAME_START = .095;
+const ROLL_IFRAME_END = .31;
 export const ATTACKS: Record<AttackName, AttackSpec> = {
   light: { duration: .27, reach: 92, damage: 5, stun: .18, push: 110, gain: 7 },
   heavy: { duration: .48, reach: 116, damage: 11, stun: .32, push: 185, gain: 12 },
@@ -56,6 +64,9 @@ export class Fighter {
   // Two-stage throw animations are controlled by the arena's grapple state.
   grabPose: 'reach' | 'hold' | 'held' | 'throw' | null = null;
   grabRecovery = 0;
+  private rollElapsed = -1;
+  private rollDirection: 1 | -1 = 1;
+  private rollCooldown = 0;
   // Throws have 0.5 s prone + 0.5 s recovery. A defeated fighter
   // instead lands in 'ko' and stays on the ground until a new round.
   knockdownPhase: 'flying' | 'prone' | 'rising' | 'ko' | null = null;
@@ -246,6 +257,11 @@ export class Fighter {
 
   get airborne(): boolean { return this.yOffset < -.1; }
   get knockedOut(): boolean { return this.hp <= 0; }
+  get isRolling(): boolean { return this.rollElapsed >= 0; }
+  get isRollInvulnerable(): boolean {
+    return this.isRolling && this.rollElapsed >= ROLL_IFRAME_START &&
+      this.rollElapsed < ROLL_IFRAME_END;
+  }
   get knockedDown(): boolean { return this.knockdownPhase !== null; }
   get knockoutSettled(): boolean { return this.knockedOut && this.knockdownPhase === 'ko'; }
 
@@ -256,6 +272,7 @@ export class Fighter {
     this.hitFlash=0; this.blockFlash=0; this.impactVelocity=0; this.time=0;
     this.queuedSolo=null; this.queuedSpecial=0;
     this.grabPose=null; this.grabRecovery=0;
+    this.rollElapsed=-1; this.rollDirection=1; this.rollCooldown=0;
     this.knockdownPhase=null;this.knockdownTimer=0;this.knockdownFlightAge=0;
     this.knockoutForever=false;
     this.rig.rotation=0;
@@ -268,6 +285,7 @@ export class Fighter {
     if (!this.knockedDown) this.face = opponentX >= this.x ? 1 : -1;
     this.hitFlash = Math.max(0, this.hitFlash-dt);
     this.blockFlash = Math.max(0, this.blockFlash-dt);
+    this.rollCooldown = Math.max(0, this.rollCooldown-dt);
     const knock = this.impactVelocity;
     this.x = Phaser.Math.Clamp(this.x + knock*dt,STAGE_MIN_X,STAGE_MAX_X);
     this.impactVelocity *= Math.pow(.055,dt);
@@ -280,6 +298,26 @@ export class Fighter {
     }
     if (this.knockedOut) { this.draw(dt); return; }
     if (this.stunned>0) this.stunned=Math.max(0,this.stunned-dt);
+
+    // The roll has priority over its X+A components, and occupies the whole
+    // fighter until its recovery completes. It cannot cancel heavy/special.
+    if (this.isRolling) {
+      this.advanceRoll(dt);
+      this.draw(dt);
+      return;
+    }
+    const horizontal = Number(input.right) - Number(input.left);
+    const canCancelEarlyLight = this.attack?.name === 'light' &&
+      this.attack.elapsed < .13;
+    if (just.roll && horizontal !== 0 && !this.airborne &&
+        this.stunned <= 0 && this.grabRecovery <= 0 &&
+        !this.grabPose && this.rollCooldown <= 0 &&
+        (!this.attack || canCancelEarlyLight)) {
+      this.startRoll(horizontal > 0 ? 1 : -1);
+      this.advanceRoll(dt);
+      this.draw(dt);
+      return;
+    }
 
     // A failed grab and a completed throw both have a short recovery.
     if (this.grabRecovery > 0) {
@@ -378,6 +416,33 @@ export class Fighter {
     this.draw(dt);
   }
 
+  private startRoll(direction: 1 | -1): void {
+    this.rollElapsed = 0;
+    this.rollDirection = direction;
+    this.rollCooldown = ROLL_COOLDOWN;
+    this.attack = null;
+    this.queuedSolo = null;
+    this.queuedSpecial = 0;
+    this.blocking = false;
+    this.crouching = false;
+    this.walking = false;
+    this.impactVelocity = 0;
+  }
+
+  private advanceRoll(dt: number): void {
+    // Smooth-in/smooth-out horizontal travel (around 178 px normally).
+    const before = Phaser.Math.Clamp(this.rollElapsed / ROLL_DURATION,0,1);
+    this.rollElapsed = Math.min(ROLL_DURATION,this.rollElapsed + dt);
+    const after = Phaser.Math.Clamp(this.rollElapsed / ROLL_DURATION,0,1);
+    const ease = (t:number) => t*t*(3-2*t);
+    const distance = ROLL_DISTANCE * (this.id === 'runa' ? .84 : 1);
+    this.x = Phaser.Math.Clamp(this.x +
+      this.rollDirection * distance * (ease(after)-ease(before)),
+      STAGE_MIN_X, STAGE_MAX_X);
+    if (this.rollElapsed >= ROLL_DURATION) this.rollElapsed = -1;
+    this.advanceGravity(dt);
+  }
+
   private advanceKnockdown(dt: number): void {
     // A throw that removes the final HP is permanent, including edge cases
     // where its defeat state is detected after the launch.
@@ -458,6 +523,7 @@ export class Fighter {
     this.grabPose=null;
     this.attack=null;
     this.blocking=false;
+    this.rollElapsed=-1;
     this.queuedSolo=null;
     this.queuedSpecial=0;
     this.hp=Math.max(0,this.hp-damage);
@@ -503,7 +569,8 @@ export class Fighter {
   }
 
   bodyBox(): {x:number;y:number;w:number;h:number} {
-    return {x:this.x-25,y:GROUND_Y+this.yOffset-(this.crouching?73:145),w:50,h:this.crouching?72:142};
+    const low = this.crouching || this.isRolling;
+    return {x:this.x-25,y:GROUND_Y+this.yOffset-(low?73:145),w:50,h:low?72:142};
   }
 
   receiveHit(spec: AttackSpec, attackerFace: 1|-1, attackName: AttackName): {damage:number;blocked:boolean;interrupted:boolean} {
@@ -517,6 +584,9 @@ export class Fighter {
     this.energy=Math.min(100,this.energy+(blocked?3:9));
     this.impactVelocity=attackerFace*spec.push*(blocked?.43:1);
     if(!blocked) {
+      // Startup/recovery hits interrupt the roll; invulnerable frames
+      // are checked before receiveHit() in ArenaScene.resolveStrike().
+      this.rollElapsed=-1;
       this.stunned=spec.stun;
       this.attack=null;
       this.queuedSolo=null;
@@ -548,6 +618,7 @@ export class Fighter {
     this.attack=null;
     this.grabPose=null;
     this.grabRecovery=0;
+    this.rollElapsed=-1;
     this.queuedSolo=null;
     this.queuedSpecial=0;
     this.blocking=false;
@@ -618,6 +689,28 @@ export class Fighter {
     } else if (this.grabPose==='throw') {
       this.frontArm.rotation=-2.60;this.backArm.rotation=-2.10;
       this.body.y=-9;
+    }
+    if (this.isRolling) {
+      // Procedural low somersault: until pixel-art roll frames arrive,
+      // rotate the rig around the torso, not its feet. The adjusted pivot
+      // keeps the fighter visually on the ground during a full turn.
+      const progress = this.rollElapsed / ROLL_DURATION;
+      const angle = this.rollDirection * Math.PI * 2 * progress;
+      const squash = 1 - .36 * Math.sin(Math.PI * progress);
+      const pivot = 80 * squash;
+      const centerY = GROUND_Y - 80 + 20 * Math.sin(Math.PI * progress);
+      this.rig.setPosition(
+        this.x - pivot * Math.sin(angle),
+        centerY + pivot * Math.cos(angle)
+      );
+      this.rig.setScale(this.face,squash);
+      this.rig.setRotation(angle);
+      this.shadow.setPosition(this.x,GROUND_Y+5);
+      this.shadow.setScale(.76,1);
+      this.rig.alpha=1;
+      this.guardAura.setVisible(false);
+      this.body.setAlpha(this.hitFlash>0?.45:1);
+      return;
     }
     // Tilt the entire body in mid-air, stay horizontal for half a second
     // after landing, then smoothly rotate upright over another half second.
