@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import {
   earnSpecialMeter, makeHealthTrail, advanceHealthTrail, healthFillRect,
-  SPECIAL_METER_COST, METER_PER_DAMAGE, HEALTH_TRAIL_TOTAL, HEALTH_TRAIL_HOLD,
+  SPECIAL_METER_COST, METER_PER_DAMAGE, HEALTH_TRAIL_TOTAL, HEALTH_TRAIL_HOLD, MAX_HEALTH,
 } from '../src/combat/CombatFeedback.ts';
 
+assert.equal(MAX_HEALTH,200,'fighter HP doubles without altering strike damage');
 assert.equal(SPECIAL_METER_COST, 40);
 assert.equal(METER_PER_DAMAGE, 0.6);
 assert.equal(earnSpecialMeter(0, 5), 3, 'a real light hit awards damage-proportional meter');
@@ -44,6 +45,16 @@ assert.equal(hp.displayed,60);
 hp=advanceHealthTrail(hp,100,0);
 assert.equal(hp.displayed,100,'healing/round reset has no red trail');
 
+// The new 200 HP maximum must not clamp away the extra 100 points.
+let doubleHealth=makeHealthTrail(MAX_HEALTH);
+doubleHealth=advanceHealthTrail(doubleHealth,175,0);
+assert.equal(doubleHealth.displayed,MAX_HEALTH);
+assert.equal(doubleHealth.target,175);
+doubleHealth=advanceHealthTrail(doubleHealth,MAX_HEALTH,0);
+assert.equal(doubleHealth.displayed,MAX_HEALTH,'new round fully restores 200 HP');
+assert.equal(advanceHealthTrail(doubleHealth,250,0).target,MAX_HEALTH,
+  'health trails clamp at the new maximum');
+
 // P1 bar empties from right, P2 from left; red is visible only in lost zone.
 const p1=healthFillRect(112,300,80,false);
 const p1ghost=healthFillRect(112,300,100,false);
@@ -53,4 +64,7 @@ const p2=healthFillRect(548,300,80,true);
 const p2ghost=healthFillRect(548,300,100,true);
 assert.deepEqual(p2,{x:608,width:240});
 assert.deepEqual(p2ghost,{x:548,width:300});
+const halfHealth=MAX_HEALTH/2;
+assert.equal(healthFillRect(112,300,halfHealth/MAX_HEALTH*100,false).width,150,
+  'HUD must normalize 100/200 HP to a half-filled bar');
 console.log('✓ Meter economy and both 0.5s red health trails: passed.');
