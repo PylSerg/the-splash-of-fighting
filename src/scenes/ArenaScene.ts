@@ -18,7 +18,7 @@ import { canBeGrabbed } from '../combat/GrabRules';
 import {
   DUEL_DURATION, DUEL_RESULT_ANIMATION, DUEL_GUARD_STUN,
   DUEL_TIE_PUSH, DUEL_GUARD_PUSH, chooseDuelInput,
-  resolveDuel, duelDamage, type DuelChoice, type DuelStrike,
+  resolveDuel, duelDamage, reviseDuelChoice, type DuelChoice, type DuelStrike,
 } from '../combat/DuelRules';
 import { getStage, type StageId } from '../stages/Stages';
 import { SPLASH_WINDUP, SPLASH_MOVES, SPLASH_DUEL_WIN_GAIN,
@@ -845,12 +845,13 @@ export class ArenaScene extends Phaser.Scene {
     };
     this.centerLabel.setText('DUEL!').setColor('#f9c5ff').setVisible(true);
     this.combatNotice('DUEL!',(attacker.x+defender.x)/2,GROUND_Y-210,0xf4aaff);
-    this.onStatus('ДУЕЛЬ! 2 секунди на таємний вибір: X, Y або B. Захисник може натиснути A. Бій завмер!');
+    this.onStatus('ДУЕЛЬ! Протягом 2 секунд можна змінювати таємний вибір X, Y або B; захисник також може A. Вирішує останнє натискання!');
   }
 
   /** Only input polling and a visible two-second stripe advance here.
    * Fighters, gravity, stage timer, attacks and CPU locomotion are frozen.
-   * Each selection is locked on its first NEW press and never displayed.
+   * Any new valid press replaces that player's hidden choice until timeout.
+   * Current choices remain secret and are locked only at the end.
    */
   private stepDuel(dt: number): void {
     const duel=this.duel;
@@ -861,11 +862,11 @@ export class ArenaScene extends Phaser.Scene {
     const j2=justPressed(p2,duel.previous[1]);
     duel.previous=[p1,p2];
     this.prev1=p1;this.prev2=p2;
-    if(duel.choices[0]===null) {
-      duel.choices[0]=chooseDuelInput(j1,duel.defender===this.player1);
-    }
-    if(this.mode==='versus' && duel.choices[1]===null) {
-      duel.choices[1]=chooseDuelInput(j2,duel.defender===this.player2);
+    duel.choices[0]=reviseDuelChoice(
+      duel.choices[0],j1,duel.defender===this.player1);
+    if(this.mode==='versus'){
+      duel.choices[1]=reviseDuelChoice(
+        duel.choices[1],j2,duel.defender===this.player2);
     }
     duel.elapsed=Math.min(DUEL_DURATION,duel.elapsed+dt);
     if(this.mode==='cpu' && duel.choices[1]===null && duel.elapsed>=.32) {
