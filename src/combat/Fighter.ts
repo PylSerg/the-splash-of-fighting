@@ -13,6 +13,7 @@ import {
 import { type EviMotionInput } from './EviRigMotion.ts';
 import { EviPixelPuppet } from './EviPixelPuppet.ts';
 import { groundedRollVisual } from './GroundedRollVisual.ts';
+import { legacyFallVisual } from './EviGroundedTumble.ts';
 import { earnSplashEnergy, SPLASH_METER_MAX, SPLASH_INPUT_GRACE, splashFacing } from './SplashRules';
 import {
   FIGHTER_STYLES, ATTACK_ACTIVE, WAKEUP_PROTECTION,
@@ -684,7 +685,7 @@ export class Fighter {
     // orientation: a roll behind the fighter exposes their back.
     // Include the current held input so defense cannot auto-turn in
     // the same frame that the player first presses A.
-    if (!preserveFacing && this.blockstun<=0 &&
+    if (!preserveFacing && !this.isRolling && this.blockstun<=0 &&
         canAutoTurn(this.face,input,this.airborne,this.stunned,this.knockedDown))
       this.face = opponentX >= this.x ? 1 : -1;
     this.hitFlash = Math.max(0, this.hitFlash-dt);
@@ -1467,7 +1468,8 @@ export class Fighter {
       const visual=groundedRollVisual(
         this.rollElapsed/ROLL_DURATION,this.rollDirection!==this.face);
       const puppetVisible=this.pixelPuppet?.root.visible===true;
-      this.rig.setPosition(this.x,GROUND_Y+this.yOffset+visual.lift);
+      this.rig.setPosition(this.x,GROUND_Y+this.yOffset+
+        (puppetVisible?0:visual.lift));
       this.rig.setScale(this.face,puppetVisible?1:visual.fallbackScaleY);
       this.rig.setRotation(puppetVisible?0:this.face*visual.fallbackLean);
       this.shadow.setPosition(this.x,GROUND_Y+5);
@@ -1490,10 +1492,16 @@ export class Fighter {
       fallAngle=Math.PI*.47*(1-smooth);
     }
     this.rig.setPosition(this.x,GROUND_Y+this.yOffset);
-    this.rig.setScale(this.face,1);
-    // Pixel-art fallen and prone poses are already horizontal. Rotating
-    // them again would flip the sprite upright and corrupt the silhouette.
-    this.rig.setRotation(this.pixelSprite?0:this.face*fallAngle);
+    const articulated=this.pixelPuppet?.root.visible===true;
+    const needsFallback=!this.pixelSprite && !articulated;
+    const fallFraction=fallAngle/(Math.PI*.47);
+    const legacy=legacyFallVisual(fallFraction);
+    // Older procedural fighters must NOT headstand around their foot pivot.
+    // Instead they collapse into a compact sideways silhouette. Evi's new
+    // puppet folds its own joints and must not be rotated a second time.
+    this.rig.setScale(this.face,needsFallback?legacy.scaleY:1);
+    this.rig.setRotation(needsFallback
+      ?this.face*fallAngle*legacy.rotationRatio:0);
     // A separate world-space shadow stays flat underneath the trajectory.
     this.shadow.setPosition(this.x,GROUND_Y+5);
     this.rig.alpha=this.knockedOut ? .65 : 1;
