@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { InputState } from '../input/Controls';
-import { stopsHit, strikeBand, strikeDamage, canAutoTurn, STANDING_ATTACK_LANES, type HitLevel, type GuardStance } from './HitRules';
+import { stopsHit, strikeBand, fighterHurtboxBand, strikeDamage, canAutoTurn, STANDING_ATTACK_LANES, type HitLevel, type GuardStance } from './HitRules';
 import { crouchMoveForPress } from './CrouchRules';
 import { blockedGrabRecoil } from './GrabRules';
 import { earnSpecialMeter, MAX_HEALTH } from './CombatFeedback';
@@ -1171,8 +1171,15 @@ export class Fighter {
   }
 
   bodyBox(): {x:number;y:number;w:number;h:number} {
-    const low = this.crouching || this.isRolling;
-    return {x:this.x-25,y:GROUND_Y+this.yOffset-(low?73:145),w:50,h:low?72:142};
+    // Same silhouette used by green debug boxes and the real combat
+    // detector: the old 145px box stopped below the heads of BOTH fighters.
+    const low=this.crouching||this.isRolling;
+    const {halfWidth,top,height}=fighterHurtboxBand(low);
+    return {
+      x:this.x-halfWidth,
+      y:GROUND_Y+this.yOffset+top,
+      w:halfWidth*2,h:height,
+    };
   }
 
   /** Both strikes landed in the SAME fixed frame. Apply guard impact to
