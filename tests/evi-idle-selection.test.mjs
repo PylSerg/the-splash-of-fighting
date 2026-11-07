@@ -5,12 +5,34 @@ import JSZip from 'jszip';
 import {
   EVI_IDLE_FRAMES,EVI_IDLE_WIDTH,EVI_IDLE_HEIGHT,EVI_IDLE_FRAME_MS,
   parseEviIdleFiles,packEviIdleFrames,bundledEviIdleUrls,
+  advanceEviIdleFrame,
 } from '../src/ui/EviIdleAnimation.ts';
 
 assert.equal(EVI_IDLE_FRAMES,6);
 assert.equal(EVI_IDLE_WIDTH,512);
 assert.equal(EVI_IDLE_HEIGHT,768);
 assert.ok(EVI_IDLE_FRAME_MS>=120 && EVI_IDLE_FRAME_MS<=250);
+
+// Playback must never jump last → first: 1..6..1 is ten distinct
+// intervals in a seamless loop, without a duplicated frame at either end.
+let playback={frame:0,direction:1};
+const played=[playback.frame];
+for(let i=0;i<30;i++){
+  playback=advanceEviIdleFrame(playback.frame,playback.direction);
+  played.push(playback.frame);
+}
+assert.deepEqual(played.slice(0,11),[0,1,2,3,4,5,4,3,2,1,0],
+  'six PNG frames ping-pong up and down, with no last-to-first jump');
+assert.deepEqual(played.slice(10,21),[0,1,2,3,4,5,4,3,2,1,0],
+  'repeated ping-pong cycles must be identical');
+assert.ok(played.slice(1).every((frame,i)=>Math.abs(frame-played[i])===1),
+  'each rendered transition advances by only one adjacent frame');
+assert.deepEqual(advanceEviIdleFrame(0,1,1),{frame:0,direction:1},
+  'a single-frame fallback must stay stable');
+assert.deepEqual(advanceEviIdleFrame(0,1,2),{frame:1,direction:-1},
+  'two-frame animation turns around at the last frame');
+assert.deepEqual(advanceEviIdleFrame(1,-1,2),{frame:0,direction:1},
+  'two-frame animation turns around at the first frame');
 
 // These assets MUST be real committed RGBA PNGs, not Git LFS stubs,
 // a former sprite atlas, or temporary chat-only links.
@@ -81,6 +103,12 @@ const app=read('src/main.ts');
 const html=read('index.html');
 const styles=read('src/ui/selection.css');
 assert.match(selector,/setInterval\(/,'idle animation must advance frames');
+assert.match(selector,/advanceEviIdleFrame\(this\.idleFrame,this\.idleDirection,this\.idleUrls\.length\)/,
+  'selector drives PNG frames through the shared tested ping-pong stepper');
+assert.doesNotMatch(selector,/this\.idleFrame=\(this\.idleFrame\+1\)%/,
+  'old looping last-to-first jump must be removed');
+assert.ok((selector.match(/this\.idleDirection=1;/g)||[]).length>=3,
+  'showing selector, reimporting and clearing artwork reset to forward frame 1');
 assert.match(selector,/this\.stopIdle\(\)/,'close selection must stop idle timer');
 assert.match(selector,/URL\.revokeObjectURL/,'old frame URLs are disposed');
 assert.match(selector,/has-idle-animation/,'native PNG art replaces SVG fallback');
@@ -93,4 +121,4 @@ assert.match(app,/await installBundledIdle\(version\)/,
 assert.match(html,/id="input-evi-idle"/,'ZIP upload in character select');
 assert.match(html,/multiple/,'individual PNG imports also supported');
 assert.match(styles,/image-rendering:pixelated/,'retain crisp pixel art');
-console.log('✓ Six committed 512×768 RGBA idle PNGs: SHA-256 match, Vite asset URLs, automatic default, local overrides and animation.');
+console.log('✓ Six committed 512×768 RGBA idle PNGs: original hashes, Vite paths, local overrides and seamless 1→6→1 ping-pong animation.');
