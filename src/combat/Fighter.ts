@@ -6,7 +6,10 @@ import { blockedGrabRecoil } from './GrabRules';
 import { earnSpecialMeter, MAX_HEALTH } from './CombatFeedback';
 import { scaleDamage } from './CombatScale.ts';
 import { canLaunchSpecial, specialDamageAt, spendSpecialCharge } from './SpecialRules.ts';
-import { frameForEvi, EVI_CINEMATIC_SECONDS } from './EviSpriteStates.ts';
+import {
+  frameForEvi,eviFrameTextureKey,EVI_CINEMATIC_SECONDS,
+  EVI_RENDER_WIDTH,EVI_RENDER_HEIGHT,EVI_FEET_ORIGIN_Y,
+} from './EviSpriteStates.ts';
 import { earnSplashEnergy, SPLASH_METER_MAX, SPLASH_INPUT_GRACE, splashFacing } from './SplashRules';
 import {
   FIGHTER_STYLES, ATTACK_ACTIVE, WAKEUP_PROTECTION,
@@ -321,12 +324,13 @@ export class Fighter {
       this.cape,this.backArm,this.leftLeg,this.rightLeg,this.body,
       this.weapon,this.frontArm,this.hair,this.head,
     ];
-    const ready=this.id==='evi' && this.scene.textures.exists('evi-combat');
+    const key=eviFrameTextureKey('combat',0);
+    const ready=this.id==='evi' && this.scene.textures.exists(key);
     for(const visual of graphics)visual.setVisible(!ready);
     if(ready){
-      this.pixelSprite=this.scene.add.image(0,0,'evi-combat','f0')
-        .setOrigin(.5,1).setDisplaySize(125,195);
-      this.pixelSprite.setPosition(0,10);
+      this.pixelSprite=this.scene.add.image(0,0,key)
+        .setOrigin(.5,EVI_FEET_ORIGIN_Y)
+        .setDisplaySize(EVI_RENDER_WIDTH,EVI_RENDER_HEIGHT);
       this.rig.add(this.pixelSprite);
     }
     this.draw(0);
@@ -1234,14 +1238,21 @@ export class Fighter {
         stunned:this.stunned>0,walking:this.walking,
         movingForward:this.movingForward,time:this.time,
       });
-      const kind=chosen.sheet==='cinematic' && this.scene.textures.exists('evi-cinematic')
-        ?'evi-cinematic':'evi-combat';
-      const frame=kind==='evi-combat' && chosen.sheet==='cinematic'
+      const hasCinematic=this.scene.textures.exists(eviFrameTextureKey('cinematic',0));
+      const kind=chosen.sheet==='cinematic' && hasCinematic?'cinematic':'combat';
+      const frame=kind==='combat' && chosen.sheet==='cinematic'
         ?(this.cinematic?.kind==='victory'?20:0):chosen.frame;
-      this.pixelSprite.setTexture(kind,'f'+frame);
+      const textureKey=eviFrameTextureKey(kind,frame);
+      if(this.pixelSprite.texture.key!==textureKey){
+        this.pixelSprite.setTexture(textureKey);
+      }
+      // setTexture may update origin/size. Reassert a stable foot pivot on
+      // every frame, including jumps and wide horizontal attacks.
+      this.pixelSprite.setOrigin(.5,EVI_FEET_ORIGIN_Y);
+      this.pixelSprite.setDisplaySize(EVI_RENDER_WIDTH,EVI_RENDER_HEIGHT);
+      this.pixelSprite.setPosition(0,0);
       this.pixelSprite.setTint(this.hitFlash>0?0xffcad8:0xffffff);
       this.pixelSprite.setAlpha(this.knockedOut?0.76:1);
-      this.pixelSprite.setPosition(0,10);
     }
     const motion=this.walking?Math.sin(this.time*15):Math.sin(this.time*2.5)*.11;
     const swing=this.walking?Math.sin(this.time*15)*.30:0;
