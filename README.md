@@ -21,6 +21,13 @@ npm run build
 npm run preview
 ```
 
+## Alpha 1.22.10 · Evi idle animation ships with the game
+
+- Added **all six original 512 × 768 transparent RGBA PNG frames** directly to `public/assets/evi/idle/idle_001.png` … `idle_006.png`. The exact source bytes and alpha are preserved and SHA-256 verified by regression tests.
+- **No ZIP upload is required.** On the Character Select screen Evi automatically animates from the built-in files (185 ms/frame) on first launch. Vite's `BASE_URL` supports both development and GitHub Pages.
+- The **🪭 Замінити Idle** import remains for edited individual PNGs or a ZIP. Valid saved custom frames in IndexedDB override the built-ins. Resetting artwork restores the bundled version. Without an accessible sprite file, the existing SVG fighter remains the fallback.
+- Added guards against stale asynchronous loaders replacing freshly imported artwork. All gameplay, other fighters, selection controls and combat sprites are unchanged.
+
 ## Alpha 1.22.9 · Six-frame Evi idle animation in Character Select
 
 - The **character selection carousel** can now display six individually authored, transparent **512 × 768 PNG** frames of Evi (not a rigid atlas). Her idle animation loops every **185 ms** without changing gameplay, HUD portraits or other fighters.

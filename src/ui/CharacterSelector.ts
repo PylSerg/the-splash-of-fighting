@@ -51,6 +51,7 @@ export class CharacterSelector {
   private idleUrls: string[] = [];
   private idleFrame = 0;
   private idleTimer: ReturnType<typeof setInterval> | null = null;
+  private idleInstallGeneration=0;
 
   constructor(
     private readonly onStart: (p1: FighterId, p2: FighterId, mode: MatchMode) => void,
@@ -210,7 +211,14 @@ export class CharacterSelector {
   }
   /** Update the carousel without touching fighter logic, lineup or selections. */
   async installEviIdle(frames:Blob[]):Promise<void>{
+    const generation=++this.idleInstallGeneration;
     const urls=await preloadEviIdle(frames);
+    // Do not let a slow built-in fetch overwrite a newer user-imported set,
+    // or revive sprites that were cleared while image decoders were busy.
+    if(generation!==this.idleInstallGeneration){
+      urls.forEach(url=>URL.revokeObjectURL(url));
+      return;
+    }
     this.stopIdle();
     const previous=this.idleUrls;
     this.idleUrls=urls;
@@ -221,6 +229,7 @@ export class CharacterSelector {
   }
 
   clearEviIdle():void{
+    this.idleInstallGeneration++;
     this.stopIdle();
     this.idleUrls.forEach(url=>URL.revokeObjectURL(url));
     this.idleUrls=[];

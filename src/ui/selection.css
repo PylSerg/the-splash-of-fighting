@@ -737,9 +737,9 @@
 }
 
 
-/* Alpha 1.22.9: transparent, independently imported six-frame idle art.
- * PNG pixels stay sharp and all frames share the same anchored 512x768 box.
- * Existing SVG art remains the fallback until the player imports the ZIP. */
+/* Alpha 1.22.10: bundled six-frame idle PNGs, editable by local import.
+ * PNG pixels stay sharp and all frames share the anchored 512x768 box.
+ * SVG art is a fallback only if loading the bundled PNGs fails. */
 .fighter-figure.has-idle-animation>svg{display:none}
 .fighter-figure .evi-idle-sprite{
   width:100%;height:100%;display:block;object-fit:contain;
