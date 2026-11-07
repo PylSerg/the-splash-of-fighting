@@ -43,7 +43,7 @@
         <div class="pause-panel">
           <header class="pause-heading">
             <div>
-              <div class="pause-eyebrow">THE SPLASH OF FIGHTING <span>• ALPHA 1.18.0</span></div>
+              <div class="pause-eyebrow">THE SPLASH OF FIGHTING <span>• ALPHA 1.19.0</span></div>
               <h1 id="pause-title">ПАУЗА <span>Ⅱ</span></h1>
             </div>
             <div class="pause-heading-actions">
@@ -171,7 +171,7 @@
         <div class="home-logo">
           <div class="home-kicker">✦ ARCADE FIGHTING ✦</div>
           <h1 id="home-title"><span>THE SPLASH</span><small>OF FIGHTING</small></h1>
-          <div class="home-version">ALPHA 1.18.0 · ЕВІ × РУНА × ЛІРА × КАЙ</div>
+          <div class="home-version">ALPHA 1.19.0 · ЕВІ × РУНА × ЛІРА × КАЙ</div>
         </div>
         <div class="home-buttons">
           <button id="btn-home-start" class="home-primary" type="button">🥊 Почати</button>
@@ -188,7 +188,7 @@
           <div class="cinematic-heading">
             <div class="cinematic-kicker">THE SPLASH OF FIGHTING · SELECT STAGE</div>
             <h1 id="stage-select-title">ОБЕРИ АРЕНУ <span>✦</span></h1>
-            <p id="stage-select-help">Гортай ліворуч або праворуч, щоб оглянути арену.</p>
+            <p id="stage-select-help">Гортай арени вліво або вправо. Торкнись вибраної ще раз, щоб прочитати історію.</p>
           </div>
           <div id="stage-counter" class="cinematic-counter" aria-live="polite">1 / 2</div>
         </header>
@@ -205,9 +205,34 @@
           </div>
           <div class="cinematic-actions">
             <span class="cinematic-tip">⇆ Свайп · ← → · D-pad</span>
+            <button id="btn-stage-lore" class="cinematic-stage-lore" type="button">📖 Історія</button>
             <button id="btn-stage-confirm" class="cinematic-confirm" type="button">🥊 На арену!</button>
           </div>
         </footer>
+      </section>
+      <section id="stage-lore-dialog" class="fighter-bio-overlay stage-lore-overlay" role="dialog"
+        aria-modal="true" aria-labelledby="stage-lore-name" aria-describedby="stage-lore-story" hidden>
+        <div class="fighter-bio-panel stage-lore-panel">
+          <button id="stage-lore-close" class="fighter-bio-close" type="button"
+            aria-label="Закрити історію локації">✕</button>
+          <div class="fighter-bio-kicker">✧ АРХІВ АРЕН / ІСТОРІЯ ЛОКАЦІЇ</div>
+          <div class="fighter-bio-main stage-lore-main">
+            <div class="stage-lore-art" id="stage-lore-art" aria-hidden="true"></div>
+            <div class="fighter-bio-body">
+              <h2 id="stage-lore-name">НЕОНОВЕ МІСТО</h2>
+              <p id="stage-lore-title" class="fighter-bio-title"></p>
+              <p id="stage-lore-story" class="fighter-bio-story"></p>
+              <div class="fighter-bio-facts">
+                <p><span>✦ АТМОСФЕРА</span><strong id="stage-lore-atmosphere"></strong></p>
+                <p><span>⌖ ОСОБЛИВЕ МІСЦЕ</span><strong id="stage-lore-landmark"></strong></p>
+              </div>
+            </div>
+          </div>
+          <div class="fighter-bio-footer">
+            <span>Локації та їхні історії · The Splash of Fighting</span>
+            <button id="stage-lore-return" type="button">← До вибору арен</button>
+          </div>
+        </div>
       </section>
       <section id="character-select" class="character-select cinematic-select dual-character-select"
         role="dialog" aria-modal="true" aria-labelledby="select-title" hidden>
