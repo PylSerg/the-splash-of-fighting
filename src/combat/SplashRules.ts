@@ -1,8 +1,7 @@
 /** Cinematic splash: deliberately independent of normal (damage-based) special energy. */
 export const SPLASH_METER_MAX = 100;
 export const SPLASH_WINDUP = 0.5;
-export const SPLASH_COMBO_LINK_GAIN = 8;
-export const SPLASH_COMBO_FINISH_GAIN = 16;
+export const SPLASH_COMBO_COMPLETE_GAIN = 24;
 export const SPLASH_DUEL_WIN_GAIN = 26;
 
 export type SplashId = 'evi' | 'runa' | 'lyra' | 'kai';
@@ -25,10 +24,9 @@ export function earnSplashEnergy(current:number, bonus:number): number {
   if (!Number.isFinite(bonus) || bonus<=0) return current;
   return Math.min(SPLASH_METER_MAX,Math.max(0,current)+bonus);
 }
-/** Successful second hit AND successful finisher award one bonus each. */
+/** Only a FULL, clean three-hit combo earns splash energy. */
 export function comboSplashBonus(cleanHits:number): number {
-  return cleanHits===2 ? SPLASH_COMBO_LINK_GAIN :
-    cleanHits===3 ? SPLASH_COMBO_FINISH_GAIN : 0;
+  return cleanHits===3 ? SPLASH_COMBO_COMPLETE_GAIN : 0;
 }
 export function splashChord(buttons:{
   up:boolean; light:boolean; heavy:boolean; l1:boolean; r1:boolean;
