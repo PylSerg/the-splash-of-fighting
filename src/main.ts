@@ -10,8 +10,9 @@ import { CHARACTERS, getCharacter, portraitSvg } from './characters/Roster';
 import gamePackage from '../package.json';
 import { getStage, type StageId } from './stages/Stages';
 import type { FighterId } from './combat/Fighter';
+import type { TrainingBehavior } from './combat/TrainingRules';
 
-type Pair = { first: FighterId; second: FighterId; mode: MatchMode };
+type Pair = { first: FighterId; second: FighterId; mode: MatchMode; training:boolean };
 type Screen = 'home' | 'characters' | 'stages' | 'battle' | 'menu' | 'layout';
 type MenuTab = 'game' | 'controls' | 'display' | 'help';
 type DisruptiveAction = 'restart' | 'characters' | 'stage' | 'exit';
@@ -71,6 +72,7 @@ let stageOrigin: 'new' | 'menu' | 'after-fighters'='new';
 let activePair: Pair | null=null;
 let pendingPair: Pair | null=null;
 let activeStage: StageId='city';
+let requestedTraining=false;
 let logicalWidth=960;
 let gamepadStartHeld=false;
 let selectionDirectionHeld=0;
@@ -115,7 +117,8 @@ const characterSelector=new CharacterSelector(onCharacterChosen, backFromCharact
 const stageSelector=new StageSelector(onStageChosen, backFromStage);
 
 function isSamePair(a: Pair, b: Pair): boolean {
-  return a.first===b.first && a.second===b.second && a.mode===b.mode;
+  return a.first===b.first && a.second===b.second && a.mode===b.mode &&
+    a.training===b.training;
 }
 function updateAvatars(p1: FighterId,p2: FighterId): void {
   avatar1.innerHTML=portraitSvg(p1);
@@ -170,6 +173,7 @@ function goHome(): void {
   // pause a still-booting scene before its create() can construct HUD/stage.
   if (activePair) game.scene.pause('Arena');
   pendingPair=null;
+  requestedTraining=false;
   setScreen('home');
   home.querySelector<HTMLButtonElement>('#btn-home-start')?.focus({preventScroll:true});
 }
@@ -178,7 +182,11 @@ function showMenu(origin:'home'|'battle', tab:MenuTab='game'): void {
   menuOrigin=origin;
   controls.clear();
   game.scene.pause('Arena');
-  menuContext.textContent=origin==='home'?'Налаштування гри':'Бій зупинено';
+  const training=origin==='battle' && arena.isTraining();
+  menuContext.textContent=origin==='home'?'Налаштування гри':
+    training?'Тренування зупинено':'Бій зупинено';
+  get<HTMLElement>('#training-ai-settings').hidden=!training;
+  if(training)refreshTrainingBehaviorButtons();
   get<HTMLElement>('#pause-title').innerHTML=origin==='home'
     ? 'НАЛАШТУВАННЯ <span>⚙</span>' : 'ПАУЗА <span>Ⅱ</span>';
   resumeButton.textContent=origin==='home'?'← На головну':'▶ Продовжити';
@@ -205,6 +213,7 @@ function leaveMenu(): void {
 }
 function showCharacters(origin:'home'|'menu'): void {
   characterOrigin=origin;
+  if(origin==='menu')requestedTraining=activePair?.training??false;
   controls.clear();
   game.scene.pause('Arena');
   setScreen('characters');
@@ -216,10 +225,12 @@ function showCharacters(origin:'home'|'menu'): void {
   // The destination differs: title screen vs paused fight menu.
   get<HTMLButtonElement>('#btn-select-back').textContent=
     origin==='home'?'← На головну':'← До меню';
-  characterSelector.show(pendingPair?.mode ?? activePair?.mode ?? 'cpu',true,previous);
+  characterSelector.show(requestedTraining?'cpu':pendingPair?.mode ?? activePair?.mode ?? 'cpu',
+    true,previous,requestedTraining);
 }
 function onCharacterChosen(first:FighterId,second:FighterId,mode:MatchMode): void {
-  const next={first,second,mode};
+  const next:Pair={first,second,mode:requestedTraining?'cpu':mode,
+    training:requestedTraining};
   if(characterOrigin==='menu') {
     if(activePair&&isSamePair(activePair,next)){
       pendingPair=null;
@@ -271,7 +282,7 @@ function startBattle(pair:Pair,id:StageId): void {
   activePair={...pair};
   menuOrigin='battle';
   arena.setArena(id);
-  arena.setMatchup(pair.first,pair.second,pair.mode);
+  arena.setMatchup(pair.first,pair.second,pair.mode,pair.training);
   updateAvatars(pair.first,pair.second);
   resumeBattle();
 }
@@ -361,10 +372,33 @@ function togglePause(): void {
   else if(screen==='stages') stageSelector.goBack();
 }
 
-// Home screen: no combat starts until the player chooses a fighter AND stage.
-get<HTMLButtonElement>('#btn-home-start').addEventListener('click',()=>showCharacters('home'));
+// Home screen: normal match and endless practice share roster and arena selection.
+get<HTMLButtonElement>('#btn-home-start').addEventListener('click',()=>{
+  requestedTraining=false;
+  showCharacters('home');
+});
+get<HTMLButtonElement>('#btn-home-training').addEventListener('click',()=>{
+  requestedTraining=true;
+  showCharacters('home');
+});
 get<HTMLButtonElement>('#btn-home-settings').addEventListener('click',()=>showMenu('home','controls'));
 homeFullscreen.addEventListener('click',()=>{void toggleFullscreen();});
+
+function refreshTrainingBehaviorButtons():void {
+  const chosen=arena.getTrainingBehavior();
+  for(const button of document.querySelectorAll<HTMLButtonElement>('[data-training-ai]')){
+    const selected=button.dataset.trainingAi===chosen;
+    button.classList.toggle('selected',selected);
+    button.setAttribute('aria-pressed',String(selected));
+  }
+}
+for(const button of document.querySelectorAll<HTMLButtonElement>('[data-training-ai]')){
+  button.addEventListener('click',()=>{
+    if(!arena.isTraining())return;
+    arena.setTrainingBehavior(button.dataset.trainingAi as TrainingBehavior);
+    refreshTrainingBehaviorButtons();
+  });
+}
 
 // First pause tab has the five actions specified by the game design.
 menuButton.addEventListener('click',()=>showMenu('battle'));
