@@ -3,6 +3,7 @@ import {
   type EviMotionInput,type EviPose,
   neutralEviPose,eviPoseFor,blendEviPose,
 } from './EviRigMotion.ts';
+import {groundedEviTumble} from './EviGroundedTumble.ts';
 
 /** A modular pixel-art fighter rendered from individually drawn textures.
  * Parents use joints (shoulder→elbow→wrist, hip→knee→ankle), not an atlas
@@ -313,6 +314,17 @@ export class EviPixelPuppet {
     }
     this.pose=blendEviPose(this.pose,next,dt);
     this.applyPose(this.pose);
+    if(input.name==='roll'){
+      // Genuine tucked somersault with recalculated ground contact every
+      // frame. Parent Fighter remains anchored to x / GROUND_Y.
+      const tumble=groundedEviTumble(input.progress??0,input.backwards);
+      this.root.setPosition(tumble.x,tumble.y);
+      this.root.setRotation(tumble.angle);
+    }else{
+      // Restore neutral transform after dodging, including interrupted rolls.
+      this.root.setPosition(0,0);
+      this.root.setRotation(0);
+    }
     // Tint the whole puppet on contact; no additional GPU textures.
     this.root.setAlpha(hitFlash ? 0.81 : 1);
   }
