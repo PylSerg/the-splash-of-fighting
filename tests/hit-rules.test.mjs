@@ -12,41 +12,64 @@ for (const [stance, levels] of Object.entries(expected)) {
       `${stance} guard vs ${level}: expected ${blocked}`);
   }
 }
-// The enlarged 2D sprites now include the HEAD above the previous green box.
-// These are actual shared Fighter hurtbox dimensions, not a second mock shape.
-const standing=fighterHurtboxBand(false);
-const crouching=fighterHurtboxBand(true);
-assert.deepEqual(standing,{halfWidth:32,top:-222,height:220},
-  'upright hitbox reaches the head of the larger Evi AND Runa');
-assert.deepEqual(crouching,{halfWidth:29,top:-84,height:83},
-  'crouch and roll have the smaller, lower hitbox');
-assert.equal(FIGHTER_HURTBOX.standing.bottom,-2);
-assert.equal(FIGHTER_HURTBOX.low.bottom,-1);
-assert.ok(standing.halfWidth>25,'wider sprites deserve a wider active body collider');
-assert.ok(standing.top<=-220,'upright head must be inside the hurtbox');
-function hitsVertically(level,stance) {
-  const band=strikeBand(level);
-  const hurt=stance==='standing'?standing:crouching;
-  return band.top<hurt.top+hurt.height && band.top+band.height>hurt.top;
+// Each playable fighter has an independently calibrated torso/head box.
+// Cosmetic hair, flowing fabric, fans and extended feet need not be hittable.
+const profiles={
+  evi:{standing:{halfWidth:33,top:-210,bottom:-2},
+       low:{halfWidth:28,top:-81,bottom:-1}},
+  runa:{standing:{halfWidth:29,top:-184,bottom:-2},
+        low:{halfWidth:27,top:-79,bottom:-1}},
+  lyra:{standing:{halfWidth:28,top:-190,bottom:-2},
+        low:{halfWidth:26,top:-78,bottom:-1}},
+  kai:{standing:{halfWidth:26,top:-179,bottom:-2},
+       low:{halfWidth:24,top:-76,bottom:-1}},
+};
+assert.deepEqual(FIGHTER_HURTBOX,profiles);
+assert.equal(Object.keys(profiles).length,4);
+assert.equal(new Set(Object.values(profiles).map(p=>
+  p.standing.top+':'+p.standing.halfWidth)).size,4,
+  'no shared one-size-fits-all standing hurtbox');
+for(const [fighter,poses] of Object.entries(profiles)){
+  for(const [pose,low] of [['standing',false],['low',true]]){
+    const expected=poses[pose];
+    assert.deepEqual(fighterHurtboxBand(fighter,low),{
+      halfWidth:expected.halfWidth,
+      top:expected.top,
+      height:expected.bottom-expected.top,
+    },fighter+' '+pose+' uses its own geometry');
+  }
+  const standing=fighterHurtboxBand(fighter,false);
+  const crouching=fighterHurtboxBand(fighter,true);
+  const overlaps=(level,hurt)=>{
+    const band=strikeBand(level);
+    return band.top<hurt.top+hurt.height &&
+      band.top+band.height>hurt.top;
+  };
+  assert.ok(standing.top< -170 && standing.top>=-210,
+    fighter+' box includes the actual head, but does not float above it');
+  assert.ok(standing.halfWidth>crouching.halfWidth,
+    fighter+' becomes narrower while crouching');
+  assert.ok(standing.height>crouching.height*2,
+    fighter+' visibly shrinks the vulnerable area when low');
+  assert.equal(overlaps('high',standing),true,
+    fighter+' head can be hit by a high Y strike');
+  assert.equal(overlaps('high',crouching),false,
+    fighter+' ducks cleanly below a high Y strike');
+  assert.ok(strikeBand('high').top+strikeBand('high').height<crouching.top,
+    fighter+' has clearance between high Y and its low hurtbox');
+  for(const level of ['mid','low']){
+    assert.equal(overlaps(level,standing),true,
+      fighter+' standing body can be struck at '+level);
+    assert.equal(overlaps(level,crouching),true,
+      fighter+' crouched body can be struck at '+level);
+  }
 }
-const high=strikeBand('high');
-assert.equal(high.top,-232,'Y attack begins above the full head silhouette');
-assert.equal(high.top+high.height,-92,
-  'high attack ends above the crouched head');
-assert.ok(high.top+high.height<crouching.top,
-  'standing Y attack must still MISS a ducking or rolling fighter');
-assert.equal(hitsVertically('high','standing'),true,
-  'high blows now touch an upright fighter at head height');
-assert.equal(hitsVertically('high','crouching'),false,
-  'ducking under Y stays possible, even after the sprite resize');
-for(const level of ['mid','low']){
-  assert.equal(hitsVertically(level,'standing'),true);
-  assert.equal(hitsVertically(level,'crouching'),true);
-}
-assert.deepEqual(strikeBand('mid'),{top:-127,height:100},
-  'X attack scales vertically with the torso of the larger fighters');
-assert.deepEqual(strikeBand('low'),{top:-67,height:65},
-  'B attack reaches lower legs but stops at the feet');
+assert.equal(FIGHTER_HURTBOX.evi.standing.top,-210,
+  'Evi upright top follows the actual visible hairline, not the old -222');
+assert.deepEqual(strikeBand('high'),{top:-232,height:140},
+  'existing high strike height/duck timing is unchanged');
+assert.deepEqual(strikeBand('mid'),{top:-127,height:100});
+assert.deepEqual(strikeBand('low'),{top:-67,height:65});
 for (const level of ['high','mid','low']) {
   assert.ok(strikeBand(level).height > 0,
     `${level} hitbox must have positive height`);

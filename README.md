@@ -21,6 +21,15 @@ npm run build
 npm run preview
 ```
 
+## Alpha 1.22.15 · Individual hitboxes calibrated per fighter
+
+- Removed the oversized shared **64 × 220 px** standing rectangle. Each of the four playable fighters now has **its own standing and crouching/rolling hurtbox**, fitted to the character's silhouette rather than decorative hair, weapons, hands or fabric.
+- **Evi's actual six-frame combat art:** standing box **66 × 208 px**, top **-210** instead of **-222** relative to the fighter's foot pivot, so the green debug border no longer floats above her hairstyle. Low stance: **56 × 80 px**.
+- **Runa:** standing **58 × 182 px**, low **54 × 78 px**. **Lyra:** standing **56 × 188 px**, low **52 × 77 px**. **Kai:** standing **52 × 177 px**, low **48 × 75 px**. Runa/Lyra/Kai values are provisional per-character calibration for their current procedural art, ready to be refined when their individual sprite sets arrive.
+- `Fighter.bodyBox()` now passes its own `id` to the single source of truth, `FIGHTER_HURTBOX[id]`. The **green debug rectangle and live combat collision use exactly the same rectangle**.
+- Existing high Y attack band remains **-232…-92**: it reaches every standing fighter's head, but misses every crouching fighter by a positive margin. Mid X, low B, block rules, special hits, movement, damage, collision directions, fighter scale and stage floor are unchanged.
+- Expanded tests cover all four unique profiles, head contact, crouch/roll clearance, ground anchoring and per-fighter collision lookup.
+
 ## Alpha 1.22.14 · Hitboxes follow the enlarged fighter silhouettes
 
 - The green debug rectangles previously started **below the characters' heads**, since both 2D fighters still used the old upright hurtbox of 50 × 142 px and a top of -145 from the feet. The larger Evi and Runa now share a **64 × 220 px** upright hurtbox, reaching from -222 to -2 relative to their foot pivot. Its center stays aligned with the character's feet.
