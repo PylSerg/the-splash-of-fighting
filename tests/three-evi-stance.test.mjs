@@ -69,7 +69,7 @@ assert.doesNotMatch(renderer,/this\.root\.rotation\.y=frame\.face===1\?-\.19/,
   'remove the old near-frontal default orientation');
 for(const fragment of [
   'this.pelvis.rotation.y=stance.pelvisYaw',
-  'this.chest.rotation.y=stance.chestYaw',
+  'this.chest.rotation.y=stance.chestYaw+blade.torsoYaw',
   'this.head.rotation.y=stance.headYaw',
   'this.plantArm(this.leftShoulder,this.leftElbow,this.leftWrist,',
   'this.plantArm(this.rightShoulder,this.rightElbow,this.rightWrist,',
