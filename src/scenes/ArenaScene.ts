@@ -10,7 +10,7 @@ import {
 import { getCharacter } from '../characters/Roster';
 import {
   type TrainingBehavior, shouldRestoreTrainingHealth,
-  trainingCrouchGuard, trainingDuelPick,
+  trainingCrouchGuard, trainingDuelPick, passiveTrainingDefender,
 } from '../combat/TrainingRules';
 import { hitstopSeconds } from '../combat/CombatRhythm';
 import { HIT_LEVEL_NAMES, isBackStrike } from '../combat/HitRules';
@@ -386,6 +386,7 @@ export class ArenaScene extends Phaser.Scene {
     if(!this.training)return;
     this.trainingBehavior=value;
     this.aiCooldown=.20;this.aiCount=0;
+    if(value==='passive')this.player2.becomePassiveTrainingDummy();
     const names:Record<TrainingBehavior,string>={
       passive:'Пасивна',guard:'Блокує',attack:'Атакує',both:'Блокує та атакує',
     };
@@ -902,7 +903,9 @@ export class ArenaScene extends Phaser.Scene {
       return;
     }
     const wasFastAttacking=g.defender.attack?.name==='light';
-    if (defenderInput.block || defenderJust.light || wasFastAttacking) {
+    const passive=passiveTrainingDefender(
+      this.training,this.trainingBehavior,g.defender===this.player2);
+    if (!passive && (defenderInput.block || defenderJust.light || wasFastAttacking)) {
       this.stopGrab(defenderJust.light || wasFastAttacking?'counter':'block');
       return;
     }
