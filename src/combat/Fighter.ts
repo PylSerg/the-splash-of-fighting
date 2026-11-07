@@ -976,6 +976,7 @@ export class Fighter {
     this.knockdownFlightAge=0;
     this.grabRecovery=0;
     this.hitFlash=.18;
+    this.draw(0);
     return hpBefore-this.hp;
   }
 
@@ -1024,6 +1025,7 @@ export class Fighter {
   deflectSimultaneousStrike(spec: AttackSpec, attackerFace: 1 | -1): void {
     this.impactVelocity=attackerFace*spec.push*.43;
     this.blockFlash=Math.max(this.blockFlash,.18);
+    this.draw(0); // Show the guarded impact on the first frozen frame.
   }
 
   receiveHit(
@@ -1066,6 +1068,7 @@ export class Fighter {
     }
     if(this.knockedOut) this.startKnockout(attackerFace);
     this.x=Phaser.Math.Clamp(this.x,STAGE_MIN_X,STAGE_MAX_X);
+    this.draw(0); // Hitstop must freeze the IMPACT pose, not the previous pose.
     return {damage,blocked,interrupted,guardBroken};
   }
 
