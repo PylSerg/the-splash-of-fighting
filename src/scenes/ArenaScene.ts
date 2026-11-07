@@ -783,7 +783,8 @@ export class ArenaScene extends Phaser.Scene {
     // The attacker must start upright. The target must be standing or walking:
     // crouches and jumps evade a grab, even on their first input frame.
     // Horizontal input never excludes a defender who is simply walking.
-    return attacker.blockstun<=0 && !defender.wakeupProtected && !attackerInput.down && !attackerInput.up && !attackerInput.jump &&
+    return attacker.blockstun<=0 && defender.blockstun<=0 &&
+      !defender.wakeupProtected && !attackerInput.down && !attackerInput.up && !attackerInput.jump &&
       !attackerInput.roll && !attacker.crouching && !attacker.knockedOut &&
       attacker.stunned<=0 && defender.stunned<=0 &&
       !attacker.airborne && !attacker.knockedDown && !attacker.isRolling &&
@@ -885,7 +886,7 @@ export class ArenaScene extends Phaser.Scene {
           down:defenderInput.down,up:defenderInput.up,jump:defenderJust.jump,
         });
         if(Math.abs(g.attacker.x-g.defender.x)>GRAB_CATCH_RANGE ||
-           !targetUpright || g.defender.wakeupProtected) {
+           !targetUpright || g.defender.wakeupProtected || g.defender.blockstun>0) {
           // No forced stand-up: crouching/jumping away really avoids capture.
           g.attacker.breakGrab(false);
           this.grapple=null;
