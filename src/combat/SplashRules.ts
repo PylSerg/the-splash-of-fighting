@@ -1,3 +1,5 @@
+import { fullSpecialDamage } from './SpecialRules.ts';
+
 /** Cinematic splash: deliberately independent of normal (damage-based) special energy. */
 export const SPLASH_METER_MAX = 100;
 
@@ -37,10 +39,10 @@ export interface SplashMove {
 }
 /** These are distinct, full-length finishers, not reskinned normal specials. */
 export const SPLASH_MOVES: Record<SplashId, SplashMove> = {
-  evi:  {name:'Танець кришталевого віяла', duration:2.55, damage:43, pulses:7, color:0xf49bc8},
-  runa: {name:'Хвиля Мідного Бастіону', duration:2.90, damage:50, pulses:5, color:0xefac76},
-  lyra: {name:'Полум’яний вихор', duration:2.65, damage:45, pulses:6, color:0xffb165},
-  kai:  {name:'Гроза тисячі іскор', duration:2.35, damage:40, pulses:9, color:0x6ce5f7},
+  evi:  {name:'Танець кришталевого віяла', duration:2.55, damage:fullSpecialDamage('evi')*2, pulses:7, color:0xf49bc8},
+  runa: {name:'Хвиля Мідного Бастіону', duration:2.90, damage:fullSpecialDamage('runa')*2, pulses:5, color:0xefac76},
+  lyra: {name:'Полум’яний вихор', duration:2.65, damage:fullSpecialDamage('lyra')*2, pulses:6, color:0xffb165},
+  kai:  {name:'Гроза тисячі іскор', duration:2.35, damage:fullSpecialDamage('kai')*2, pulses:9, color:0x6ce5f7},
 };
 /** Visual guided projectile position. The last position is EXACTLY the
  * target on any arena width; no range checks or projectile dodge frames.
