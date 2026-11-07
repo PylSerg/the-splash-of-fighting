@@ -34,7 +34,7 @@ assert.equal(SPECIAL_METER_MAX,100);
 for(const [charge,tier] of [
   [0,0],[14.99,0],[15,1],[16,1],[34.999,1],
   [35,2],[36,2],[59.999,2],[60,3],[61,3],[99.999,3],
-  [100,4],[101,4],
+  [100,4],[101,4],[99.999,3],[99.999999999,4],
 ]){
   assert.equal(specialChargeTier(charge),tier,
     charge+' only counts the highest COMPLETELY filled section');
