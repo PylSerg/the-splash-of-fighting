@@ -9,6 +9,10 @@ import {
 } from '../combat/StrikeClashRules';
 import { getCharacter } from '../characters/Roster';
 import {
+  atlasRects,EVI_COMBAT_COLUMNS,EVI_COMBAT_ROWS,
+  EVI_CINEMATIC_COLUMNS,EVI_CINEMATIC_ROWS,
+} from '../combat/EviSpriteStates.ts';
+import {
   type TrainingBehavior, shouldRestoreTrainingHealth,
   trainingCrouchGuard, trainingDuelPick, passiveTrainingDefender,
 } from '../combat/TrainingRules';
@@ -115,6 +119,8 @@ export class ArenaScene extends Phaser.Scene {
   private rightName!: Phaser.GameObjects.Text;
   private extraHalf = 0;
   private readyTime = ROUND_INTRO_TOTAL;
+  /** A two-second fighter introduction runs once, before round one. */
+  private preMatchTime=0;
   private roundTime = 99;
   /** Simulation-wide freeze on contact, excluding any player input. */
   private hitstopTime = 0;
@@ -272,6 +278,37 @@ export class ArenaScene extends Phaser.Scene {
     return { first: this.player1.id, second: this.player2.id, mode: this.mode };
   }
 
+  /** Load a player-provided sprite sheet while preserving combat state.
+   * The sheet is divided into consistent grid frames after image decoding,
+   * so Phaser never assumes that 1448 divides evenly by 7 or 5.
+   */
+  installEviSheet(kind:'combat'|'cinematic',image:HTMLImageElement):void {
+    const key='evi-'+kind;
+    const columns=kind==='combat'?EVI_COMBAT_COLUMNS:EVI_CINEMATIC_COLUMNS;
+    const rows=kind==='combat'?EVI_COMBAT_ROWS:EVI_CINEMATIC_ROWS;
+    if(image.naturalWidth<columns*24||image.naturalHeight<rows*36)
+      throw new Error('Спрайт-лист занадто малий для потрібної сітки.');
+    this.player1?.clearSpriteArt();
+    this.player2?.clearSpriteArt();
+    if(this.textures.exists(key))this.textures.remove(key);
+    const texture=this.textures.addImage(key,image);
+    if(!texture)throw new Error('Не вдалося додати текстуру до Phaser.');
+    for(const part of atlasRects(image.naturalWidth,image.naturalHeight,columns,rows))
+      texture.add(part.name,0,part.x,part.y,part.width,part.height);
+    this.refreshSpriteArt();
+  }
+
+  removeEviSheets():void {
+    this.player1?.clearSpriteArt();this.player2?.clearSpriteArt();
+    for(const key of ['evi-combat','evi-cinematic'])
+      if(this.textures.exists(key))this.textures.remove(key);
+    this.refreshSpriteArt();
+  }
+
+  refreshSpriteArt():void {
+    this.player1?.refreshSpriteArt();this.player2?.refreshSpriteArt();
+  }
+
   setMatchup(first: FighterId, second: FighterId, mode: GameMode, training=false): void {
     if(training && mode!=='cpu')throw new Error('Training requires a CPU dummy.');
     if (first === second) throw new Error('A mirror match is not allowed.');
@@ -421,6 +458,13 @@ export class ArenaScene extends Phaser.Scene {
     this.healthTrail2=makeHealthTrail(this.player2.hp);
     this.prev1=ZERO();this.prev2=ZERO();
     this.readyTime=this.training?0:ROUND_INTRO_TOTAL;
+    this.preMatchTime=!this.training && this.roundsPlayed===0?2:0;
+    if(this.preMatchTime){
+      this.player1.beginCinematic('intro');
+      this.player2.beginCinematic('intro');
+    }else{
+      this.player1.endCinematic();this.player2.endCinematic();
+    }
     this.roundTime=99;this.roundOver=false;
     this.hitstopTime=0;
     this.grapple=null;
@@ -432,7 +476,7 @@ export class ArenaScene extends Phaser.Scene {
     this.roundTransition=0;
     this.aiCooldown=.85;this.aiCount=0;this.frameCount=0;this.accumulator=0;
     this.centerLabel.setText(roundIntroText(this.readyTime,this.roundsPlayed+1) ?? '')
-      .setColor('#fff0c0').setVisible(!this.training);
+      .setColor('#fff0c0').setVisible(!this.training && this.preMatchTime===0);
     this.roundLabel.setText(this.training?'TRAINING ∞':
       'ROUND '+(this.roundsPlayed+1)+' / '+MATCH_MAX_ROUNDS);
     this.paintHud();
@@ -461,6 +505,16 @@ export class ArenaScene extends Phaser.Scene {
 
   private step(dt: number): void {
     this.frameCount++;
+    if(this.preMatchTime>0){
+      this.preMatchTime=Math.max(0,this.preMatchTime-dt);
+      this.player1.advanceCinematic(dt);
+      this.player2.advanceCinematic(dt);
+      if(this.preMatchTime===0){
+        this.player1.endCinematic();this.player2.endCinematic();
+        this.centerLabel.setVisible(true); // Only now announce ROUND / FIGHT.
+      }
+      return; // No movement, hitboxes, AI or timer during introductions.
+    }
     if(this.readyTime>0){
       this.readyTime=Math.max(0,this.readyTime-dt);
       const label=roundIntroText(this.readyTime,this.roundsPlayed+1);
@@ -490,6 +544,11 @@ export class ArenaScene extends Phaser.Scene {
     }
     if(this.roundOver) {
       this.advanceFallenFighters(dt);
+      if(this.matchWinner!==null){
+        // Allow a complete 2s winner flourish and then keep its final pose.
+        const winner=this.matchWinner===0?this.player1:this.player2;
+        winner.advanceCinematic(dt);
+      }
       if(this.matchWinner===null){
         this.roundTransition=Math.max(0,this.roundTransition-dt);
         if(this.roundTransition===0 && this.player1.knockdownPhase!=='flying' &&
@@ -1506,6 +1565,7 @@ export class ArenaScene extends Phaser.Scene {
       const loser=winnerIndex===0?this.player2:this.player1;
       // On timeout, a standing loser must visibly fall before the next round.
       if(!loser.knockedDown)loser.startDefeatFall(victor.face);
+      if(this.matchWinner!==null)victor.beginCinematic('victory');
     }
     const label=winnerIndex===null?'DRAW!':this.matchWinner!==null
       ?getCharacter((this.matchWinner===0?this.player1:this.player2).id).name+' CHAMPION!'

@@ -6,6 +6,7 @@ import { blockedGrabRecoil } from './GrabRules';
 import { earnSpecialMeter, MAX_HEALTH } from './CombatFeedback';
 import { scaleDamage } from './CombatScale.ts';
 import { canLaunchSpecial, specialDamageAt, spendSpecialCharge } from './SpecialRules.ts';
+import { frameForEvi, EVI_CINEMATIC_SECONDS } from './EviSpriteStates.ts';
 import { earnSplashEnergy, SPLASH_METER_MAX, SPLASH_INPUT_GRACE, splashFacing } from './SplashRules';
 import {
   FIGHTER_STYLES, ATTACK_ACTIVE, WAKEUP_PROTECTION,
@@ -101,6 +102,10 @@ export class Fighter {
   blocking = false;
   crouching = false;
   walking = false;
+  private movingForward = true;
+  /** The 2s opening/closing display is purely visual and never changes hitboxes. */
+  private cinematic: {kind:'intro'|'victory';elapsed:number}|null=null;
+  private pixelSprite?: Phaser.GameObjects.Image;
   attack: ActiveAttack | null = null;
   // Two-stage throw animations are controlled by the arena's grapple state.
   grabPose: 'reach' | 'hold' | 'held' | 'throw' | null = null;
@@ -145,7 +150,7 @@ export class Fighter {
   private hair: Phaser.GameObjects.Graphics;
   private weapon: Phaser.GameObjects.Graphics;
 
-  constructor(scene: Phaser.Scene, id: FighterId, initialX: number, face: 1 | -1) {
+  constructor(private readonly scene: Phaser.Scene, id: FighterId, initialX: number, face: 1 | -1) {
     this.id = id;
     this.x = initialX;
     this.face = face;
@@ -296,6 +301,51 @@ export class Fighter {
       this.guardAura,this.cape,this.backArm,this.leftLeg,this.rightLeg,
       this.body,this.weapon,this.frontArm,this.hair,this.head
     ]);
+    this.refreshSpriteArt();
+    this.draw(0);
+  }
+
+  /** Dynamic local sprite import can happen while the battle is paused.
+   * Other fighters, or Evi before her art is supplied, retain vector rigs.
+   */
+  clearSpriteArt():void {
+    this.pixelSprite?.destroy();this.pixelSprite=undefined;
+    for(const element of [
+      this.cape,this.backArm,this.leftLeg,this.rightLeg,this.body,
+      this.weapon,this.frontArm,this.hair,this.head,
+    ])element.setVisible(true);
+  }
+  refreshSpriteArt():void {
+    this.clearSpriteArt();
+    const graphics=[
+      this.cape,this.backArm,this.leftLeg,this.rightLeg,this.body,
+      this.weapon,this.frontArm,this.hair,this.head,
+    ];
+    const ready=this.id==='evi' && this.scene.textures.exists('evi-combat');
+    for(const visual of graphics)visual.setVisible(!ready);
+    if(ready){
+      this.pixelSprite=this.scene.add.image(0,0,'evi-combat','f0')
+        .setOrigin(.5,1).setDisplaySize(125,195);
+      this.pixelSprite.setPosition(0,10);
+      this.rig.add(this.pixelSprite);
+    }
+    this.draw(0);
+  }
+
+  beginCinematic(kind:'intro'|'victory'):void {
+    this.cinematic={kind,elapsed:0};
+    this.attack=null;
+    this.walking=false;this.blocking=false;this.crouching=false;
+    this.draw(0);
+  }
+  advanceCinematic(dt:number):void {
+    if(!this.cinematic)return;
+    this.cinematic.elapsed=Math.min(EVI_CINEMATIC_SECONDS,
+      this.cinematic.elapsed+Math.max(0,dt));
+    this.draw(dt);
+  }
+  endCinematic():void {
+    this.cinematic=null;
     this.draw(0);
   }
 
@@ -590,6 +640,7 @@ export class Fighter {
     this.yOffset=0; this.vy=0; this.stunned=0; this.blockstun=0;
     this.wakeupGrace=0; this.blocking=false;
     this.crouching=false; this.walking=false; this.attack=null;
+    this.cinematic=null;
     this.hitFlash=0; this.blockFlash=0; this.impactVelocity=0; this.time=0;
     this.queuedSolo=null; this.queuedSpecial=0;
     this.clearCombo();this.comboRecovery=0;this.duelWhiffRecovery=0;
@@ -865,6 +916,7 @@ export class Fighter {
     const moveSpeed=baseMoveSpeed*(this.blocking?style.guardingMovement:
       this.attack?style.attackingMovement:style.movement);
     this.walking = move!==0 && !this.airborne;
+    this.movingForward=move*this.face>=0;
     this.x += move*moveSpeed*dt;
     this.x = Phaser.Math.Clamp(this.x,STAGE_MIN_X,STAGE_MAX_X);
     this.advanceGravity(dt);
@@ -1167,6 +1219,30 @@ export class Fighter {
   }
 
   private draw(_dt: number): void {
+    if(this.pixelSprite){
+      const chosen=frameForEvi({
+        cinematic:this.cinematic,
+        splash:this.splashPose,
+        attack:this.attack&&{
+          name:this.attack.name,elapsed:this.attack.elapsed,
+          startup:this.attack.spec.duration,
+        },
+        grab:this.grabPose,
+        knockdown:this.knockdownPhase,
+        rolling:this.isRolling,airborne:this.airborne,
+        blocking:this.blocking,crouching:this.crouching,
+        stunned:this.stunned>0,walking:this.walking,
+        movingForward:this.movingForward,time:this.time,
+      });
+      const kind=chosen.sheet==='cinematic' && this.scene.textures.exists('evi-cinematic')
+        ?'evi-cinematic':'evi-combat';
+      const frame=kind==='evi-combat' && chosen.sheet==='cinematic'
+        ?(this.cinematic?.kind==='victory'?20:0):chosen.frame;
+      this.pixelSprite.setTexture(kind,'f'+frame);
+      this.pixelSprite.setTint(this.hitFlash>0?0xffcad8:0xffffff);
+      this.pixelSprite.setAlpha(this.knockedOut?0.76:1);
+      this.pixelSprite.setPosition(0,10);
+    }
     const motion=this.walking?Math.sin(this.time*15):Math.sin(this.time*2.5)*.11;
     const swing=this.walking?Math.sin(this.time*15)*.30:0;
     this.leftLeg.rotation=swing;
@@ -1274,6 +1350,17 @@ export class Fighter {
       }
     }
     if(this.stunned>0 && !this.splashPose) this.frontArm.rotation=-.5;
+    if(this.cinematic && !this.pixelSprite) {
+      // Temporary entrance and victory movement for fighters with no
+      // hand-drawn sprite art yet; this never modifies their hitboxes.
+      const p=Math.min(1,this.cinematic.elapsed/EVI_CINEMATIC_SECONDS);
+      const flourish=Math.sin(p*Math.PI);
+      this.frontArm.rotation=-1.1-flourish*.7;
+      this.backArm.rotation=-.35-flourish*.5;
+      this.weapon.rotation=-1.1-flourish*2.3;
+      this.body.y=-5*flourish;
+      this.head.y=this.body.y;this.hair.y=this.body.y;
+    }
     if (this.knockedDown) {
       this.leftLeg.rotation=-.45;
       this.rightLeg.rotation=.5;
@@ -1297,7 +1384,8 @@ export class Fighter {
       this.body.y=-9;
     }
     if (this.isRolling) {
-      // Procedural low somersault: until pixel-art roll frames arrive,
+      // Temporary rolling pose: rotate the sprite sheet's sweep frame
+      // until dedicated roll animation keyframes are drawn.
       // rotate the rig around the torso, not its feet. The adjusted pivot
       // keeps the fighter visually on the ground during a full turn.
       const progress = this.rollElapsed / ROLL_DURATION;
@@ -1332,7 +1420,9 @@ export class Fighter {
     }
     this.rig.setPosition(this.x,GROUND_Y+this.yOffset);
     this.rig.setScale(this.face,1);
-    this.rig.setRotation(this.face*fallAngle);
+    // Pixel-art fallen and prone poses are already horizontal. Rotating
+    // them again would flip the sprite upright and corrupt the silhouette.
+    this.rig.setRotation(this.pixelSprite?0:this.face*fallAngle);
     // A separate world-space shadow stays flat underneath the trajectory.
     this.shadow.setPosition(this.x,GROUND_Y+5);
     this.rig.alpha=this.knockedOut ? .65 : 1;

@@ -817,3 +817,40 @@ body { min-height:0; }
   .combo-guide-move{grid-template-columns:minmax(100px,38%) 1fr;padding:5px;gap:5px}
   .combo-guide-players .pill{font-size:12px;padding:5px 7px}
 }
+
+/* Alpha 1.20.0: import the existing Evi sprite drawings without touching
+   hitbox geometry. The first pass keeps image selection device-local. */
+.sprite-import-panel{
+  margin:clamp(9px,2dvh,15px) auto 0;
+  width:min(760px,100%);border:1px solid #89cde09b;border-radius:13px;
+  background:linear-gradient(115deg,#243553ab,#3828479b);
+  padding:clamp(10px,2dvh,16px);
+}
+.sprite-import-panel h3{
+  margin:0 0 6px;color:#fbd9ee;
+  font:800 clamp(16px,3vmin,22px)/1.1 Rajdhani,system-ui,sans-serif;
+}
+.sprite-import-panel p{
+  font:500 clamp(11px,1.8vmin,13px)/1.4 Inter,system-ui,sans-serif;
+  color:#d7e2f6;margin:6px 0;
+}
+.sprite-import-actions{
+  display:flex;flex-wrap:wrap;align-items:stretch;gap:8px;margin:11px 0;
+}
+.sprite-import-button{
+  cursor:pointer;display:grid;place-items:center;text-align:center;
+  padding:9px 13px;min-height:40px;touch-action:manipulation;
+  border:1px solid #b4d9e2a6;border-radius:9px;
+  background:linear-gradient(120deg,#29596d,#554372);
+  color:#fbf4ff;font:800 clamp(12px,2.2vmin,16px)/1.15 Rajdhani,sans-serif;
+}
+.sprite-import-button:hover,
+.sprite-import-button:focus-within{border-color:white;filter:brightness(1.15)}
+.sprite-import-button input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.sprite-import-actions .pill{font-size:clamp(11px,2vmin,14px);white-space:normal}
+#evi-sprite-status{color:#abebde;font-weight:700;margin-bottom:0}
+@media(orientation:landscape) and (max-height:370px){
+  .sprite-import-panel{margin-top:6px;padding:7px}
+  .sprite-import-button{min-height:32px;padding:5px 9px}
+  .sprite-import-panel p{margin:4px 0}
+}
