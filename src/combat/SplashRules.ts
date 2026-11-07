@@ -1,6 +1,12 @@
 /** Cinematic splash: deliberately independent of normal (damage-based) special energy. */
 export const SPLASH_METER_MAX = 100;
 export const SPLASH_WINDUP = 0.5;
+/** A damaging counterstrike or another SPLASH can stop the ability only
+ * before the half-second preparation has finished.
+ */
+export function splashWindupActive(elapsed:number):boolean {
+  return elapsed>=0 && elapsed<SPLASH_WINDUP;
+}
 export const SPLASH_COMBO_COMPLETE_GAIN = 24;
 export const SPLASH_DUEL_WIN_GAIN = 26;
 
