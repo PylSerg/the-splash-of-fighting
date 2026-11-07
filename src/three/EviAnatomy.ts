@@ -22,7 +22,7 @@ export const EVI_FOOT_REST_HEIGHT=.080;
 export const EVI_HIP_ROOT_HEIGHT=.97;
 export const EVI_WALK_CYCLE=14.5;
 
-const finite=(n:number)=>Number.isFinite(n)?n:0;
+const finite=(n:number|undefined):number=>typeof n==='number'&&Number.isFinite(n)?n:0;
 const sub=(a:Vec3,b:Vec3):Vec3=>({x:a.x-b.x,y:a.y-b.y,z:a.z-b.z});
 const add=(a:Vec3,b:Vec3):Vec3=>({x:a.x+b.x,y:a.y+b.y,z:a.z+b.z});
 const times=(v:Vec3,s:number):Vec3=>({x:v.x*s,y:v.y*s,z:v.z*s});
