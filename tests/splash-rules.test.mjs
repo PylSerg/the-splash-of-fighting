@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
 import {SPLASH_METER_MAX,SPLASH_WINDUP,SPLASH_MOVES,
   earnSplashEnergy,comboSplashBonus,splashChord,canSplashGuard,
-  SPLASH_DUEL_WIN_GAIN,guidedSplashPosition,splashWindupActive} from '../src/combat/SplashRules.ts';
+  SPLASH_DUEL_WIN_GAIN,guidedSplashPosition,splashWindupActive,splashFacing} from '../src/combat/SplashRules.ts';
 assert.equal(SPLASH_WINDUP,0.5);
+assert.equal(splashFacing(300,400,-1),1,'turn right toward an opponent during splash');
+assert.equal(splashFacing(400,300,1),-1,'turn left toward an opponent during splash');
+assert.equal(splashFacing(300,300,-1),-1,'overlapping fighters retain previous facing');
+assert.equal(splashFacing(300,300,1),1,'overlapping fighters retain prior right facing');
 assert.equal(splashWindupActive(0),true);
 assert.equal(splashWindupActive(.49),true,'counter can interrupt until last windup frame');
 assert.equal(splashWindupActive(.5),false,'no interruption after the first half-second');

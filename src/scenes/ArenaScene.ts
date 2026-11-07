@@ -587,6 +587,9 @@ export class ArenaScene extends Phaser.Scene {
         return;
       }
       defender.step(dt,defensiveInput,just,attacker.x);
+      // Even a fighter holding ↓+A auto-faces the caster during SPLASH.
+      // Outside SPLASH, normal guard direction remains locked.
+      defender.faceOpponentDuringSplash(attacker.x);
       // Ordinary attacks and specials can ALSO break the windup, but only
       // after a genuine collision that removes HP. This is not a free cancel.
       const pendingHit=defender.getActiveStrike();

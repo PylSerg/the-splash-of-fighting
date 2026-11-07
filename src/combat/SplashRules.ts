@@ -1,5 +1,14 @@
 /** Cinematic splash: deliberately independent of normal (damage-based) special energy. */
 export const SPLASH_METER_MAX = 100;
+
+/** During any SPLASH, both fighters turn toward the other regardless of
+ * normal guard-facing lock. If they share the same X, preserve orientation.
+ */
+export function splashFacing(
+  ownX:number, opponentX:number, current:1|-1,
+):1|-1 {
+  return opponentX===ownX ? current : opponentX>ownX ? 1 : -1;
+}
 export const SPLASH_WINDUP = 0.5;
 /** A damaging counterstrike or another SPLASH can stop the ability only
  * before the half-second preparation has finished.
