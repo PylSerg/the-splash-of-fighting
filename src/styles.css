@@ -726,3 +726,49 @@ body { min-height:0; }
   .confirm-panel p{margin-bottom:9px;font-size:12px}
   .confirm-actions button{min-height:43px;padding:6px}
 }
+
+/* Alpha 1.16: practice is a distinct front-screen action. */
+.home-buttons button.home-training{
+  background:linear-gradient(115deg,#27635f,#28596c 55%,#554779);
+  color:#e4fff6;border-color:#86dcc8;
+  box-shadow:0 5px 23px #0519219c,inset 0 1px #ffffff46;
+}
+
+/* Four exclusive dummy modes, visible ONLY for a paused training session. */
+.training-ai-settings{
+  margin-top:clamp(11px,2dvh,17px);padding:clamp(9px,1.8vmin,13px);
+  border:1px solid #7ecfb984;border-radius:14px;
+  background:linear-gradient(130deg,#163b4170,#302b517d);
+}
+.training-ai-settings[hidden]{display:none!important}
+.training-ai-heading{
+  font:800 clamp(16px,2.8vmin,21px)/1.1 Rajdhani,sans-serif;
+  color:#d6fff1;letter-spacing:.4px;
+}
+.training-ai-settings p{
+  margin:5px 0 9px;color:#c7dce4;
+  font:500 clamp(11px,1.8vmin,13px)/1.3 Inter,system-ui,sans-serif;
+}
+.training-ai-choices{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;
+}
+.training-ai-choices .pill{
+  min-width:0;min-height:clamp(42px,8dvh,52px);
+  padding:7px 10px;border-radius:11px;
+  font:700 clamp(13px,2.35vmin,17px)/1.2 Rajdhani,sans-serif;
+}
+.training-ai-choices .pill.selected{
+  border-color:#abffde;background:#256f68;color:#fff;
+  box-shadow:0 0 0 1px #8aebd395,0 0 15px #60d9bd36;
+}
+@media (orientation:landscape) and (max-height:430px){
+  .home-buttons{gap:clamp(5px,1.4dvh,9px)}
+  .home-buttons button{min-height:clamp(38px,9.4dvh,44px);padding:5px 12px}
+  .training-ai-settings{margin-top:8px;padding:8px}
+  .training-ai-choices{gap:6px}
+  .training-ai-choices .pill{min-height:35px;padding:5px;font-size:13px}
+}
+@media (orientation:landscape) and (max-height:295px){
+  .home-buttons{gap:4px}
+  .home-buttons button{min-height:29px;padding:3px 10px;font-size:clamp(14px,5dvh,18px)}
+}
