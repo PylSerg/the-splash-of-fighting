@@ -41,7 +41,7 @@ for(const n of [0,.1,.5,.9,1]){
   assert.ok(legacy.scaleY>=.57 && legacy.scaleY<=1);
 }
 assert.equal(legacyFallVisual(0).scaleY,1);
-assert.equal(legacyFallVisual(1).scaleY,.57);
+assert.ok(Math.abs(legacyFallVisual(1).scaleY-.57)<1e-9);
 
 const fighter=readFileSync(new URL('../src/combat/Fighter.ts',import.meta.url),'utf8');
 const puppet=readFileSync(new URL('../src/combat/EviPixelPuppet.ts',import.meta.url),'utf8');
