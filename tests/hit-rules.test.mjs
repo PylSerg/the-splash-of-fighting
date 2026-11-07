@@ -24,6 +24,10 @@ function hitsVertically(level, stance) {
   return band.top < hurt.bottom && band.top + band.height > hurt.top;
 }
 assert.equal(hitsVertically('high','standing'), true);
+assert.ok(strikeBand('high').top<=-185,
+  'the high strike extends to the head of the visible 3D fighter');
+assert.equal(strikeBand('high').top+strikeBand('high').height,-81,
+  'raising the upper strike must NOT make it hit a crouching fighter');
 assert.equal(hitsVertically('high','crouching'), false);
 for (const level of ['mid','low']) {
   assert.equal(hitsVertically(level,'standing'), true);
