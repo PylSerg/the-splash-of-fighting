@@ -22,7 +22,7 @@ export const FIGHTER_STYLES: Readonly<Record<FighterId,FighterStyle>> = {
   evi: {
     movement:1.14, attackingMovement:1.08, guardingMovement:1.04,
     startup:{light:.84,kick:.90,heavy:.91,crouchMid:.88},
-    reach:{light:1.02,kick:1.04},
+    reach:{light:1.02,kick:1.04,heavy:1.08,duel:1.08},
     recovery:.09, comboWindow:.92,
     rollDistance:1.04, rollCooldown:.94,
   },

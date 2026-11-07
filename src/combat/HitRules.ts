@@ -58,12 +58,13 @@ export function stopsHit(guard: GuardStance, attack: HitLevel): boolean {
 }
 
 /** Relative to the character's feet (negative means above ground).
- * Grounded crouching hurtboxes reach from -73 to -1. A high attack ends
- * at -81, so it passes OVER a crouched fighter even without blocking.
+ * High fan/weapon cuts include the head silhouette, not just the upper
+ * torso. Their lower edge remains at -81, so a crouching fighter (-73
+ * to -1) can still duck cleanly beneath the swing.
  */
 export function strikeBand(level: HitLevel): { top: number; height: number } {
   switch (level) {
-    case 'high': return { top: -151, height: 70 }; // bottom -81
+    case 'high': return { top: -190, height: 109 }; // bottom -81, covers head
     case 'mid':  return { top: -113, height: 87 }; // bottom -26
     case 'low':  return { top: -60, height: 58 };  // bottom -2
   }

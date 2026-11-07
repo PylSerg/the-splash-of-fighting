@@ -79,7 +79,7 @@ for(const fragment of [
   'this.plantLeg(this.rightHip,this.rightKnee,this.rightFoot,',
   'this.leftFoot.rotation.set(0,stance.rearFootYaw,0)',
   'this.rightFoot.rotation.set(0,stance.leadFootYaw,0)',
-  "this.fan.rotation.set(.16,stance.fanYaw,.06,'XYZ')",
+  "this.fan.rotation.set(.16,stance.fanYaw+blade.yaw,.06+blade.roll,'XYZ')",
 ]){
   assert.ok(renderer.includes(fragment),
     'real 3D meshes must adopt independent combat pose: '+fragment);

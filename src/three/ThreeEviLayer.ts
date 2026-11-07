@@ -4,7 +4,7 @@ import {eviSlashGlow} from '../combat/EviFanSlash.ts';
 import {threeGroundedRoll,screenToThree,threeViewDimensions,THREE_ROLL_PIVOT} from './ThreeFighterRules.ts';
 import {threeEviStance} from './ThreeEviStance.ts';
 import {
-  eviHandTargets,blendEviHands,solveEviArm,
+  eviHandTargets,blendEviHands,solveEviArm,eviFanSwingAngles,
   type HandTargets,
 } from './EviArmMotion.ts';
 import {
@@ -472,9 +472,11 @@ class EviThreeCharacter{
       this.rightFoot.rotation.set(0,stance.leadFootYaw,0);
     }
 
-    // The right wrist is counter-rotated by IK; aim the opened fan toward
-    // the rival, not back into Evi or into her other hand.
-    this.fan.rotation.set(.16,stance.fanYaw,.06,'XYZ');
+    // Preserve the anatomical right-hand attachment, but rotate the
+    // OPEN blade through the cutting arc. Constant forward yaw made the
+    // old motion look like repeated spear thrusts rather than fan slashes.
+    const blade=eviFanSwingAngles(input);
+    this.fan.rotation.set(.16,stance.fanYaw+blade.yaw,.06+blade.roll,'XYZ');
     this.fan.scale.setScalar(.94+.1*p.fanScale);
     for(let i=0;i<this.hem.length;i++){
       const mesh=this.hem[i];

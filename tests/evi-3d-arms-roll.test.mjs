@@ -3,7 +3,7 @@ import {readFileSync} from 'node:fs';
 import {eviPoseFor,neutralEviPose} from '../src/combat/EviRigMotion.ts';
 import {threeGroundedRoll,THREE_ROLL_PIVOT} from '../src/three/ThreeFighterRules.ts';
 import {
-  eviHandTargets,blendEviHands,solveEviArm,
+  eviHandTargets,blendEviHands,solveEviArm,eviFanSwingAngles,
   EVI_UPPER_ARM_LENGTH,EVI_FOREARM_LENGTH,EVI_RIGHT_WRIST,
 } from '../src/three/EviArmMotion.ts';
 
@@ -60,10 +60,28 @@ const strike=eviHandTargets({name:'heavy',time:.42,elapsed:.42,startup:.42,durat
   neutralEviPose());
 const windup=eviHandTargets({name:'heavy',time:.25,elapsed:.25,startup:.42,duration:.9},
   neutralEviPose());
-assert.ok(strike.right.z>windup.right.z+.60,
-  'right wrist cuts horizontally forward after the windup');
-assert.ok(Math.abs(strike.right.y-windup.right.y)<.05,
-  'fan sweep stays close to one horizontal plane');
+assert.ok(strike.right.x>windup.right.x+.60,
+  'right wrist sweeps SIDEWAYS across the rival, not a forward poke');
+assert.ok(strike.right.z-windup.right.z<.35,
+  'the blade swing uses only shallow depth instead of a spear thrust');
+assert.ok(strike.right.y>.58,
+  'the high Y fan cut rises to the head lane');
+assert.ok(Math.abs(strike.right.y-windup.right.y)<.10,
+  'high slash tracks a consistent near-horizontal hand plane');
+const lowCut=eviHandTargets({name:'crouchMid',time:.42,elapsed:.42,
+  startup:.42,duration:.9},neutralEviPose());
+assert.ok(lowCut.right.y<.30,
+  'crouching fan attack must stay below the head');
+const slashWindup=eviFanSwingAngles({name:'heavy',time:.28,elapsed:.28,
+  startup:.42,duration:.65});
+const slashImpact=eviFanSwingAngles({name:'heavy',time:.42,elapsed:.42,
+  startup:.42,duration:.65});
+assert.ok(slashWindup.yaw<0 && slashImpact.yaw>0,
+  'fan turns across the opponent during a slash');
+assert.ok(slashWindup.roll<0 && slashImpact.roll>0,
+  'opened blade slices through an arc instead of pointing steadily forward');
+assert.deepEqual(eviFanSwingAngles(idle),{yaw:0,roll:0},
+  'fan stays stable in the idle guard');
 const tucked=eviHandTargets({name:'roll',time:.23,progress:.5},neutralEviPose());
 assert.ok(tucked.right.x>0 && tucked.left.x<0,
   'during the roll each hand keeps its anatomical shoulder');
