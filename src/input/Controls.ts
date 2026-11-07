@@ -65,6 +65,7 @@ export class Controls {
   private buttons = new Map<Action, HTMLButtonElement>();
   /** One-tap splash works reliably on phones, with no three-finger chord. */
   private splashButton: HTMLButtonElement | null = null;
+  private splashReady=false;
   // One-finger duel swipe: drag a held B (kick) onto Y (heavy), or the reverse.
   // The gesture remains active for the pointer lifetime, like a two-button chord.
   private comboSwipePointers = new Set<number>();
@@ -276,6 +277,8 @@ export class Controls {
 
   setSplashReady(ready:boolean):void {
     if(!this.splashButton)return;
+    if(ready===this.splashReady && this.splashButton.disabled===!ready)return;
+    this.splashReady=ready;
     this.splashButton.disabled=!ready;
     this.splashButton.classList.toggle('is-ready',ready);
     this.splashButton.setAttribute('aria-label',ready
