@@ -366,6 +366,7 @@ export class ArenaScene extends Phaser.Scene {
     return {
       fighters:[this.player1.getThreeSnapshot(),this.player2.getThreeSnapshot()],
       logicalWidth:this.scale?.width??960,
+      frozen:this.hitstopTime>0,
     };
   }
 
