@@ -220,6 +220,14 @@ export class CharacterSelector {
     if(this.isOpen)this.startIdle();
   }
 
+  clearEviIdle():void{
+    this.stopIdle();
+    this.idleUrls.forEach(url=>URL.revokeObjectURL(url));
+    this.idleUrls=[];
+    this.idleFrame=0;
+    this.renderIdleFrame();
+  }
+
   private renderIdleFrame():void{
     for(const img of this.root.querySelectorAll<HTMLImageElement>('.evi-idle-sprite')){
       const hasFrames=this.idleUrls.length>0;
