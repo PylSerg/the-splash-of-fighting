@@ -4,6 +4,7 @@ import { stopsHit, strikeBand, strikeDamage, canAutoTurn, STANDING_ATTACK_LANES,
 import { crouchMoveForPress } from './CrouchRules';
 import { blockedGrabRecoil } from './GrabRules';
 import { earnSpecialMeter, MAX_HEALTH } from './CombatFeedback';
+import { scaleDamage } from './CombatScale.ts';
 import { canLaunchSpecial, specialDamageAt, spendSpecialCharge } from './SpecialRules.ts';
 import { earnSplashEnergy, SPLASH_METER_MAX, SPLASH_INPUT_GRACE, splashFacing } from './SplashRules';
 import {
@@ -58,15 +59,15 @@ const ROLL_COOLDOWN = .88;
 const ROLL_IFRAME_START = .095;
 const ROLL_IFRAME_END = .31;
 export const ATTACKS: Record<AttackName, AttackSpec> = {
-  light: { duration: .27, reach: 92, damage: 5, level: STANDING_ATTACK_LANES.light, stun: .18, push: 110, gain: 7 },
-  heavy: { duration: .48, reach: 116, damage: 11, level: STANDING_ATTACK_LANES.heavy, stun: .32, push: 185, gain: 12 },
-  kick: { duration: .40, reach: 135, damage: 9, level: STANDING_ATTACK_LANES.kick, stun: .27, push: 150, gain: 10 },
+  light: { duration: .27, reach: 92, damage: scaleDamage(5), level: STANDING_ATTACK_LANES.light, stun: .18, push: 110, gain: 7 },
+  heavy: { duration: .48, reach: 116, damage: scaleDamage(11), level: STANDING_ATTACK_LANES.heavy, stun: .32, push: 185, gain: 12 },
+  kick: { duration: .40, reach: 135, damage: scaleDamage(9), level: STANDING_ATTACK_LANES.kick, stun: .27, push: 150, gain: 10 },
   // Supers keep their own damage but behave as a mid-level strike defensively.
-  special: { duration: .82, reach: 205, damage: 13, level: 'mid', stun: .40, push: 290, gain: 0 },
+  special: { duration: .82, reach: 205, damage: scaleDamage(13), level: 'mid', stun: .40, push: 290, gain: 0 },
   // Crouching B: low trip. Knockdown triggers ONLY on an unblocked hit.
-  sweep: { duration: .47, reach: 114, damage: 5, level: 'low', stun: .12, push: 78, gain: 8 },
+  sweep: { duration: .47, reach: 114, damage: scaleDamage(5), level: 'low', stun: .12, push: 78, gain: 8 },
   // Crouching X: short-range, weak mid jab. Strong high Y is unavailable.
-  crouchMid: { duration: .30, reach: 99, damage: 4, level: 'mid', stun: .15, push: 78, gain: 6 },
+  crouchMid: { duration: .30, reach: 99, damage: scaleDamage(4), level: 'mid', stun: .15, push: 78, gain: 6 },
   // A Y-shaped, zero-damage, unblockable challenge swing.
   duel: { duration: .43, reach: 116, damage: 0, level: 'high', stun: 0, push: 0, gain: 0 },
 };
@@ -74,11 +75,11 @@ export const ATTACKS: Record<AttackName, AttackSpec> = {
 /** Runa: slower and stronger, but her attacks can still be interrupted. */
 const RUNA_ATTACKS: Record<AttackName,AttackSpec> = {
   light: ATTACKS.light,
-  heavy: { ...ATTACKS.heavy, duration: .56, reach: 114, damage: 14, stun: .36, push: 225 },
+  heavy: { ...ATTACKS.heavy, duration: .56, reach: 114, damage: scaleDamage(14), stun: .36, push: 225 },
   kick: ATTACKS.kick,
-  special: { ...ATTACKS.special, duration: .94, reach: 195, damage: 16, stun: .44, push: 335 },
-  sweep: { ...ATTACKS.sweep, duration: .52, reach: 121, damage: 6 },
-  crouchMid: { ...ATTACKS.crouchMid, duration: .34, damage: 5 },
+  special: { ...ATTACKS.special, duration: .94, reach: 195, damage: scaleDamage(16), stun: .44, push: 335 },
+  sweep: { ...ATTACKS.sweep, duration: .52, reach: 121, damage: scaleDamage(6) },
+  crouchMid: { ...ATTACKS.crouchMid, duration: .34, damage: scaleDamage(5) },
   duel: { ...ATTACKS.duel, duration: .50, reach: 114 },
 };
 
@@ -976,7 +977,7 @@ export class Fighter {
     this.stunned=Math.max(this.stunned, counterPunch ? .25 : .12);
     this.blocking=false;
     if(counterPunch) {
-      this.hp=Math.max(0,this.hp-3);
+      this.hp=Math.max(0,this.hp-scaleDamage(3));
       this.hitFlash=.18;
       if(this.knockedOut) this.startKnockout(this.face===1 ? -1 : 1);
     }
@@ -1048,7 +1049,7 @@ export class Fighter {
   }
 
   /** A successful grappler throw should be rewarding, but still escapable. */
-  get throwDamage(): number { return this.id === 'runa' ? 21 : 16; }
+  get throwDamage(): number { return scaleDamage(this.id === 'runa' ? 21 : 16); }
 
   getActiveStrike(): ActiveAttack | null {
     const a=this.attack;

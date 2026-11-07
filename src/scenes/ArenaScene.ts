@@ -21,6 +21,7 @@ import {
 } from '../combat/CombatFeedback';
 import { canBeGrabbed } from '../combat/GrabRules';
 import { SPECIAL_MIN_CHARGE, SPECIAL_CHARGE_MARKS } from '../combat/SpecialRules.ts';
+import { scaleDamage } from '../combat/CombatScale.ts';
 import {
   DUEL_DURATION, DUEL_RESULT_ANIMATION, DUEL_GUARD_STUN,
   DUEL_TIE_PUSH, DUEL_GUARD_PUSH,
@@ -28,7 +29,7 @@ import {
 } from '../combat/DuelRules';
 import { getStage, type StageId } from '../stages/Stages';
 import { SPLASH_WINDUP, SPLASH_MOVES, SPLASH_DUEL_WIN_GAIN,
-  comboSplashBonus, canSplashGuard, guidedSplashPosition, splashWindupActive } from '../combat/SplashRules';
+  comboSplashBonus, specialSplashBonus, canSplashGuard, guidedSplashPosition, splashWindupActive } from '../combat/SplashRules';
 import { awardRound, winnerByRemainingHealth, MATCH_MAX_ROUNDS, ROUND_INTRO_TOTAL, roundIntroText } from '../combat/MatchRules';
 
 type GameMode = 'cpu' | 'versus';
@@ -286,7 +287,7 @@ export class ArenaScene extends Phaser.Scene {
     this.rightName.setText(getCharacter(second).name);
     this.restartMatch();
     this.onStatus(training
-      ? 'ТРЕНУВАННЯ: обидва бійці автоматично відновлюють 200 HP. Поведінку суперника можна змінити в меню бою.'
+      ? 'ТРЕНУВАННЯ: обидва бійці автоматично відновлюють '+MAX_HEALTH+' HP. Поведінку суперника можна змінити в меню бою.'
       :mode==='cpu'
         ? getCharacter(first).name+' проти '+getCharacter(second).name+' (CPU)!'
         : getCharacter(first).name+' проти '+getCharacter(second).name+' (PvP)!');
@@ -870,7 +871,7 @@ export class ArenaScene extends Phaser.Scene {
     this.combatNotice(label,(grapple.attacker.x+grapple.defender.x)/2,260,
       reason==='counter'?0xffd1a4:0x9cf3eb);
     const status:Record<typeof reason,string>={
-      counter:'Захват перервано швидким ударом X! Атакувальний втрачає 3 HP.',
+      counter:'Захват перервано швидким ударом X! Атакувальний втрачає '+scaleDamage(3)+' HP.',
       block:'БЛОК ЗАХВАТУ! Суперник відштовхує атакувального на кілька кроків назад.',
       interrupted:'Захват перервано ударом суперника.',
       released:'Захват відпущено: для кидка треба продовжувати тримати A+X (або L1).',
@@ -1190,7 +1191,7 @@ export class ArenaScene extends Phaser.Scene {
       this.combatNotice('HP REFILL!',this.player2.x,GROUND_Y-190,0x8cf4c0);
     }
     if(healed.length)this.onStatus('ТРЕНУВАННЯ: '+
-      healed.join(' і ')+' відновлює 200 HP. Тренування триває!');
+      healed.join(' і ')+' відновлює '+MAX_HEALTH+' HP. Тренування триває!');
   }
 
   /** The normal CPU stays unchanged in arcade mode. Practice exposes four
@@ -1429,8 +1430,14 @@ export class ArenaScene extends Phaser.Scene {
       target.receiveSweep(attacker.face);
       this.combatNotice('SWEEP!',target.x,GROUND_Y-143,0xffd596);
     }
-    attacker.rewardDamage(hit.damage);
-    attacker.gainSplash(comboSplashBonus(comboHits));
+    if(strike.name==='special'){
+      // A special NEVER refills its own ordinary meter. Its successful
+      // damage instead contributes only to the separate SPLASH gauge.
+      attacker.gainSplash(specialSplashBonus(hit.damage));
+    }else{
+      attacker.rewardDamage(hit.damage);
+      attacker.gainSplash(comboSplashBonus(comboHits));
+    }
     if(comboHits===2) {
       this.combatNotice('2 HIT!',target.x,GROUND_Y-206,0x8ce9fa);
     } else if(comboHits===3) {

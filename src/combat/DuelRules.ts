@@ -1,3 +1,5 @@
+import { scaleDamage } from './CombatScale.ts';
+
 /** A frozen, secret-choice showdown after a zero-damage heavy starter. */
 export type DuelStrike = 'light' | 'heavy' | 'kick';
 export type DuelChoice = DuelStrike | 'block' | null;
@@ -8,8 +10,8 @@ export const DUEL_WHIFF_RECOVERY = .30;
 export const DUEL_RESULT_ANIMATION = .55;
 /** A correct defensive A punishes repeat challenges for half a second. */
 export const DUEL_GUARD_STUN = .50;
-export const DUEL_DAMAGE = 24;
-export const DUEL_RUNA_DAMAGE = 28;
+export const DUEL_DAMAGE = scaleDamage(24);
+export const DUEL_RUNA_DAMAGE = scaleDamage(28);
 export const DUEL_TIE_PUSH = 330;
 export const DUEL_GUARD_PUSH = 630;
 
