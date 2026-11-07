@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {
-  forwardHeld, resolveDuel, chooseDuelInput, duelDamage, canDuelCatchTarget,
+  forwardHeld, resolveDuel, chooseDuelInput, reviseDuelChoice, duelDamage, canDuelCatchTarget,
   DUEL_DURATION, DUEL_WHIFF_RECOVERY, DUEL_RESULT_ANIMATION, DUEL_GUARD_STUN,
   DUEL_DAMAGE, DUEL_RUNA_DAMAGE,
   DUEL_TIE_PUSH, DUEL_GUARD_PUSH,
@@ -56,6 +56,32 @@ assert.equal(chooseDuelInput({...keys,block:false,light:true},true),'light');
 assert.equal(chooseDuelInput({...keys,block:false,kick:true},false),'kick');
 assert.equal(chooseDuelInput({...keys,block:false},true),null,
   'unselected input stays private until resolution');
+// A fresh valid input overwrites the earlier secret choice throughout
+// the countdown. Releasing or pressing a disallowed key cannot erase it.
+const noPress={light:false,heavy:false,kick:false,block:false};
+let attackerPick=null;
+attackerPick=reviseDuelChoice(attackerPick,{...noPress,light:true},false);
+assert.equal(attackerPick,'light');
+attackerPick=reviseDuelChoice(attackerPick,noPress,false);
+assert.equal(attackerPick,'light','releasing X preserves the last choice');
+attackerPick=reviseDuelChoice(attackerPick,{...noPress,heavy:true},false);
+assert.equal(attackerPick,'heavy','Y replaces an earlier X');
+attackerPick=reviseDuelChoice(attackerPick,{...noPress,kick:true},false);
+assert.equal(attackerPick,'kick','B can replace Y at the last moment');
+attackerPick=reviseDuelChoice(attackerPick,{...noPress,block:true},false);
+assert.equal(attackerPick,'kick','attacker cannot switch to defensive A');
+let defenderPick=null;
+defenderPick=reviseDuelChoice(defenderPick,{...noPress,block:true},true);
+assert.equal(defenderPick,'block');
+defenderPick=reviseDuelChoice(defenderPick,{...noPress,heavy:true},true);
+assert.equal(defenderPick,'heavy','defender can switch from guard to Y');
+defenderPick=reviseDuelChoice(defenderPick,{...noPress,block:true},true);
+assert.equal(defenderPick,'block','defender can switch back to guard');
+assert.equal(reviseDuelChoice(defenderPick,noPress,true),'block');
+assert.equal(reviseDuelChoice(null,noPress,false),null,'no choice stays null');
+assert.equal(resolveDuel(attackerPick,defenderPick),'guard',
+  'resolution evaluates final selections, not the first pressed moves');
+
 // A duel opener is a non-damaging high challenge, not an automatic
 // cutscene. Only a standing IDLE or ordinary horizontal walking target
 // may be challenged. Every other combat state must count as a MISS.
@@ -106,4 +132,4 @@ challengeContact=challengeContact && canDuelCatchTarget({...upright,walking:true
 assert.equal(challengeContact,false,'crouch then stand cannot restore a missed duel');
 
 console.log('✓ Duel target eligibility: standing/walking only; all other states miss.');
-console.log('✓ Duel triangle, defensive A, input timing and mirrored forward direction: passed.');
+console.log('✓ Duel triangle, last-press reselection, defensive A and mirrored direction: passed.');
