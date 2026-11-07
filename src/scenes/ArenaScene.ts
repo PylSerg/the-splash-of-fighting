@@ -8,6 +8,7 @@ import {
   isSimultaneousClash, type ClashAttempt, type ClashRect,
 } from '../combat/StrikeClashRules';
 import { getCharacter } from '../characters/Roster';
+import { hitstopSeconds } from '../combat/CombatRhythm';
 import { HIT_LEVEL_NAMES, isBackStrike } from '../combat/HitRules';
 import { sweepTrips } from '../combat/CrouchRules';
 import {
@@ -107,6 +108,8 @@ export class ArenaScene extends Phaser.Scene {
   private extraHalf = 0;
   private readyTime = ROUND_INTRO_TOTAL;
   private roundTime = 99;
+  /** Simulation-wide freeze on contact, excluding any player input. */
+  private hitstopTime = 0;
   private roundOver = false;
   private accumulator = 0;
   private aiCooldown = .85;
@@ -393,6 +396,7 @@ export class ArenaScene extends Phaser.Scene {
     this.healthTrail2=makeHealthTrail(this.player2.hp);
     this.prev1=ZERO();this.prev2=ZERO();
     this.readyTime=ROUND_INTRO_TOTAL;this.roundTime=99;this.roundOver=false;
+    this.hitstopTime=0;
     this.grapple=null;
     this.duel=null;
     this.duelPending=null;
@@ -419,7 +423,7 @@ export class ArenaScene extends Phaser.Scene {
       frames++;
     }
     // HUD animations advance even after a KO or while fighters are recovering.
-    const visualDt=(this.duel || this.duelAftermath || this.splash)?0:
+    const visualDt=(this.duel || this.duelAftermath || this.splash || this.hitstopTime>0)?0:
       Math.min(Math.max(0,delta/1000),.10);
     this.healthTrail1=advanceHealthTrail(this.healthTrail1,this.player1.hp,visualDt);
     this.healthTrail2=advanceHealthTrail(this.healthTrail2,this.player2.hp,visualDt);
@@ -434,6 +438,12 @@ export class ArenaScene extends Phaser.Scene {
       const label=roundIntroText(this.readyTime,this.roundsPlayed+1);
       if(label)this.centerLabel.setText(label);
       else this.centerLabel.setVisible(false);
+      return;
+    }
+    if(this.hitstopTime>0){
+      // Timers, hitboxes, gravity and controls all pause together for impact.
+      // Do not update input edges: a held button during hitstop is read next.
+      this.hitstopTime=Math.max(0,this.hitstopTime-dt);
       return;
     }
     if(this.splash){
@@ -773,7 +783,7 @@ export class ArenaScene extends Phaser.Scene {
     // The attacker must start upright. The target must be standing or walking:
     // crouches and jumps evade a grab, even on their first input frame.
     // Horizontal input never excludes a defender who is simply walking.
-    return !attackerInput.down && !attackerInput.up && !attackerInput.jump &&
+    return !defender.wakeupProtected && !attackerInput.down && !attackerInput.up && !attackerInput.jump &&
       !attackerInput.roll && !attacker.crouching && !attacker.knockedOut &&
       attacker.stunned<=0 && defender.stunned<=0 &&
       !attacker.airborne && !attacker.knockedDown && !attacker.isRolling &&
@@ -875,7 +885,7 @@ export class ArenaScene extends Phaser.Scene {
           down:defenderInput.down,up:defenderInput.up,jump:defenderJust.jump,
         });
         if(Math.abs(g.attacker.x-g.defender.x)>GRAB_CATCH_RANGE ||
-           !targetUpright) {
+           !targetUpright || g.defender.wakeupProtected) {
           // No forced stand-up: crouching/jumping away really avoids capture.
           g.attacker.breakGrab(false);
           this.grapple=null;
@@ -1122,7 +1132,8 @@ export class ArenaScene extends Phaser.Scene {
           this.aiCount%3!==0) input.block=true;
       return input;
     }
-    if(this.player2.stunned>0||this.player2.knockedOut||this.player2.knockedDown ||
+    if(this.player2.stunned>0||this.player2.blockstun>0||
+       this.player2.knockedOut||this.player2.knockedDown ||
        this.player2.isComboRecovering||this.player2.isDuelRecovering)return input;
     // CPU occasionally links a completed hit into a valid X/B/Y chain.
     // Read options only after impact; inputs remain single-frame presses.
@@ -1207,13 +1218,13 @@ export class ArenaScene extends Phaser.Scene {
     const attempt1: ClashAttempt | null = strike1 ? {
       name:strike1.name,strikeBox:box1,rivalBody:second.bodyBox(),
       rivalKnockedOut:second.knockedOut,rivalKnockedDown:second.knockedDown,
-      rivalRollInvulnerable:second.isRollInvulnerable,
+      rivalRollInvulnerable:second.isRollInvulnerable || second.wakeupProtected,
       rivalAirborne:second.airborne,
     } : null;
     const attempt2: ClashAttempt | null = strike2 ? {
       name:strike2.name,strikeBox:box2,rivalBody:first.bodyBox(),
       rivalKnockedOut:first.knockedOut,rivalKnockedDown:first.knockedDown,
-      rivalRollInvulnerable:first.isRollInvulnerable,
+      rivalRollInvulnerable:first.isRollInvulnerable || first.wakeupProtected,
       rivalAirborne:first.airborne,
     } : null;
     if(strike1 && strike2 && isSimultaneousClash(attempt1,attempt2)) {
@@ -1229,6 +1240,7 @@ export class ArenaScene extends Phaser.Scene {
       second.recordComboImpact(strike2,true,true,0);
       const middle=(first.x+second.x)/2;
       this.spawnSparks(middle,GROUND_Y-98,true);
+      this.hitstopTime=Math.max(this.hitstopTime,hitstopSeconds('heavy',true,true));
       this.combatNotice('CLASH!',middle,GROUND_Y-205,0x88f5f2);
       this.cameras.main.shake(65,.002);
       this.onStatus('ЗІТКНЕННЯ УДАРІВ! Обидві атаки заблоковані одночасно: 0 HP, 0 енергії.');
@@ -1244,10 +1256,10 @@ export class ArenaScene extends Phaser.Scene {
     strike: ActiveAttack | null = attacker.getActiveStrike(),
     box: ClashRect | null = attacker.strikeBox()): void {
     if(!strike)return;
-    // Consume the one impact frame even if the attack misses. Otherwise a
-    // whiff could "hit late" during follow-through and become unavoidable.
-    strike.connected=true;
+    // One hit per attack, but a missed first active frame may connect on
+    // later active frames. Attacks genuinely stop colliding in recovery.
     if(strike.name==='duel') {
+      strike.connected=true;
       // Zero-damage, unblockable hitbox: contact is recorded here, but
       // neither the duel nor miss recovery starts before full Y follow-through.
       const connects=Boolean(box && target.isDuelTargetEligible &&
@@ -1257,40 +1269,38 @@ export class ArenaScene extends Phaser.Scene {
       };
       return;
     }
-    if(target.knockedOut||target.knockedDown||!box) {
-      attacker.recordComboImpact(strike,false,false,0);
-      return;
-    }
+    if(target.knockedOut||target.knockedDown||!box) return;
     // A ground-level leg sweep cannot trip an airborne opponent.
-    if(strike.name==='sweep' && target.airborne) {
-      attacker.recordComboImpact(strike,false,false,0);
-      return;
-    }
+    if(strike.name==='sweep' && target.airborne) return;
     const hurt=target.bodyBox();
     if(!overlap(box,hurt)) {
-      attacker.recordComboImpact(strike,false,false,0);
       // The high hitbox ends ABOVE crouching hurtboxes. Even an unguarded
       // crouch slips beneath Y, so this is a true miss, not a blocked hit.
       if(strike.spec.level==='high' && target.crouching &&
+         strike.elapsed<strike.spec.duration+STEP*1.1 &&
          box.x<hurt.x+hurt.w && box.x+box.w>hurt.x) {
         this.combatNotice('WHIFF!',target.x,GROUND_Y-150,0xa3d7ff);
         this.onStatus('Верхній удар пройшов над присілим суперником!');
       }
       return;
     }
-    if(target.isRollInvulnerable) {
-      attacker.recordComboImpact(strike,false,false,0);
-      this.combatNotice('DODGE!',target.x,GROUND_Y-152,0x9aeefb);
-      return; // No damage or energy reward during the roll's evasion window.
+    if(target.isRollInvulnerable || target.wakeupProtected) {
+      if(strike.elapsed<strike.spec.duration+STEP*1.1)
+        this.combatNotice(target.wakeupProtected?'WAKEUP!':'DODGE!',
+          target.x,GROUND_Y-152,0x9aeefb);
+      return; // Protected wakeup or roll: neither damage nor meter gain.
     }
     // Only a third strike PREPARED by two successful unblocked hits
     // ignores guard. It must still genuinely overlap the target's hurtbox.
     const unblockable=attacker.isUnblockableFinisher(strike);
     const rear=isBackStrike(attacker.x,target.x,target.face);
     const failedHighGuard=target.guardStance==='standing' && strike.spec.level==='low';
+    strike.connected=true;
     const hit=target.receiveHit(strike.spec,attacker.face,unblockable,{
-      rear,guardBreaker:strike.name==='special',
+      rear,guardBreaker:strike.name==='special',attackName:strike.name,
     });
+    this.hitstopTime=Math.max(this.hitstopTime,
+      hitstopSeconds(strike.name,hit.blocked));
     const comboHits=attacker.recordComboImpact(strike,true,hit.blocked,hit.damage);
     const sweepLanded=sweepTrips(strike.name,hit.blocked,target.airborne,target.knockedOut);
     if(sweepLanded) {
