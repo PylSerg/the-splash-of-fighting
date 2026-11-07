@@ -21,6 +21,12 @@ npm run build
 npm run preview
 ```
 
+## Alpha 1.22.16 · Evi's hurtbox follows shoulder width
+
+- Narrowed **Evi's standing hurtbox only** from 66px to **50px** across (halfWidth 33→25) and crouching/rolling from 56px to **46px** (halfWidth 28→23). The hitboxes remain centered on her root position.
+- Preserved her established upright and low hurtbox heights, as well as independently calibrated sizes for Runa, Lyra and Kai, and unchanged strike/guard rules.
+- Updated regression tests to lock in the narrower Evi-only profile.
+
 ## Alpha 1.22.15 · Individual hitboxes calibrated per fighter
 
 - Removed the oversized shared **64 × 220 px** standing rectangle. Each of the four playable fighters now has **its own standing and crouching/rolling hurtbox**, fitted to the character's silhouette rather than decorative hair, weapons, hands or fabric.

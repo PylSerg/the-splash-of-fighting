@@ -85,8 +85,8 @@ export type FighterHurtboxProfile = {
 /** One calibrated upright + crouch/roll profile per playable fighter. */
 export const FIGHTER_HURTBOX:Readonly<Record<FighterId,FighterHurtboxProfile>> = {
   evi: {
-    standing:{halfWidth:33,top:-210,bottom:-2},
-    low:     {halfWidth:28,top:-81,bottom:-1},
+    standing:{halfWidth:25,top:-210,bottom:-2},
+    low:     {halfWidth:23,top:-81,bottom:-1},
   },
   runa: {
     standing:{halfWidth:29,top:-184,bottom:-2},
