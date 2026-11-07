@@ -533,6 +533,97 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
+
+  /** Phase 1 is reactable. After 0.5 s the opponent is locked until the end.
+   * Only an actual crouching A guard during the wind-up survives the cinematic.
+   * One final damage application prevents early KO animations from escaping it.
+   */
+  private stepSplash(dt:number):void {
+    const session=this.splash;
+    if(!session)return;
+    const {attacker,defender}=session;
+    const move=SPLASH_MOVES[attacker.id];
+    const oldElapsed=session.elapsed;
+    session.elapsed=Math.min(move.duration,session.elapsed+dt);
+    const justEntered=oldElapsed<SPLASH_WINDUP && session.elapsed>=SPLASH_WINDUP;
+
+    if(oldElapsed<SPLASH_WINDUP){
+      // Until the attack begins, defender input (including walking and guard)
+      // stays live. The splash attacker is committed and cannot be controlled.
+      const defensiveInput=defender===this.player1 ? this.controls.read(0) :
+        this.mode==='cpu' ? this.cpuSplashDefense(session) : this.controls.read(1);
+      const oldInput=defender===this.player1?this.prev1:this.prev2;
+      const just=justPressed(defensiveInput,oldInput);
+      if(defender===this.player1)this.prev1=defensiveInput;
+      else this.prev2=defensiveInput;
+      defender.step(dt,defensiveInput,just,attacker.x);
+      session.guarded ||= canSplashGuard({
+        down:defensiveInput.down,block:defensiveInput.block,
+        airborne:defender.airborne,knockedDown:defender.knockedDown,
+        knockedOut:defender.knockedOut,stunned:defender.stunned,
+        guarding:defender.blocking && defender.crouching,
+      });
+      attacker.stepSplashPose(dt,'startup',
+        Math.min(1,session.elapsed/SPLASH_WINDUP),defender.x);
+    }
+    if(session.elapsed>=SPLASH_WINDUP){
+      const progress=Math.min(1,(session.elapsed-SPLASH_WINDUP)/
+        (move.duration-SPLASH_WINDUP));
+      if(justEntered){
+        this.combatNotice(session.guarded?'SPLASH GUARD!':'SPLASH HIT!',
+          defender.x,GROUND_Y-218,session.guarded?0x78e5ed:move.color);
+      }
+      attacker.stepSplashPose(oldElapsed<SPLASH_WINDUP?0:dt,'attack',
+        progress,defender.x);
+      // Even a jumping, attacking or rolling defender is frozen from here.
+      defender.stepSplashPose(0,session.guarded?'guard':'victim',
+        progress,attacker.x);
+      const pulse=Math.min(move.pulses,Math.floor(progress*move.pulses));
+      while(session.pulses<pulse){
+        session.pulses++;
+        this.spawnSparks(defender.x,GROUND_Y+defender.yOffset-104,
+          session.guarded);
+        if(session.pulses===Math.ceil(move.pulses/2))
+          this.combatNotice(session.guarded?'BLOCKED!':'COMBO SPLASH!',
+            defender.x,GROUND_Y-202,session.guarded?0x87f1ec:move.color);
+      }
+    }
+    if(session.elapsed>=move.duration){
+      attacker.endSplashPose();
+      defender.endSplashPose();
+      let damage=0;
+      if(!session.guarded){
+        const hit=defender.receiveHit({
+          ...ATTACKS.special,damage:move.damage,stun:.56,push:380,
+        },attacker.face,true);
+        damage=hit.damage;
+        this.cameras.main.shake(200,.009);
+      }else{
+        defender.deflectSimultaneousStrike(ATTACKS.special,attacker.face);
+      }
+      this.combatNotice(session.guarded?'PERFECT GUARD!':'SPLASH FINISH!',
+        defender.x,GROUND_Y-238,session.guarded?0x82edee:move.color);
+      this.onStatus(session.guarded
+        ? getCharacter(defender.id).name+
+          ' вчасно натискає ↓+A! Увесь сплеш заблоковано, 0 HP.'
+        : getCharacter(attacker.id).name+' виконує '+move.name+
+          ' і завдає '+damage+' HP!'+(defender.knockedOut?' НОКАУТ!':''));
+      this.splash=null;
+      // Holding the cinematic chord must not queue a regular hit afterwards.
+      this.prev1=this.controls.read(0);
+      this.prev2=this.mode==='cpu'?emptyInput():this.controls.read(1);
+    }
+  }
+
+  /** CPU has a human-like reaction delay and does not always find ↓+A. */
+  private cpuSplashDefense(session:SplashSession):InputState {
+    const input=emptyInput();
+    if(session.elapsed>=.20 && this.aiCount%3===0){
+      input.down=true;input.block=true;
+    }
+    return input;
+  }
+
   private advanceFallenFighters(dt: number): void {
     const inert=emptyInput();
     if(this.player1.knockedDown) this.player1.step(dt,inert,inert,this.player2.x);
