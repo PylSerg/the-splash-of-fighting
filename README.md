@@ -21,6 +21,13 @@ npm run build
 npm run preview
 ```
 
+## Alpha 1.22.5 · Actual fan slashes and head-level hits
+
+- The 3D right wrist now sweeps **sideways across the opponent** instead of stabbing forward; the fan itself turns through the blade arc and its trail follows the cutting edge.
+- Upper Y and duel slashes rise to **head height**. The high attack collision band includes the visible head silhouette, while its lower edge is still above crouching defenders.
+- Evi's high fan attacks gain a modest 8% reach correction to match the extended blade. The mid/low attacks keep their separate height lanes and damage/combo rules remain unchanged.
+- Regression tests cover the lateral hand arc, blade rotation, head-level collision band and crouch evasion.
+
 ## Alpha 1.22.4 · Natural downward elbow bend
 
 - Fixed the 3D IK pole direction for **both arms**: the elbows now bend down toward the waist and outward instead of pointing above the shoulders in guard/idle poses.
