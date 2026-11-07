@@ -25,6 +25,21 @@ export function visualChords(b:{
   };
 }
 
+/** A pair of physical fingers remains two separate pointer IDs. A captured
+ * X↔Y swipe may also provide both logical buttons with one finger while the
+ * other thumb holds ↑. Never borrow an A or B press as X/Y.
+ */
+export function resolveXYTouch(
+  pointers:ReadonlyMap<number,string>,swipe:boolean,
+):{light:boolean;heavy:boolean}{
+  let light=swipe,heavy=swipe;
+  for(const action of pointers.values()){
+    if(action==='light')light=true;
+    if(action==='heavy')heavy=true;
+  }
+  return {light,heavy};
+}
+
 export function deriveCommandChords(b: CommandButtons): {duel:boolean;special:boolean} {
   const special=(b.block && b.kick) || b.r1AndR2 || b.specialSwipe;
   // New A+B / R1+R2 special always wins over a conflicting duel chord.

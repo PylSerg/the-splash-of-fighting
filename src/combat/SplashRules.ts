@@ -12,6 +12,10 @@ export function splashFacing(
   if(role==='defender' || opponentX===ownX)return current;
   return opponentX>ownX ? 1 : -1;
 }
+/** Allow touch fingers a short delay to form ↑+X+Y before a solo attack.
+ * Charged SPLASH only: normal light/strong attacks retain their timing.
+ */
+export const SPLASH_INPUT_GRACE = 0.24;
 export const SPLASH_WINDUP = 0.5;
 /** A damaging counterstrike or another SPLASH can stop the ability only
  * before the half-second preparation has finished.
@@ -59,17 +63,6 @@ export function earnSplashEnergy(current:number, bonus:number): number {
 export function comboSplashBonus(cleanHits:number): number {
   return cleanHits===3 ? SPLASH_COMBO_COMPLETE_GAIN : 0;
 }
-/** Dedicated one-tap button bypasses difficult simultaneous touch gestures.
- * Keep keyboard/gamepad Up+X+Y and Up+L1+R1 fully backward compatible.
- */
-export function splashRequested(
-  dedicated:boolean, buttons:{
-    up:boolean;light:boolean;heavy:boolean;l1:boolean;r1:boolean;
-  },
-):boolean {
-  return dedicated || splashChord(buttons);
-}
-
 export function splashChord(buttons:{
   up:boolean; light:boolean; heavy:boolean; l1:boolean; r1:boolean;
 }): boolean {
