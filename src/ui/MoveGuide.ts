@@ -23,6 +23,7 @@ export function getMoveGuide(fighter:FighterId):MoveGuide {
   const style=FIGHTER_STYLES[fighter];
   const runa=fighter==='runa';
   const short=(number:number)=>String(number).replace('.',',');
+  const damageLabel=(hp:number)=>hp+' HP ('+short(Number(damagePercent(hp).toFixed(1)))+'% макс. HP)';
   const heavyDamage=scaleDamage(runa?14:11);
   const throwDamage=scaleDamage(runa?21:16);
   const cleanComboBonus=24;
@@ -35,18 +36,18 @@ export function getMoveGuide(fighter:FighterId):MoveGuide {
       'Третій чистий удар пробиває блок і додає +'+cleanComboBonus+' SPLASH.',
     sections:[
       {title:'Основні атаки',moves:[
-        {buttons:'Y',description:'Висока сильна атака · '+heavyDamage+' HP. Промахується над присілим суперником.'},
-        {buttons:'X',description:'Середня швидка атака · '+scaleDamage(5)+' HP ('+short(Number(damagePercent(scaleDamage(5)).toFixed(1)))+'% HP).'},
-        {buttons:'B',description:'Нижня атака ногою · '+scaleDamage(9)+' HP. Проходить під стоячим блоком.'},
-        {buttons:'↓ + X',description:'Середній швидкий удар навприсядки · '+scaleDamage(runa?5:4)+' HP.'},
-        {buttons:'↓ + B',description:'Нижня підсічка · '+scaleDamage(runa?6:5)+' HP. Збиває з ніг, якщо не заблокована.'},
+        {buttons:'Y',description:'Висока сильна атака · '+damageLabel(heavyDamage)+'. Промахується над присілим суперником.'},
+        {buttons:'X',description:'Середня швидка атака · '+damageLabel(scaleDamage(5))+'.'},
+        {buttons:'B',description:'Нижня атака ногою · '+damageLabel(scaleDamage(9))+'. Проходить під стоячим блоком.'},
+        {buttons:'↓ + X',description:'Середній швидкий удар навприсядки · '+damageLabel(scaleDamage(runa?5:4))+'.'},
+        {buttons:'↓ + B',description:'Нижня підсічка · '+damageLabel(scaleDamage(runa?6:5))+'. Збиває з ніг, якщо не заблокована.'},
       ]},
       {title:'Спеціальні дії та захист',moves:[
         {buttons:'Вперед + A + B',description:'Заряджений спецприйом від 15% до 100%: '+
-          specialDamageAt(fighter,15)+'–'+specialDamageAt(fighter,100)+
-          ' HP. Витрачає увесь заряд, але враховує лише повністю завершені секції 15/35/60/100%. Фронтальний блок пропускає 50% шкоди; влучання заряджає тільки SPLASH.'},
+          damageLabel(specialDamageAt(fighter,15))+' → '+damageLabel(specialDamageAt(fighter,100))+
+          '. Витрачає увесь заряд, але враховує лише повністю завершені секції 15/35/60/100%. Фронтальний блок пропускає 50% шкоди; влучання заряджає тільки SPLASH.'},
         {buttons:'Вперед + B + Y',description:'Виклик на таємну дуель · вибір X/Y/B протягом 2 с. Захисник може обрати A.'},
-        {buttons:'↑ + X + Y',description:'SPLASH: «'+SPLASH_MOVES[fighter].name+'» · '+SPLASH_MOVES[fighter].damage+' HP. Потрібно 100 заряду.'},
+        {buttons:'↑ + X + Y',description:'SPLASH: «'+SPLASH_MOVES[fighter].name+'» · '+damageLabel(SPLASH_MOVES[fighter].damage)+'. Потрібно 100 заряду.'},
         {buttons:'↑ + X + Y / ↑ + L1 + R1',description:'Утримуй ↑ й затисни X та Y двома пальцями або одним проведи X↔Y. На геймпаді ↑+L1+R1. Здібність діє по всій арені.'},
         {buttons:'X + A / L1',description:'Захват стоячого противника. Потім потягни джойстик назад для кидка · '+throwDamage+' HP.'},
         {buttons:'Напрямок + ↓ + X + A',description:'Перекат із короткою невразливістю. На геймпаді: напрямок + L2.'},
