@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {SPLASH_METER_MAX,SPLASH_WINDUP,SPLASH_MOVES,
-  earnSplashEnergy,comboSplashBonus,splashChord,canSplashGuard,
+  earnSplashEnergy,comboSplashBonus,splashChord,splashRequested,canSplashGuard,
   SPLASH_DUEL_WIN_GAIN,guidedSplashPosition,splashWindupActive,splashFacing} from '../src/combat/SplashRules.ts';
 assert.equal(SPLASH_WINDUP,0.5);
 assert.equal(splashFacing(300,400,-1,'attacker'),1,'caster turns right toward opponent');
@@ -33,6 +33,12 @@ assert.equal(earnSplashEnergy(74,SPLASH_DUEL_WIN_GAIN),100);
 assert.equal(comboSplashBonus(1),0);
 assert.equal(comboSplashBonus(2),0,'two connected strikes are not a complete combo');
 assert.equal(comboSplashBonus(3),24,'only the third clean hit grants splash charge');
+const noChord={up:false,light:false,heavy:false,l1:false,r1:false};
+assert.equal(splashRequested(true,noChord),true,
+  'single SPLASH touch launches without Up+X+Y');
+assert.equal(splashRequested(false,noChord),false);
+assert.equal(splashRequested(false,{...noChord,up:true,light:true,heavy:true}),true);
+assert.equal(splashRequested(false,{...noChord,up:true,l1:true,r1:true}),true);
 assert.equal(splashChord({up:true,light:true,heavy:true,l1:false,r1:false}),true);
 assert.equal(splashChord({up:true,light:false,heavy:false,l1:true,r1:true}),true);
 assert.equal(splashChord({up:false,light:true,heavy:true,l1:false,r1:false}),false);
