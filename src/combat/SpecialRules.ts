@@ -24,10 +24,14 @@ export type SpecialTier=0|1|2|3|4;
  * exactly 100 -> 4. E.g. 99% still hits with completed 60% strength.
  */
 export function specialChargeTier(charge:number):SpecialTier {
-  if(!Number.isFinite(charge)||charge<SPECIAL_MIN_CHARGE)return 0;
-  if(charge<35)return 1;
-  if(charge<60)return 2;
-  if(charge<100)return 3;
+  // Meter gains are fractional (damage-based). Accept floating-point dust
+  // at a mathematically completed boundary, never genuine partial charging.
+  if(!Number.isFinite(charge))return 0;
+  const filled=charge+1e-8;
+  if(filled<SPECIAL_MIN_CHARGE)return 0;
+  if(filled<35)return 1;
+  if(filled<60)return 2;
+  if(filled<100)return 3;
   return 4;
 }
 
