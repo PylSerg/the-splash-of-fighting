@@ -44,7 +44,7 @@ export function getMoveGuide(fighter:FighterId):MoveGuide {
         {buttons:'Вперед + A + B',description:'Спецприйом · '+specialDamage+' HP, потребує 40 звичайної енергії. Пробиває блок за 50% шкоди.'},
         {buttons:'Вперед + B + Y',description:'Виклик на таємну дуель · вибір X/Y/B протягом 2 с. Захисник може обрати A.'},
         {buttons:'↑ + X + Y',description:'SPLASH: «'+SPLASH_MOVES[fighter].name+'» · '+SPLASH_MOVES[fighter].damage+' HP. Потрібно 100 заряду.'},
-        {buttons:'SPLASH / ↑ + L1 + R1',description:'Окрема сенсорна кнопка SPLASH (або комбінація на геймпаді). Здібність діє по всій арені.'},
+        {buttons:'↑ + X + Y / ↑ + L1 + R1',description:'Утримуй ↑ й затисни X та Y двома пальцями або одним проведи X↔Y. На геймпаді ↑+L1+R1. Здібність діє по всій арені.'},
         {buttons:'X + A / L1',description:'Захват стоячого противника. Потім потягни джойстик назад для кидка · '+throwDamage+' HP.'},
         {buttons:'Напрямок + ↓ + X + A',description:'Перекат із короткою невразливістю. На геймпаді: напрямок + L2.'},
         {buttons:'A / ↓ + A',description:'Стоячий блок / блок навприсядки. Під час блоку напрямок не змінюється.'},
