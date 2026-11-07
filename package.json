@@ -1,22 +1,20 @@
 {
   "name": "the-splash-of-fighting",
   "private": true,
-  "version": "1.22.7",
+  "version": "1.22.8",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "check": "tsc --noEmit",
     "build": "npm run test:combat && tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test:combat": "node --experimental-strip-types tests/hit-rules.test.mjs && node --experimental-strip-types tests/grab-rules.test.mjs && node --experimental-strip-types tests/crouch-rules.test.mjs && node --experimental-strip-types tests/combat-feedback.test.mjs && node --experimental-strip-types tests/special-rules.test.mjs && node --experimental-strip-types tests/combat-rhythm.test.mjs && node --experimental-strip-types tests/training-rules.test.mjs && node --experimental-strip-types tests/move-guide.test.mjs && node --experimental-strip-types tests/stage-lore.test.mjs && node --experimental-strip-types tests/evi-sprites.test.mjs && node --experimental-strip-types tests/evi-rig.test.mjs && node --experimental-strip-types tests/evi-fan-slash.test.mjs && node --experimental-strip-types tests/three-fighter-rules.test.mjs && node --experimental-strip-types tests/three-evi-stance.test.mjs && node --experimental-strip-types tests/evi-3d-anatomy.test.mjs && node --experimental-strip-types tests/evi-3d-arms-roll.test.mjs && node --experimental-strip-types tests/grounded-roll.test.mjs && node --experimental-strip-types tests/evi-grounded-tumble.test.mjs && node --experimental-strip-types tests/combo-rules.test.mjs && node --experimental-strip-types tests/duel-rules.test.mjs && node --experimental-strip-types tests/command-rules.test.mjs && node --experimental-strip-types tests/strike-clash.test.mjs && node --experimental-strip-types tests/splash-rules.test.mjs && node --experimental-strip-types tests/match-rules.test.mjs"
+    "test:combat": "node --experimental-strip-types tests/hit-rules.test.mjs && node --experimental-strip-types tests/grab-rules.test.mjs && node --experimental-strip-types tests/crouch-rules.test.mjs && node --experimental-strip-types tests/combat-feedback.test.mjs && node --experimental-strip-types tests/special-rules.test.mjs && node --experimental-strip-types tests/combat-rhythm.test.mjs && node --experimental-strip-types tests/training-rules.test.mjs && node --experimental-strip-types tests/move-guide.test.mjs && node --experimental-strip-types tests/stage-lore.test.mjs && node --experimental-strip-types tests/evi-sprites.test.mjs && node --experimental-strip-types tests/evi-rig.test.mjs && node --experimental-strip-types tests/evi-fan-slash.test.mjs && node --experimental-strip-types tests/grounded-roll.test.mjs && node --experimental-strip-types tests/evi-grounded-tumble.test.mjs && node --experimental-strip-types tests/combo-rules.test.mjs && node --experimental-strip-types tests/duel-rules.test.mjs && node --experimental-strip-types tests/command-rules.test.mjs && node --experimental-strip-types tests/strike-clash.test.mjs && node --experimental-strip-types tests/splash-rules.test.mjs && node --experimental-strip-types tests/match-rules.test.mjs"
   },
   "dependencies": {
-    "phaser": "4.2.1",
-    "three": "^0.181.0"
+    "phaser": "4.2.1"
   },
   "devDependencies": {
     "typescript": "^5.9.2",
-    "@types/three": "^0.181.0",
     "vite": "^7.1.0"
   }
 }
