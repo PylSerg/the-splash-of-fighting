@@ -2,6 +2,7 @@
  * The old keyframe sheet has been replaced by smooth, interpolated joints.
  * Combat timing and collision boxes are owned exclusively by Fighter.
  */
+import {eviSideSlashPose,isEviFanSlash} from './EviFanSlash.ts';
 export type EviMotionName=
   'idle'|'walk'|'crouch'|'jump'|'guard'|'guardLow'|'light'|'heavy'|
   'kick'|'crouchMid'|'sweep'|'special'|'duel'|'hit'|'roll'|
@@ -221,25 +222,12 @@ export function eviPoseFor(input:EviMotionInput):EviPose{
     ?smooth(e/startup)
     :e<startup+active?1
       :1-smooth((e-startup-active)/recover);
-  const windup=Math.sin(Math.PI*Math.min(1,e/startup));
   const lunge=Math.max(0,strength);
-  if(input.name==='light'){
-    return merged(base,{
-      torsoTilt:.16*lunge,armR:-.30-1.30*lunge,
-      elbowR:-.87+.87*lunge,armL:.3,
-      fanAngle:-.24-.26*lunge,legR:.16,
-      hipY:-2*lunge,
-    });
-  }
-  if(input.name==='heavy'||input.name==='duel'){
-    return merged(base,{
-      torsoTilt:.19*lunge,
-      armR:-.28-2.6*lunge,elbowR:-.87+.9*lunge,
-      armL:-.1-.5*lunge,
-      fanAngle:-.2-1.36*lunge,
-      legL:-.19*lunge,legR:.32*lunge,
-      hairSwing:-.11*lunge,
-    });
+  if(isEviFanSlash(input.name)){
+    // X/Y, the duelling starter and the charged special all use deliberate
+    // rearward preparation followed by a fast, near-horizontal side cut.
+    // No downward overhead chop remains in the animated Evi puppet.
+    return eviSideSlashPose(base,input.name,e,startup,d);
   }
   if(input.name==='kick'){
     return merged(base,{
@@ -256,24 +244,6 @@ export function eviPoseFor(input:EviMotionInput):EviPose{
       legR:-1.45*lunge,kneeR:.2*lunge,
       legL:-.58,torsoTilt:.24,
       skirtTilt:.24,armL:-.8,
-    });
-  }
-  if(input.name==='crouchMid'){
-    const low=eviPoseFor({name:'crouch',time:t});
-    return merged(low,{
-      armR:-.4-1.4*lunge,elbowR:-.8+.8*lunge,
-      fanAngle:-.15-.5*lunge,torsoTilt:.13,
-    });
-  }
-  if(input.name==='special'){
-    return merged(base,{
-      torsoTilt:mix(-.14,.28,lunge),
-      armR:-.55-2.15*lunge,elbowR:-.84+.56*lunge,
-      fanAngle:-.3-1.95*lunge,
-      fanScale:.95+.28*lunge,
-      armL:-.3-.6*windup,
-      legR:.23,legL:-.22,
-      skirtTilt:-.08+.17*lunge,
     });
   }
   return base;

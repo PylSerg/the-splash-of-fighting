@@ -34,10 +34,10 @@ assert.ok(eviPoseFor({name:'crouch',time:0}).hipY>20,
   'crouching lowers the articulated pelvis');
 assert.ok(eviPoseFor({name:'kick',time:0,elapsed:.5,startup:.4,duration:.8}).legR<
   base.legR-.7,'kick extends the front leg');
-assert.ok(eviPoseFor({name:'heavy',time:0,elapsed:.5,startup:.4,duration:.8}).armR<
-  base.armR-1.4,'heavy Y raises the weapon arm');
-assert.ok(eviPoseFor({name:'special',time:0,elapsed:.5,startup:.4,duration:.8}).fanAngle<
-  base.fanAngle-1.2,'charged special uses the fan joint');
+assert.ok(eviPoseFor({name:'heavy',time:0,elapsed:.4,startup:.4,duration:.8}).armR<
+  base.armR-.95,'heavy Y extends the fan horizontally at contact');
+assert.ok(eviPoseFor({name:'special',time:0,elapsed:.4,startup:.4,duration:.8}).armR<
+  base.armR-1,'special uses a forward fan side-cut rather than an overhead chop');
 
 const entranceStart=eviPoseFor({name:'intro',time:0,elapsed:0});
 const entranceMiddle=eviPoseFor({name:'intro',time:1,elapsed:1});
