@@ -1,6 +1,15 @@
 /** Best-of-three: first to two won rounds takes the match. Draws replay. */
 export const MATCH_MAX_ROUNDS = 3;
 export const MATCH_WINS_REQUIRED = 2;
+export const ROUND_ANNOUNCE_SECONDS = 1;
+export const FIGHT_ANNOUNCE_SECONDS = 1;
+export const ROUND_INTRO_TOTAL = ROUND_ANNOUNCE_SECONDS + FIGHT_ANNOUNCE_SECONDS;
+/** First show ROUND N for one second, then FIGHT! for one second. */
+export function roundIntroText(remaining:number,roundNumber:number):string|null {
+  if(remaining>FIGHT_ANNOUNCE_SECONDS)return 'ROUND '+roundNumber;
+  if(remaining>0)return 'FIGHT!';
+  return null;
+}
 export interface MatchScore {
   wins: [number,number];
   roundsPlayed:number;
