@@ -21,6 +21,7 @@ import {
 } from '../combat/CombatFeedback';
 import { canBeGrabbed } from '../combat/GrabRules';
 import { SPECIAL_MIN_CHARGE, SPECIAL_CHARGE_MARKS } from '../combat/SpecialRules.ts';
+import { scaleDamage } from '../combat/CombatScale.ts';
 import {
   DUEL_DURATION, DUEL_RESULT_ANIMATION, DUEL_GUARD_STUN,
   DUEL_TIE_PUSH, DUEL_GUARD_PUSH,
@@ -870,7 +871,7 @@ export class ArenaScene extends Phaser.Scene {
     this.combatNotice(label,(grapple.attacker.x+grapple.defender.x)/2,260,
       reason==='counter'?0xffd1a4:0x9cf3eb);
     const status:Record<typeof reason,string>={
-      counter:'Захват перервано швидким ударом X! Атакувальний втрачає 3 HP.',
+      counter:'Захват перервано швидким ударом X! Атакувальний втрачає '+scaleDamage(3)+' HP.',
       block:'БЛОК ЗАХВАТУ! Суперник відштовхує атакувального на кілька кроків назад.',
       interrupted:'Захват перервано ударом суперника.',
       released:'Захват відпущено: для кидка треба продовжувати тримати A+X (або L1).',
