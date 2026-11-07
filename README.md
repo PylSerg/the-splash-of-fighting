@@ -21,6 +21,14 @@ npm run build
 npm run preview
 ```
 
+## Alpha 1.22.7 · True anatomical right hand and fully extended fan swing
+
+- Corrected the **3D shoulder/hand convention**: with the model facing local +Z, anatomical right is -X, not +X. Both shoulder chains, the IK origin, every hand animation and the right-wrist-owned fan now agree; no more left-handed fan disguised as a right-wrist joint.
+- Replaced a lerped wrist stab with a **fixed-radius, shoulder-led swing**: the right arm moves far **backward** behind the torso, visibly holds that loaded pose during startup, and then sweeps toward the enemy while the elbow stays nearly straight (reach .727 of the .75 arm length) throughout the strike.
+- Attack wrist targets are applied **without delayed smoothing**; a separate early windup and hold guarantee the actual extended pose is reached at Phaser's hit frame. The non-attacking hands continue to animate smoothly.
+- Tests verify both facing directions, anatomical hand, screen-space travel, held windup, near-straight elbow through all five fan attacks, and right-wrist-only weapon ownership.
+- Gameplay rules, hitboxes, damage, startup duration, active windows and the grounded roll remain unchanged.
+
 ## Alpha 1.22.6 · Visible backswing before fan attacks
 
 - Fixed an animation that technically swept sideways but did not show a readable **windup**. In the 3/4 camera angle, the earlier windup wrist moved across the front of the torso and disappeared into its silhouette.
