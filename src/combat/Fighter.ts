@@ -1364,15 +1364,15 @@ export class Fighter {
       this.pixelSprite.setTint(this.hitFlash>0?0xffcad8:0xffffff);
       this.pixelSprite.setAlpha(this.knockedOut?0.76:1);
     }
-    const motion=this.walking?Math.sin(this.time*15):Math.sin(this.time*2.5)*.11;
+    const idleSway=this.walking?Math.sin(this.time*15):Math.sin(this.time*2.5)*.11;
     const swing=this.walking?Math.sin(this.time*15)*.30:0;
     this.leftLeg.rotation=swing;
     this.rightLeg.rotation=-swing;
     this.backArm.rotation=-swing*.5;
     this.frontArm.rotation=swing*.5;
-    this.weapon.rotation=.15+motion*.2;
-    this.cape.rotation=-motion*.08;
-    this.hair.rotation=this.id==='runa'?-motion*.04:0;
+    this.weapon.rotation=.15+idleSway*.2;
+    this.cape.rotation=-idleSway*.08;
+    this.hair.rotation=this.id==='runa'?-idleSway*.04:0;
 
     if(this.crouching) {
       this.leftLeg.rotation=.8;this.rightLeg.rotation=-.8;
