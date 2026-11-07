@@ -3,6 +3,7 @@
  * Import remains opt-in, so no external asset server or API is required.
  */
 export type EviSheetKind='combat'|'cinematic';
+export type EviArtKind=EviSheetKind|'idle-selection';
 const DATABASE='splash-fighter-art-v1';
 const STORE='sheets';
 
@@ -21,7 +22,7 @@ function openDatabase():Promise<IDBDatabase> {
   });
 }
 
-export async function storeEviSheet(kind:EviSheetKind,file:Blob):Promise<void>{
+export async function storeEviSheet(kind:EviArtKind,file:Blob):Promise<void>{
   const db=await openDatabase();
   try {
     await new Promise<void>((resolve,reject)=>{
@@ -34,7 +35,7 @@ export async function storeEviSheet(kind:EviSheetKind,file:Blob):Promise<void>{
   }finally{db.close();}
 }
 
-export async function readEviSheet(kind:EviSheetKind):Promise<Blob|null>{
+export async function readEviSheet(kind:EviArtKind):Promise<Blob|null>{
   const db=await openDatabase();
   try{
     return await new Promise<Blob|null>((resolve,reject)=>{
