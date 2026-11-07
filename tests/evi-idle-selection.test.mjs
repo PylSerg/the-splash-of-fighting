@@ -1,15 +1,44 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 import JSZip from 'jszip';
 import {
   EVI_IDLE_FRAMES,EVI_IDLE_WIDTH,EVI_IDLE_HEIGHT,EVI_IDLE_FRAME_MS,
-  parseEviIdleFiles,packEviIdleFrames,
+  parseEviIdleFiles,packEviIdleFrames,bundledEviIdleUrls,
 } from '../src/ui/EviIdleAnimation.ts';
 
 assert.equal(EVI_IDLE_FRAMES,6);
 assert.equal(EVI_IDLE_WIDTH,512);
 assert.equal(EVI_IDLE_HEIGHT,768);
 assert.ok(EVI_IDLE_FRAME_MS>=120 && EVI_IDLE_FRAME_MS<=250);
+
+// These assets MUST be real committed RGBA PNGs, not Git LFS stubs,
+// a former sprite atlas, or temporary chat-only links.
+const pathPrefix='/the-splash-of-fighting/';
+const urls=Array.from({length:6},(_,i)=>
+  pathPrefix+'assets/evi/idle/idle_'+String(i+1).padStart(3,'0')+'.png');
+assert.deepEqual(bundledEviIdleUrls(pathPrefix),urls,
+  'GitHub Pages must resolve six PNGs under Vite BASE_URL');
+assert.deepEqual(bundledEviIdleUrls('/the-splash-of-fighting'),urls);
+const expectedHashes=[
+  'c2d364d64b57bb0f1f315c1ee7f3c4e2f05f1e9780bed5f086aba031d4c7befe',
+  'fe557ec291303704649e8a79e97608d4bac4488cf80a11e25b832f3c621a13e7',
+  '946f0b11d07246052fa2629d2f5e0756c211965f4992b48b7004dc0a4c041eee',
+  'e75507ec64fb70aaba1ca429c500b68675eb8b8604d4bfb404914b5424865797',
+  'a9b6e30c6c61a2d49f26b83385ac1f0eb61a43264bac7ff21e2f6f8c1fc757a0',
+  '879a83b4e2a558b5e0ae5e2e1c98675d9e629d7983e9a91c444813cebfa4b19b',
+];
+for(let i=0;i<EVI_IDLE_FRAMES;i++){
+  const name='idle_'+String(i+1).padStart(3,'0')+'.png';
+  const png=readFileSync(new URL('../public/assets/evi/idle/'+name,import.meta.url));
+  assert.ok(png.length>250_000,name+' is full-resolution sprite data');
+  assert.deepEqual([...png.subarray(0,8)],[137,80,78,71,13,10,26,10]);
+  assert.equal(png.readUInt32BE(16),EVI_IDLE_WIDTH,name+' width');
+  assert.equal(png.readUInt32BE(20),EVI_IDLE_HEIGHT,name+' height');
+  assert.equal(png[25],6,name+' must have real RGBA transparency');
+  assert.equal(createHash('sha256').update(png).digest('hex'),
+    expectedHashes[i],name+' exactly matches the source PNG');
+}
 
 function testPng(width=512,height=768,rgba=true){
   // Only the 33-byte PNG IHDR matters to the import validator.
@@ -57,7 +86,11 @@ assert.match(selector,/URL\.revokeObjectURL/,'old frame URLs are disposed');
 assert.match(selector,/has-idle-animation/,'native PNG art replaces SVG fallback');
 assert.match(app,/storeEviSheet\('idle-selection',zip\)/);
 assert.match(app,/readEviSheet\('idle-selection'\)/);
+assert.match(app,/loadBundledEviIdleFrames\(import\.meta\.env\.BASE_URL\)/,
+  'new visitors automatically load the six game-bundled PNGs');
+assert.match(app,/await installBundledIdle\(version\)/,
+  'clearing user imports restores the original bundled artwork');
 assert.match(html,/id="input-evi-idle"/,'ZIP upload in character select');
 assert.match(html,/multiple/,'individual PNG imports also supported');
 assert.match(styles,/image-rendering:pixelated/,'retain crisp pixel art');
-console.log('✓ Six 512×768 RGBA idle PNGs: ZIP roundtrip, validation, local persistence, selection animation and clean fallback.');
+console.log('✓ Six committed 512×768 RGBA idle PNGs: SHA-256 match, Vite asset URLs, automatic default, local overrides and animation.');
