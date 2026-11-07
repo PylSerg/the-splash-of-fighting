@@ -8,6 +8,10 @@ import {
   isSimultaneousClash, type ClashAttempt, type ClashRect,
 } from '../combat/StrikeClashRules';
 import { getCharacter } from '../characters/Roster';
+import {
+  type TrainingBehavior, shouldRestoreTrainingHealth,
+  trainingCrouchGuard, trainingDuelPick,
+} from '../combat/TrainingRules';
 import { hitstopSeconds } from '../combat/CombatRhythm';
 import { HIT_LEVEL_NAMES, isBackStrike } from '../combat/HitRules';
 import { sweepTrips } from '../combat/CrouchRules';
@@ -95,6 +99,8 @@ export class ArenaScene extends Phaser.Scene {
   private prev1 = ZERO();
   private prev2 = ZERO();
   private mode: GameMode = 'cpu';
+  private training=false;
+  private trainingBehavior:TrainingBehavior='passive';
   private debug = false;
   private hud!: Phaser.GameObjects.Graphics;
   private debugDraw!: Phaser.GameObjects.Graphics;
@@ -264,20 +270,25 @@ export class ArenaScene extends Phaser.Scene {
     return { first: this.player1.id, second: this.player2.id, mode: this.mode };
   }
 
-  setMatchup(first: FighterId, second: FighterId, mode: GameMode): void {
+  setMatchup(first: FighterId, second: FighterId, mode: GameMode, training=false): void {
+    if(training && mode!=='cpu')throw new Error('Training requires a CPU dummy.');
     if (first === second) throw new Error('A mirror match is not allowed.');
     this.player1?.destroy();
     this.player2?.destroy();
     this.player1=new Fighter(this,first,250,1);
     this.player2=new Fighter(this,second,710,-1);
     this.mode=mode;
+    this.training=training;
+    this.trainingBehavior='passive';
     this.hasMatch=true;
     this.leftName.setText(getCharacter(first).name);
     this.rightName.setText(getCharacter(second).name);
     this.restartMatch();
-    this.onStatus(mode==='cpu'
-      ? getCharacter(first).name+' проти '+getCharacter(second).name+' (CPU)!'
-      : getCharacter(first).name+' проти '+getCharacter(second).name+' (PvP)!');
+    this.onStatus(training
+      ? 'ТРЕНУВАННЯ: обидва бійці автоматично відновлюють 200 HP. Поведінку суперника можна змінити в меню бою.'
+      :mode==='cpu'
+        ? getCharacter(first).name+' проти '+getCharacter(second).name+' (CPU)!'
+        : getCharacter(first).name+' проти '+getCharacter(second).name+' (PvP)!');
   }
 
   /** Original hand-drawn moonlit coast, extending beyond 16:9 devices. */
@@ -369,6 +380,17 @@ export class ArenaScene extends Phaser.Scene {
     if (this.hasMatch) this.restartMatch();
   }
   getMode(): GameMode { return this.mode; }
+  isTraining():boolean {return this.training;}
+  getTrainingBehavior():TrainingBehavior{return this.trainingBehavior;}
+  setTrainingBehavior(value:TrainingBehavior):void {
+    if(!this.training)return;
+    this.trainingBehavior=value;
+    this.aiCooldown=.20;this.aiCount=0;
+    const names:Record<TrainingBehavior,string>={
+      passive:'Пасивна',guard:'Блокує',attack:'Атакує',both:'Блокує та атакує',
+    };
+    this.onStatus('ТРЕНУВАННЯ: поведінка суперника «'+names[value]+'».');
+  }
 
   setDebug(next: boolean): void {
     this.debug=next;
@@ -395,7 +417,8 @@ export class ArenaScene extends Phaser.Scene {
     this.healthTrail1=makeHealthTrail(this.player1.hp);
     this.healthTrail2=makeHealthTrail(this.player2.hp);
     this.prev1=ZERO();this.prev2=ZERO();
-    this.readyTime=ROUND_INTRO_TOTAL;this.roundTime=99;this.roundOver=false;
+    this.readyTime=this.training?0:ROUND_INTRO_TOTAL;
+    this.roundTime=99;this.roundOver=false;
     this.hitstopTime=0;
     this.grapple=null;
     this.duel=null;
@@ -406,8 +429,9 @@ export class ArenaScene extends Phaser.Scene {
     this.roundTransition=0;
     this.aiCooldown=.85;this.aiCount=0;this.frameCount=0;this.accumulator=0;
     this.centerLabel.setText(roundIntroText(this.readyTime,this.roundsPlayed+1) ?? '')
-      .setColor('#fff0c0').setVisible(true);
-    this.roundLabel.setText('ROUND '+(this.roundsPlayed+1)+' / '+MATCH_MAX_ROUNDS);
+      .setColor('#fff0c0').setVisible(!this.training);
+    this.roundLabel.setText(this.training?'TRAINING ∞':
+      'ROUND '+(this.roundsPlayed+1)+' / '+MATCH_MAX_ROUNDS);
     this.paintHud();
   }
 
@@ -419,6 +443,7 @@ export class ArenaScene extends Phaser.Scene {
     let frames=0;
     while(this.accumulator>=STEP && frames<6){
       this.step(STEP);
+      if(this.training)this.restoreTrainingHealth();
       this.accumulator-=STEP;
       frames++;
     }
@@ -474,15 +499,15 @@ export class ArenaScene extends Phaser.Scene {
     }
     // Once someone has 0 HP, freeze the remaining fight and let the KO fall
     // finish before displaying the winner. There can be no extra attacks.
-    if(this.player1.knockedOut || this.player2.knockedOut) {
+    if(!this.training && (this.player1.knockedOut || this.player2.knockedOut)) {
       this.advanceFallenFighters(dt);
       if((!this.player1.knockedOut || this.player1.knockoutSettled) &&
          (!this.player2.knockedOut || this.player2.knockoutSettled)) this.finishRound();
       return;
     }
-    this.roundTime=Math.max(0,this.roundTime-dt);
+    if(!this.training)this.roundTime=Math.max(0,this.roundTime-dt);
     const input1=this.controls.read(0);
-    const input2=this.mode==='cpu'?this.cpuInput(dt):this.controls.read(1);
+    const input2=this.mode==='cpu'?this.trainingCpuInput(dt):this.controls.read(1);
     const just1=justPressed(input1,this.prev1);
     const just2=justPressed(input2,this.prev2);
     this.prev1=input1;this.prev2=input2;
@@ -555,7 +580,7 @@ export class ArenaScene extends Phaser.Scene {
     // If HP reaches zero now, the next fixed step will animate the fall.
     // A timeout can end the round immediately, with the defeated fighter
     // continuing its knockdown in the round-over branch.
-    if(this.roundTime<=0 && !this.duel && !this.duelPending && !this.duelAftermath) {
+    if(!this.training && this.roundTime<=0 && !this.duel && !this.duelPending && !this.duelAftermath) {
       this.finishRound();
     }
   }
@@ -756,6 +781,20 @@ export class ArenaScene extends Phaser.Scene {
    */
   private cpuSplashDefense(session:SplashSession):InputState {
     const input=emptyInput();
+    if(this.training){
+      if(this.trainingBehavior==='passive')return input;
+      if(this.trainingBehavior==='guard'){
+        if(session.elapsed>=.12){input.down=true;input.block=true;}
+        return input;
+      }
+      if(this.trainingBehavior==='attack') {
+        if(session.elapsed>=.12 && this.aiCount%4===1 &&
+           Math.abs(this.player1.x-this.player2.x)<100){
+          input.light=true;
+        }
+        return input;
+      }
+    }
     if(session.elapsed>=.20 && this.aiCount%3===0){
       input.down=true;input.block=true;
     } else if(session.elapsed>=.11 && this.aiCount%5===1 &&
@@ -1004,9 +1043,14 @@ export class ArenaScene extends Phaser.Scene {
     }
     duel.elapsed=Math.min(DUEL_DURATION,duel.elapsed+dt);
     if(this.mode==='cpu' && duel.choices[1]===null && duel.elapsed>=.32) {
+      if(this.training){
+        duel.choices[1]=trainingDuelPick(this.trainingBehavior,
+          duel.defender===this.player2,this.aiCount);
+      }else{
       const pool: DuelChoice[] = duel.defender===this.player2
         ? ['light','heavy','kick','block'] : ['light','heavy','kick'];
       duel.choices[1]=pool[Math.floor(Math.random()*pool.length)];
+      }
     }
     if(duel.elapsed>=DUEL_DURATION) this.resolveDuelChoices(duel);
   }
@@ -1111,6 +1155,62 @@ export class ArenaScene extends Phaser.Scene {
       targets:label,y:y-38,alpha:0,duration:630,ease:'Quad.easeOut',
       onComplete:()=>label.destroy(),
     });
+  }
+
+  /** Practice never ends on KO: refill HP immediately while keeping
+   * fighters, current stage and both energy meters. Fighter cleans up
+   * knockout/fall state so a lethal strike cannot leave a permanent corpse.
+   */
+  private restoreTrainingHealth():void {
+    const healed:string[]=[];
+    if(shouldRestoreTrainingHealth(this.training,this.player1.hp) &&
+       this.player1.restoreTrainingHealth()){
+      healed.push(getCharacter(this.player1.id).name);
+      this.healthTrail1=makeHealthTrail(MAX_HEALTH);
+      this.combatNotice('HP REFILL!',this.player1.x,GROUND_Y-190,0x8cf4c0);
+    }
+    if(shouldRestoreTrainingHealth(this.training,this.player2.hp) &&
+       this.player2.restoreTrainingHealth()){
+      healed.push(getCharacter(this.player2.id).name);
+      this.healthTrail2=makeHealthTrail(MAX_HEALTH);
+      this.combatNotice('HP REFILL!',this.player2.x,GROUND_Y-190,0x8cf4c0);
+    }
+    if(healed.length)this.onStatus('ТРЕНУВАННЯ: '+
+      healed.join(' і ')+' відновлює 200 HP. Тренування триває!');
+  }
+
+  /** The normal CPU stays unchanged in arcade mode. Practice exposes four
+   * deliberately different, selectable input policies for the dummy.
+   */
+  private trainingCpuInput(dt:number):InputState {
+    if(!this.training)return this.cpuInput(dt);
+    if(this.trainingBehavior==='passive')return emptyInput();
+    if(this.trainingBehavior==='guard'){
+      const input=emptyInput();
+      input.block=true;
+      input.down=trainingCrouchGuard(this.player1.attack?.spec.level??null);
+      return input; // No locomotion or attacks in guard-only mode.
+    }
+    const input=this.cpuInput(dt);
+    if(this.trainingBehavior==='attack'){
+      // Offensive-only dummy still closes the gap and throws, but never
+      // raises a normal block, including against a telegraphed attack.
+      if(this.grapple?.defender===this.player2){
+        input.block=false;input.down=false;input.light=true;
+        return input;
+      }
+      const wasBlocking=input.block;
+      input.block=false;
+      if(wasBlocking){
+        input.down=false;
+        const forward=this.player1.x>this.player2.x?'right':'left';
+        if(Math.abs(this.player1.x-this.player2.x)>105){
+          input[forward]=true;
+          input[forward==='left'?'right':'left']=false;
+        }
+      }
+    }
+    return input;
   }
 
   private cpuInput(dt: number): InputState {
@@ -1417,7 +1517,7 @@ export class ArenaScene extends Phaser.Scene {
     this.splashLabel1.setText(this.player1.splashEnergy>=100?'SPLASH READY!':'SPLASH');
     this.splashLabel2.setText(this.player2.splashEnergy>=100?'SPLASH READY!':'SPLASH');
     // Two victory pips at each side; no round is awarded for a draw.
-    for(let i=0;i<2;i++){
+    for(let i=0;i<(this.training?0:2);i++){
       const x1=left+284-i*22,x2=right+16+i*22;
       this.hud.fillStyle(i<this.matchWins[0]?p1Color:0x171a2e,.96).fillCircle(x1,36,8);
       this.hud.fillStyle(i<this.matchWins[1]?p2Color:0x171a2e,.96).fillCircle(x2,36,8);
@@ -1434,7 +1534,7 @@ export class ArenaScene extends Phaser.Scene {
       this.hud.lineStyle(2,0xe6d0fd,.82).strokeRect(x,y,full,h);
       this.hud.lineStyle(2,0xffffff,.9).lineBetween(480,y,480,y+h);
     }
-    this.timeLabel.setText(String(Math.ceil(this.roundTime)));
+    this.timeLabel.setText(this.training?'∞':String(Math.ceil(this.roundTime)));
   }
 
   private drawHealth(x:number,y:number,hp:number,trailHp:number,color:number,right:boolean): void {

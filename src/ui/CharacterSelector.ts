@@ -41,6 +41,7 @@ export class CharacterSelector {
   private bioReturn: HTMLButtonElement;
   private bioPreviousFocus: HTMLElement | null = null;
   private mode: MatchMode = 'cpu';
+  private training=false;
   private picks: [FighterId, FighterId];
   private ready: [boolean, boolean] = [false, false];
   private allowBack = true;
@@ -175,9 +176,11 @@ export class CharacterSelector {
     mode: MatchMode,
     allowBack: boolean,
     previous?: { first: FighterId; second: FighterId },
+    training=false,
   ): void {
     this.closeBio(false);
-    this.mode = mode;
+    this.training=training;
+    this.mode = training?'cpu':mode;
     const valid = previous && previous.first !== previous.second &&
       CHARACTERS.some(c => c.id === previous.first) &&
       CHARACTERS.some(c => c.id === previous.second);
@@ -288,7 +291,7 @@ export class CharacterSelector {
   }
 
   private switchMode(mode: MatchMode): void {
-    if (this.isBioOpen || this.mode === mode) return;
+    if (this.isBioOpen || this.training || this.mode === mode) return;
     this.mode = mode;
     this.ready = [false, false];
     this.paint();
@@ -303,15 +306,20 @@ export class CharacterSelector {
 
   private paint(): void {
     const versus = this.mode === 'versus';
+    this.versusButton.hidden=this.training;
+    this.cpuButton.textContent=this.training?'🎯 Тренування':'⚡ CPU';
     this.cpuButton.classList.toggle('selected', !versus);
     this.versusButton.classList.toggle('selected', versus);
     this.cpuButton.setAttribute('aria-pressed', String(!versus));
     this.versusButton.setAttribute('aria-pressed', String(versus));
     this.backButton.hidden = !this.allowBack;
-    this.secondLabel.textContent = versus ? 'P2 · ГРАВЕЦЬ 2' : '⚡ СУПЕРНИК CPU';
-    this.instructions.textContent = versus
-      ? 'PvP · Свайп для вибору · Торкнись бійця для історії · Підтверди готовність'
-      : 'CPU · Свайп для вибору · Торкнись бійця для історії · Далі: арена';
+    this.secondLabel.textContent = versus ? 'P2 · ГРАВЕЦЬ 2' :
+      this.training?'🎯 ТРЕНУВАЛЬНИЙ СУПЕРНИК':'⚡ СУПЕРНИК CPU';
+    this.instructions.textContent = this.training
+      ? 'ТРЕНУВАННЯ · Два бійці · Нескінченне здоров’я · Поведінка CPU в меню бою'
+      : versus
+        ? 'PvP · Свайп для вибору · Торкнись бійця для історії · Підтверди готовність'
+        : 'CPU · Свайп для вибору · Торкнись бійця для історії · Далі: арена';
 
     this.randomButton.hidden = versus;
     for (const p of [0, 1] as const) {
@@ -355,7 +363,7 @@ export class CharacterSelector {
 
     const [a,b] = this.picks;
     this.lineup.textContent = 'P1: ' + getCharacter(a).name + '  ⚔  ' +
-      (versus ? 'P2: ' : 'CPU: ') + getCharacter(b).name;
+      (versus ? 'P2: ' : this.training?'ТРЕНЕР: ':'CPU: ') + getCharacter(b).name;
     this.startButton.disabled = a === b || (versus && !this.ready.every(Boolean));
     this.startButton.textContent = versus ? '🥊 Далі: арена' : '✓ Далі: арена';
   }

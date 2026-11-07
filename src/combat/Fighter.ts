@@ -536,6 +536,32 @@ export class Fighter {
     return 0;
   }
 
+  /** In endless practice a KO is immediately undone without resetting
+   * position or energy. Clear all defeat/knockdown states too, since zero HP
+   * normally initiates the permanent knockout animation on impact.
+   */
+  restoreTrainingHealth():boolean {
+    if(this.hp>0)return false;
+    this.hp=MAX_HEALTH;
+    this.knockoutForever=false;
+    this.knockdownPhase=null;
+    this.knockdownTimer=0;
+    this.knockdownFlightAge=0;
+    this.yOffset=0;this.vy=0;
+    this.stunned=0;this.blockstun=0;
+    this.attack=null;
+    this.grabPose=null;this.grabRecovery=0;
+    this.comboRecovery=0;this.duelWhiffRecovery=0;
+    this.duelStarterFinished=false;
+    this.rollElapsed=-1;
+    this.queuedSolo=null;this.queuedSpecial=0;
+    this.clearCombo();
+    this.blocking=false;this.crouching=false;this.walking=false;
+    this.impactVelocity=0;this.hitFlash=0;
+    this.draw(0);
+    return true;
+  }
+
   reset(x: number, face: 1 | -1, preserveSplash=false): void {
     this.x=x; this.face=face; this.hp=MAX_HEALTH; this.energy=0;
     if(!preserveSplash) this.splashEnergy=0;
