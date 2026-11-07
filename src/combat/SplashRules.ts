@@ -16,7 +16,7 @@ export interface SplashMove {
 /** These are distinct, full-length finishers, not reskinned normal specials. */
 export const SPLASH_MOVES: Record<SplashId, SplashMove> = {
   evi:  {name:'Танець кришталевого віяла', duration:2.55, damage:43, pulses:7, color:0xf49bc8},
-  runa: {name:'Удар Мідного Бастіону', duration:2.90, damage:50, pulses:5, color:0xefac76},
+  runa: {name:'Хвиля Мідного Бастіону', duration:2.90, damage:50, pulses:5, color:0xefac76},
   lyra: {name:'Полум’яний вихор', duration:2.65, damage:45, pulses:6, color:0xffb165},
   kai:  {name:'Гроза тисячі іскор', duration:2.35, damage:40, pulses:9, color:0x6ce5f7},
 };
