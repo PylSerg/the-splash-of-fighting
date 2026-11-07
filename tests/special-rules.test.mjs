@@ -26,7 +26,7 @@ assert.equal(earnedMeterFromDamage(62.5),15,
 assert.equal(specialSplashBonus(0),0);
 assert.equal(specialSplashBonus(65),13,
   'special hits give ONLY separate splash energy as 1 point per 1% HP removed');
-assert.equal(specialSplashBonus(33),6.6);
+assert.ok(Math.abs(specialSplashBonus(33)-6.6)<1e-9);
 assert.deepEqual(SPECIAL_CHARGE_MARKS,[0,15,35,60,100],
   'HUD subdivisions exactly at 15%,35%,60%');
 assert.equal(SPECIAL_MIN_CHARGE,15);
