@@ -25,15 +25,17 @@ export function eviHandTargets(input:EviMotionInput,_pose:EviPose):HandTargets{
   const name=input.name;
   if(isEviFanSlash(name)){
     const phase=sideSlashBlend(input.elapsed??0,input.startup??.42,input.duration??.9);
-    // A FAN CUT must cross the opponent's silhouette, not stab along +Z.
-    // Sweep the right wrist sideways across the chest, carrying the
-    // opened blade in a shallow forward arc. High Y/duel cuts travel
-    // through head height; X and crouch-X occupy lower guard lanes.
+    // Winding up across the FRONT of the torso concealed the preparation
+    // behind Evi's body in her 3/4 side-facing stance. Pull the right hand
+    // visibly BACK, OUT and UP to the far side of her shoulder first;
+    // then drive the OPEN fan forward through the opponent's silhouette.
+    // The real world-screen direction depends on both X and Z after yaw.
     const high=name==='heavy'||name==='duel';
     const low=name==='crouchMid';
-    const cutHeight=high?.62:low?.22:name==='special'?.46:.40;
-    const back:Vec3={x:-.10,y:high?.55:low?.25:name==='special'?.43:.38,z:.25};
-    const strike:Vec3={x:.59,y:cutHeight,z:.51};
+    const cutHeight=high?.68:low?.23:name==='special'?.50:.42;
+    const windupHeight=high?.72:low?.32:name==='special'?.55:.48;
+    const back:Vec3={x:.62,y:windupHeight,z:-.28};
+    const strike:Vec3={x:.43,y:cutHeight,z:.67};
     const prepared=blend(right,back,phase.windup);
     return {
       right:blend(blend(prepared,strike,phase.release),right,phase.recovery),
@@ -91,16 +93,23 @@ export function eviHandTargets(input:EviMotionInput,_pose:EviPose):HandTargets{
   }
 }
 
-/** Blade follows the sideways arm sweep with a wrist turn, rather than
- * pointing at the rival like a spear. Returns neutral orientation at rest.
- * The original fan yaw still points toward the fighter's current opponent.
+/** Staged fan windup: draw the OPEN blades up beside/behind the shoulder,
+ * coil the upper body away, then release the cut with a rapid wrist turn.
+ * All angles return to zero during recovery, and the fan never changes
+ * anatomical hands. These are rendered art poses, not combat collisions.
  */
-export function eviFanSwingAngles(input:EviMotionInput):{yaw:number;roll:number}{
-  if(!isEviFanSlash(input.name))return {yaw:0,roll:0};
+export function eviFanSwingAngles(input:EviMotionInput):{
+  yaw:number;roll:number;torsoYaw:number;
+}{
+  if(!isEviFanSlash(input.name))return {yaw:0,roll:0,torsoYaw:0};
   const phase=sideSlashBlend(input.elapsed??0,input.startup??.42,input.duration??.9);
-  const yaw=(-.60*phase.windup+.84*phase.release)*(1-phase.recovery);
-  const roll=(-.48*phase.windup+.88*phase.release)*(1-phase.recovery);
-  return {yaw,roll};
+  const coiled=phase.windup*(1-phase.release)*(1-phase.recovery);
+  const cutting=phase.release*(1-phase.recovery);
+  return {
+    yaw:-.46*coiled+.30*cutting,
+    roll:1.43*coiled-.12*cutting,
+    torsoYaw:-.35*coiled+.19*cutting,
+  };
 }
 
 /** Mirror-safe shoulder/elbow targets: the anatomical right-hand is always
