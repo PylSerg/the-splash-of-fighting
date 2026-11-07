@@ -15,8 +15,9 @@ assert.equal(EVI_COMBAT_IDLE_SOURCE_HEIGHT,768);
 assert.equal(EVI_COMBAT_IDLE_FRAME_MS,185);
 assert.equal(EVI_COMBAT_IDLE_FOOT_ORIGIN_Y,741/768);
 assert.ok(EVI_COMBAT_IDLE_DISPLAY_HEIGHT>295);
-assert.equal(EVI_COMBAT_IDLE_DISPLAY_WIDTH,
-  EVI_COMBAT_IDLE_DISPLAY_HEIGHT*(512/768));
+assert.ok(Math.abs(EVI_COMBAT_IDLE_DISPLAY_WIDTH-
+  EVI_COMBAT_IDLE_DISPLAY_HEIGHT*(512/768))<1e-9,
+  'sprite display aspect ratio matches 512:768 without floating-point rounding errors');
 
 const expectedHashes=[
   '1d1849e9a4180ffec349c8ba7d495c7fe55a548e5d145683ca9f5938a5ca9d8a',
