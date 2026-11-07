@@ -107,7 +107,7 @@ export class ArenaScene extends Phaser.Scene {
   private mode: GameMode = 'cpu';
   private training=false;
   private trainingBehavior:TrainingBehavior='passive';
-  private eviVisualMode:'three'|'puppet'|'sheet'|'legacy'='puppet';
+  private eviVisualMode:'puppet'|'sheet'|'legacy'='puppet';
   private debug = false;
   private hud!: Phaser.GameObjects.Graphics;
   private debugDraw!: Phaser.GameObjects.Graphics;
@@ -346,29 +346,13 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   /** Switch artwork only. This never resets the current match or hitboxes. */
-  setEviVisualMode(mode:'three'|'puppet'|'sheet'|'legacy'):void {
+  setEviVisualMode(mode:'puppet'|'sheet'|'legacy'):void {
     this.eviVisualMode=mode;
     this.player1?.setEviVisualMode(mode);
     this.player2?.setEviVisualMode(mode);
   }
-  getEviVisualMode(): 'three'|'puppet'|'sheet'|'legacy'{
+  getEviVisualMode(): 'puppet'|'sheet'|'legacy'{
     return this.eviVisualMode;
-  }
-
-  /** Two immutable-on-read fighter snapshots for graphics-only 3D.
-   * Positions remain original Phaser world coordinates; no 3D collider.
-   */
-  getThreeBattleFrame():{
-    fighters:[ReturnType<Fighter['getThreeSnapshot']>,ReturnType<Fighter['getThreeSnapshot']>];
-    logicalWidth:number;
-    frozen:boolean;
-  } | null {
-    if(!this.hasMatch||!this.player1||!this.player2)return null;
-    return {
-      fighters:[this.player1.getThreeSnapshot(),this.player2.getThreeSnapshot()],
-      logicalWidth:this.scale?.width??960,
-      frozen:this.hitstopTime>0,
-    };
   }
 
   setMatchup(first: FighterId, second: FighterId, mode: GameMode, training=false): void {
