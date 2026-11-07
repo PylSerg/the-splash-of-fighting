@@ -18,6 +18,7 @@ import {
   eviCombatIdleKey,eviCombatIdleFrame,
 } from './EviCombatIdle.ts';
 import { groundedRollVisual } from './GroundedRollVisual.ts';
+import { FIGHTER_GROUND_Y, FIGHTER_VISUAL_SCALE } from './FighterStageLayout.ts';
 import { legacyFallVisual } from './EviGroundedTumble.ts';
 import { earnSplashEnergy, SPLASH_METER_MAX, SPLASH_INPUT_GRACE, splashFacing } from './SplashRules';
 import {
@@ -54,7 +55,8 @@ export interface ActiveAttack {
   /** 1=opening, 2=linked strike, 3=finisher; 0=non-combo attack. */
   comboStage: number;
 }
-export const GROUND_Y = 443;
+/** Shared fighter feet/collision baseline, now INSIDE the visible floor. */
+export const GROUND_Y = FIGHTER_GROUND_Y;
 export let STAGE_MIN_X = 60;
 export let STAGE_MAX_X = 900;
 /** Keep the arena center unchanged while opening up space on wide screens. */
@@ -1514,10 +1516,11 @@ export class Fighter {
       const puppetVisible=this.pixelPuppet?.root.visible===true;
       this.rig.setPosition(this.x,GROUND_Y+this.yOffset+
         (puppetVisible?0:visual.lift));
-      this.rig.setScale(this.face,puppetVisible?1:visual.fallbackScaleY);
+      this.rig.setScale(this.face*FIGHTER_VISUAL_SCALE,
+        (puppetVisible?1:visual.fallbackScaleY)*FIGHTER_VISUAL_SCALE);
       this.rig.setRotation(puppetVisible?0:this.face*visual.fallbackLean);
       this.shadow.setPosition(this.x,GROUND_Y+5);
-      this.shadow.setScale(visual.shadowScale,1);
+      this.shadow.setScale(visual.shadowScale*FIGHTER_VISUAL_SCALE,1);
       this.rig.alpha=1;
       this.guardAura.setVisible(false);
       this.body.setAlpha(this.hitFlash>0?.45:1);
@@ -1543,7 +1546,10 @@ export class Fighter {
     // Older procedural fighters must NOT headstand around their foot pivot.
     // Instead they collapse into a compact sideways silhouette. Evi's new
     // puppet folds its own joints and must not be rotated a second time.
-    this.rig.setScale(this.face,needsFallback?legacy.scaleY:1);
+    // Every fighter, including the six PNG frames and legacy art, grows
+    // around the FOOT PIVOT rather than rising off the floor.
+    this.rig.setScale(this.face*FIGHTER_VISUAL_SCALE,
+      (needsFallback?legacy.scaleY:1)*FIGHTER_VISUAL_SCALE);
     this.rig.setRotation(needsFallback
       ?this.face*fallAngle*legacy.rotationRatio:0);
     // A separate world-space shadow stays flat underneath the trajectory.
@@ -1557,6 +1563,7 @@ export class Fighter {
     this.guardAura.setScale(this.crouching ? .9 : 1,this.crouching ? .65 : 1);
     if(this.hitFlash>0) this.body.setAlpha(.45);
     else this.body.setAlpha(1);
-    this.shadow.setScale(this.airborne?Math.max(.45,1+this.yOffset/500):1,1);
+    this.shadow.setScale(
+      (this.airborne?Math.max(.45,1+this.yOffset/500):1)*FIGHTER_VISUAL_SCALE,1);
   }
 }
