@@ -75,7 +75,7 @@ assert.match(puppet,/this\.forearmR\.add\(this\.fan\)/,
   'fan must follow the arm and wrist joints');
 const fighter=readFileSync(new URL('../src/combat/Fighter.ts',import.meta.url),'utf8');
 assert.match(fighter,/this\.pixelPuppet=new EviPixelPuppet\(scene\)/);
-assert.match(fighter,/this\.pixelPuppet\?\.update\(this\.eviMotionInput\(\),_dt/,
+assert.match(fighter,/this\.pixelPuppet\?\.update\(motion,_dt/,
   'rig receives combat state and fixed-step dt but never controls hitboxes');
 assert.match(fighter,/this\.eviVisualMode==='puppet'/,
   'modular puppet is the default even with old image sheets saved');
