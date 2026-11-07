@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   TRAINING_BEHAVIORS,shouldRestoreTrainingHealth,trainingAttacks,
-  trainingGuards,trainingCrouchGuard,trainingDuelPick,
+  trainingGuards,trainingCrouchGuard,trainingDuelPick,passiveTrainingDefender,
 } from '../src/combat/TrainingRules.ts';
 
 const ids=TRAINING_BEHAVIORS.map(item=>item.id);
@@ -19,6 +19,15 @@ assert.equal(shouldRestoreTrainingHealth(false,0),false,
   'regular arcade fighters still get knocked out normally');
 assert.equal(shouldRestoreTrainingHealth(false,-10),false);
 
+assert.equal(passiveTrainingDefender(true,'passive',true),true,
+  'passive CPU cannot automatically block grab or duel');
+assert.equal(passiveTrainingDefender(true,'guard',true),false);
+assert.equal(passiveTrainingDefender(true,'both',true),false);
+assert.equal(passiveTrainingDefender(true,'attack',true),false);
+assert.equal(passiveTrainingDefender(false,'passive',true),false,
+  'normal fights keep ordinary defensive rules');
+assert.equal(passiveTrainingDefender(true,'passive',false),false,
+  'the human fighter is never silently made passive');
 assert.equal(trainingAttacks('passive'),false);
 assert.equal(trainingGuards('passive'),false);
 assert.equal(trainingAttacks('guard'),false);

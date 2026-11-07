@@ -1,8 +1,9 @@
 /** Shared rules for slow special-meter gain and lagging health feedback. */
 export const MAX_HEALTH = 200;
-export const SPECIAL_METER_MAX = 100;
-export const SPECIAL_METER_COST = 40;
-/** Roughly 67 HP of successful damage is needed to earn one special. */
+import { SPECIAL_MIN_CHARGE, SPECIAL_METER_MAX } from './SpecialRules.ts';
+export { SPECIAL_MIN_CHARGE, SPECIAL_METER_MAX };
+/** Roughly 25 actual HP damage earns the minimum 15% special charge;
+ * 167 damage fills 100% of the normal special bar. */
 export const METER_PER_DAMAGE = 0.6;
 
 /** Only actual HP removed from the rival counts. Blocks, misses,

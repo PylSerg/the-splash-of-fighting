@@ -3,7 +3,8 @@ import type { InputState } from '../input/Controls';
 import { stopsHit, strikeBand, strikeDamage, canAutoTurn, STANDING_ATTACK_LANES, type HitLevel, type GuardStance } from './HitRules';
 import { crouchMoveForPress } from './CrouchRules';
 import { blockedGrabRecoil } from './GrabRules';
-import { earnSpecialMeter, SPECIAL_METER_COST, MAX_HEALTH } from './CombatFeedback';
+import { earnSpecialMeter, MAX_HEALTH } from './CombatFeedback';
+import { canLaunchSpecial, specialDamageAt, spendSpecialCharge } from './SpecialRules.ts';
 import { earnSplashEnergy, SPLASH_METER_MAX, SPLASH_INPUT_GRACE, splashFacing } from './SplashRules';
 import {
   FIGHTER_STYLES, ATTACK_ACTIVE, WAKEUP_PROTECTION,
@@ -61,7 +62,7 @@ export const ATTACKS: Record<AttackName, AttackSpec> = {
   heavy: { duration: .48, reach: 116, damage: 11, level: STANDING_ATTACK_LANES.heavy, stun: .32, push: 185, gain: 12 },
   kick: { duration: .40, reach: 135, damage: 9, level: STANDING_ATTACK_LANES.kick, stun: .27, push: 150, gain: 10 },
   // Supers keep their own damage but behave as a mid-level strike defensively.
-  special: { duration: .82, reach: 205, damage: 20, level: 'mid', stun: .40, push: 290, gain: 0 },
+  special: { duration: .82, reach: 205, damage: 13, level: 'mid', stun: .40, push: 290, gain: 0 },
   // Crouching B: low trip. Knockdown triggers ONLY on an unblocked hit.
   sweep: { duration: .47, reach: 114, damage: 5, level: 'low', stun: .12, push: 78, gain: 8 },
   // Crouching X: short-range, weak mid jab. Strong high Y is unavailable.
@@ -75,7 +76,7 @@ const RUNA_ATTACKS: Record<AttackName,AttackSpec> = {
   light: ATTACKS.light,
   heavy: { ...ATTACKS.heavy, duration: .56, reach: 114, damage: 14, stun: .36, push: 225 },
   kick: ATTACKS.kick,
-  special: { ...ATTACKS.special, duration: .94, reach: 195, damage: 23, stun: .44, push: 335 },
+  special: { ...ATTACKS.special, duration: .94, reach: 195, damage: 16, stun: .44, push: 335 },
   sweep: { ...ATTACKS.sweep, duration: .52, reach: 121, damage: 6 },
   crouchMid: { ...ATTACKS.crouchMid, duration: .34, damage: 5 },
   duel: { ...ATTACKS.duel, duration: .50, reach: 114 },
@@ -543,6 +544,23 @@ export class Fighter {
    * position or energy. Clear all defeat/knockdown states too, since zero HP
    * normally initiates the permanent knockout animation on impact.
    */
+  /** Clear any leftover CPU attack/guard from the previous training policy.
+   * Does NOT reset HP, normal/SPLASH energy, position, or active grapple.
+   */
+  becomePassiveTrainingDummy():void {
+    this.attack=null;
+    this.queuedSolo=null;
+    this.queuedSpecial=0;
+    this.clearCombo();
+    this.blocking=false;
+    this.crouching=false;
+    this.walking=false;
+    this.stunned=0;
+    this.blockstun=0;
+    this.impactVelocity=0;
+    this.draw(0);
+  }
+
   restoreTrainingHealth():boolean {
     if(this.hp>0)return false;
     this.hp=MAX_HEALTH;
@@ -803,13 +821,14 @@ export class Fighter {
       (this.attack.name==='kick' || this.attack.name==='heavy')
     );
     if (!canLinkCombo && canAct && forwardHeld(this.face,input.left,input.right) &&
-        this.queuedSpecial>0 && this.energy>=SPECIAL_METER_COST &&
+        this.queuedSpecial>0 && canLaunchSpecial(this.energy) &&
         (!this.attack || canCancelForChord)) {
-      this.energy-=SPECIAL_METER_COST;
+      const strength=specialDamageAt(this.id,this.energy);
+      this.energy=spendSpecialCharge(this.energy);
       this.attack=null;
       this.queuedSolo=null;
       this.queuedSpecial=0;
-      this.begin('special');
+      this.begin('special',0,strength);
     } else if (!canLinkCombo && canAct && !this.attack) {
       // With a full SPLASH meter, pressing Up plus either X or Y gives
       // the second finger a short grace period. Otherwise X remains
@@ -1018,9 +1037,10 @@ export class Fighter {
   }
 
   /** Unique spec is selected at wind-up; the shared engine still resolves hits. */
-  private begin(name: AttackName, linkedStage = 0): void {
+  private begin(name: AttackName, linkedStage = 0, overrideDamage?:number): void {
     const base = this.id === 'runa' ? RUNA_ATTACKS[name] : ATTACKS[name];
     const spec=styledAttack(this.id,name,base);
+    if(name==='special' && overrideDamage!==undefined)spec.damage=overrideDamage;
     const regular=name==='light'||name==='kick'||name==='heavy';
     if(linkedStage===0) this.clearCombo();
     this.attack={name,spec,elapsed:0,connected:false,
