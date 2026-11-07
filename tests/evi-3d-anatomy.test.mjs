@@ -97,8 +97,10 @@ for(const face of [1,-1]){
   const hipLow={x:.142,y:EVI_HIP_ROOT_HEIGHT,z:threeEviStance(face,crouch).leadHipDepth};
   const standKnee=solveTwoBoneLeg(hipHigh,stand.lead).knee;
   const crouchKnee=solveTwoBoneLeg(hipLow,low.lead).knee;
-  assert.ok(crouchKnee.y<standKnee.y-.10,
-    'crouch visibly lowers the knee rather than detaching thighs from torso');
+  const standingThighDrop=hipHigh.y-standKnee.y;
+  const crouchingThighDrop=hipLow.y-crouchKnee.y;
+  assert.ok(standingThighDrop-crouchingThighDrop>.15,
+    'crouch visibly folds thighs forward instead of keeping legs rigid');
   assert.ok(low.lead.z>stand.lead.z,
     'crouch widens stance to give knees sufficient bend room');
 }
