@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {SPLASH_METER_MAX,SPLASH_WINDUP,SPLASH_MOVES,
-  earnSplashEnergy,comboSplashBonus,splashChord,splashRequested,canSplashGuard,
+  earnSplashEnergy,comboSplashBonus,splashChord,canSplashGuard,
   SPLASH_DUEL_WIN_GAIN,guidedSplashPosition,splashWindupActive,splashFacing} from '../src/combat/SplashRules.ts';
 assert.equal(SPLASH_WINDUP,0.5);
 assert.equal(splashFacing(300,400,-1,'attacker'),1,'caster turns right toward opponent');
@@ -34,11 +34,15 @@ assert.equal(comboSplashBonus(1),0);
 assert.equal(comboSplashBonus(2),0,'two connected strikes are not a complete combo');
 assert.equal(comboSplashBonus(3),24,'only the third clean hit grants splash charge');
 const noChord={up:false,light:false,heavy:false,l1:false,r1:false};
-assert.equal(splashRequested(true,noChord),true,
-  'single SPLASH touch launches without Up+X+Y');
-assert.equal(splashRequested(false,noChord),false);
-assert.equal(splashRequested(false,{...noChord,up:true,light:true,heavy:true}),true);
-assert.equal(splashRequested(false,{...noChord,up:true,l1:true,r1:true}),true);
+assert.equal(splashChord(noChord),false,'no one-tap SPLASH button exists');
+assert.equal(splashChord({...noChord,up:true,light:true}),false,
+  'Up+X alone must not fire a splash');
+assert.equal(splashChord({...noChord,up:true,heavy:true}),false,
+  'Up+Y alone must not fire a splash');
+assert.equal(splashChord({...noChord,light:true,heavy:true}),false,
+  'X+Y requires Up on the joystick');
+assert.equal(splashChord({...noChord,up:true,light:true,heavy:true}),true,
+  'Up+X+Y starts SPLASH when all three actions are held');
 assert.equal(splashChord({up:true,light:true,heavy:true,l1:false,r1:false}),true);
 assert.equal(splashChord({up:true,light:false,heavy:false,l1:true,r1:true}),true);
 assert.equal(splashChord({up:false,light:true,heavy:true,l1:false,r1:false}),false);
