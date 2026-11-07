@@ -1,21 +1,21 @@
 import assert from 'node:assert/strict';
 import {
   earnSpecialMeter, makeHealthTrail, advanceHealthTrail, healthFillRect,
-  SPECIAL_METER_COST, METER_PER_DAMAGE, HEALTH_TRAIL_TOTAL, HEALTH_TRAIL_HOLD, MAX_HEALTH,
+  SPECIAL_MIN_CHARGE, METER_PER_DAMAGE, HEALTH_TRAIL_TOTAL, HEALTH_TRAIL_HOLD, MAX_HEALTH,
 } from '../src/combat/CombatFeedback.ts';
 
 assert.equal(MAX_HEALTH,200,'fighter HP doubles without altering strike damage');
-assert.equal(SPECIAL_METER_COST, 40);
+assert.equal(SPECIAL_MIN_CHARGE, 15);
 assert.equal(METER_PER_DAMAGE, 0.6);
 assert.equal(earnSpecialMeter(0, 5), 3, 'a real light hit awards damage-proportional meter');
 assert.equal(earnSpecialMeter(0, 20), 12, 'a heavy or special hit earns more proportionally');
 assert.equal(earnSpecialMeter(10, 0), 10, 'no gain for blocked, missed or dodged attacks');
 assert.equal(earnSpecialMeter(10, -3), 10, 'no meter from negative HP changes');
 assert.equal(earnSpecialMeter(95, 20), 100, 'meter does not overflow maximum');
-assert.ok(earnSpecialMeter(0, 50)<SPECIAL_METER_COST,
-  'fifty HP worth of hits cannot fill a special');
-assert.ok(earnSpecialMeter(0, 67)>=SPECIAL_METER_COST,
-  'roughly 67 HP worth of hits earns a special');
+assert.ok(earnSpecialMeter(0, 24)<SPECIAL_MIN_CHARGE,
+  '24 HP damage is not yet enough for a 15% special');
+assert.ok(earnSpecialMeter(0, 25)>=SPECIAL_MIN_CHARGE,
+  '25 HP damage earns the first stage of the special');
 
 // 100 -> 80 HP creates a 20 HP red segment that holds for 350 ms.
 let hp=makeHealthTrail(100);
