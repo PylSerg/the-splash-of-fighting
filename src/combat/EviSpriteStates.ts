@@ -27,6 +27,26 @@ export type EviSpriteState={
 };
 export type EviVisualFrame={sheet:'combat'|'cinematic';frame:number};
 
+/** Each imported frame is a REAL independent texture, rather than a UV
+ * rectangle cut from one WebGL atlas. This prevents large neighboring
+ * sprite fragments from appearing when Phaser scales / rotates a frame.
+ */
+export function eviFrameTextureKey(kind:'combat'|'cinematic',frame:number):string {
+  const count=kind==='combat'?EVI_COMBAT_COLUMNS*EVI_COMBAT_ROWS:
+    EVI_CINEMATIC_COLUMNS*EVI_CINEMATIC_ROWS;
+  if(!Number.isInteger(frame)||frame<0||frame>=count)
+    throw new Error('Invalid Evi '+kind+' sprite index '+frame);
+  return 'evi-'+kind+'-pose-'+frame;
+}
+
+/** Frames were created on a uniform 144 × 200 artwork canvas. The feet
+ * lie close to row 190 (10 px transparent below). Keep the visual baseline
+ * at ground level; never let Phaser reset it to origin 0.5 on a frame swap.
+ */
+export const EVI_RENDER_WIDTH=125;
+export const EVI_RENDER_HEIGHT=195;
+export const EVI_FEET_ORIGIN_Y=0.95;
+
 export function frameForEvi(state:EviSpriteState):EviVisualFrame{
   if(state.cinematic){
     const p=Math.min(1,Math.max(0,state.cinematic.elapsed/EVI_CINEMATIC_SECONDS));

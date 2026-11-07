@@ -9,7 +9,7 @@ import {
 } from '../combat/StrikeClashRules';
 import { getCharacter } from '../characters/Roster';
 import {
-  atlasRects,EVI_COMBAT_COLUMNS,EVI_COMBAT_ROWS,
+  atlasRects,eviFrameTextureKey,EVI_COMBAT_COLUMNS,EVI_COMBAT_ROWS,
   EVI_CINEMATIC_COLUMNS,EVI_CINEMATIC_ROWS,
 } from '../combat/EviSpriteStates.ts';
 import {
@@ -278,30 +278,65 @@ export class ArenaScene extends Phaser.Scene {
     return { first: this.player1.id, second: this.player2.id, mode: this.mode };
   }
 
-  /** Load a player-provided sprite sheet while preserving combat state.
-   * The sheet is divided into consistent grid frames after image decoding,
-   * so Phaser never assumes that 1448 divides evenly by 7 or 5.
+  /** Isolate every pose into its own Phaser texture.
+   * A WebGL atlas samples neighboring cells when sprite UVs move under
+   * transformation. Canvas-isolated frames have no adjacent artwork to
+   * leak into jumps, spins, sweeps or splash windups.
    */
   installEviSheet(kind:'combat'|'cinematic',image:HTMLImageElement):void {
-    const key='evi-'+kind;
     const columns=kind==='combat'?EVI_COMBAT_COLUMNS:EVI_CINEMATIC_COLUMNS;
     const rows=kind==='combat'?EVI_COMBAT_ROWS:EVI_CINEMATIC_ROWS;
     if(image.naturalWidth<columns*24||image.naturalHeight<rows*36)
       throw new Error('Спрайт-лист занадто малий для потрібної сітки.');
-    this.player1?.clearSpriteArt();
-    this.player2?.clearSpriteArt();
-    if(this.textures.exists(key))this.textures.remove(key);
-    const texture=this.textures.addImage(key,image);
-    if(!texture)throw new Error('Не вдалося додати текстуру до Phaser.');
-    for(const part of atlasRects(image.naturalWidth,image.naturalHeight,columns,rows))
-      texture.add(part.name,0,part.x,part.y,part.width,part.height);
+    // Validate all cells and render to isolated canvas buffers FIRST.
+    // The user's current art stays intact if a canvas cannot be created.
+    const cells=atlasRects(image.naturalWidth,image.naturalHeight,columns,rows);
+    const canvases=cells.map(part=>{
+      const canvas=document.createElement('canvas');
+      canvas.width=part.width;canvas.height=part.height;
+      const context=canvas.getContext('2d');
+      if(!context)throw new Error('Браузер не підтримує підготовку кадрів.');
+      context.imageSmoothingEnabled=false;
+      context.clearRect(0,0,part.width,part.height);
+      context.drawImage(image,part.x,part.y,part.width,part.height,
+        0,0,part.width,part.height);
+      return canvas;
+    });
+    this.player1?.clearSpriteArt();this.player2?.clearSpriteArt();
+    this.removeEviFrameTextures(kind);
+    const keys:string[]=[];
+    try{
+      canvases.forEach((canvas,index)=>{
+        const key=eviFrameTextureKey(kind,index);
+        const texture=this.textures.addCanvas(key,canvas);
+        if(!texture)throw new Error('Не вдалося підготувати кадр '+index+'.');
+        keys.push(key);
+      });
+    }catch(error){
+      for(const key of keys)if(this.textures.exists(key))this.textures.remove(key);
+      this.refreshSpriteArt();
+      throw error;
+    }
     this.refreshSpriteArt();
+  }
+
+  private removeEviFrameTextures(kind:'combat'|'cinematic'):void {
+    const frames=kind==='combat'
+      ? EVI_COMBAT_COLUMNS*EVI_COMBAT_ROWS
+      : EVI_CINEMATIC_COLUMNS*EVI_CINEMATIC_ROWS;
+    for(let frame=0;frame<frames;frame++){
+      const key=eviFrameTextureKey(kind,frame);
+      if(this.textures.exists(key))this.textures.remove(key);
+    }
+    // Clean up old shared-atlas textures during an in-page reimport.
+    const oldKey='evi-'+kind;
+    if(this.textures.exists(oldKey))this.textures.remove(oldKey);
   }
 
   removeEviSheets():void {
     this.player1?.clearSpriteArt();this.player2?.clearSpriteArt();
-    for(const key of ['evi-combat','evi-cinematic'])
-      if(this.textures.exists(key))this.textures.remove(key);
+    this.removeEviFrameTextures('combat');
+    this.removeEviFrameTextures('cinematic');
     this.refreshSpriteArt();
   }
 
