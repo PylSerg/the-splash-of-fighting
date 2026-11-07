@@ -9,6 +9,10 @@ import {
 } from '../combat/StrikeClashRules';
 import { getCharacter } from '../characters/Roster';
 import {
+  atlasRects,EVI_COMBAT_COLUMNS,EVI_COMBAT_ROWS,
+  EVI_CINEMATIC_COLUMNS,EVI_CINEMATIC_ROWS,
+} from '../combat/EviSpriteStates.ts';
+import {
   type TrainingBehavior, shouldRestoreTrainingHealth,
   trainingCrouchGuard, trainingDuelPick, passiveTrainingDefender,
 } from '../combat/TrainingRules';
@@ -274,10 +278,35 @@ export class ArenaScene extends Phaser.Scene {
     return { first: this.player1.id, second: this.player2.id, mode: this.mode };
   }
 
-  /** Apply imported pixel sheets to any fighter who is already on stage. */
+  /** Load a player-provided sprite sheet while preserving combat state.
+   * The sheet is divided into consistent grid frames after image decoding,
+   * so Phaser never assumes that 1448 divides evenly by 7 or 5.
+   */
+  installEviSheet(kind:'combat'|'cinematic',image:HTMLImageElement):void {
+    const key='evi-'+kind;
+    const columns=kind==='combat'?EVI_COMBAT_COLUMNS:EVI_CINEMATIC_COLUMNS;
+    const rows=kind==='combat'?EVI_COMBAT_ROWS:EVI_CINEMATIC_ROWS;
+    if(image.naturalWidth<columns*24||image.naturalHeight<rows*36)
+      throw new Error('Спрайт-лист занадто малий для потрібної сітки.');
+    this.player1?.clearSpriteArt();
+    this.player2?.clearSpriteArt();
+    if(this.textures.exists(key))this.textures.remove(key);
+    const texture=this.textures.addImage(key,image);
+    if(!texture)throw new Error('Не вдалося додати текстуру до Phaser.');
+    for(const part of atlasRects(image.naturalWidth,image.naturalHeight,columns,rows))
+      texture.add(part.name,0,part.x,part.y,part.width,part.height);
+    this.refreshSpriteArt();
+  }
+
+  removeEviSheets():void {
+    this.player1?.clearSpriteArt();this.player2?.clearSpriteArt();
+    for(const key of ['evi-combat','evi-cinematic'])
+      if(this.textures.exists(key))this.textures.remove(key);
+    this.refreshSpriteArt();
+  }
+
   refreshSpriteArt():void {
-    this.player1?.refreshSpriteArt();
-    this.player2?.refreshSpriteArt();
+    this.player1?.refreshSpriteArt();this.player2?.refreshSpriteArt();
   }
 
   setMatchup(first: FighterId, second: FighterId, mode: GameMode, training=false): void {
