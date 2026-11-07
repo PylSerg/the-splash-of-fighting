@@ -783,7 +783,7 @@ export class ArenaScene extends Phaser.Scene {
     // The attacker must start upright. The target must be standing or walking:
     // crouches and jumps evade a grab, even on their first input frame.
     // Horizontal input never excludes a defender who is simply walking.
-    return !defender.wakeupProtected && !attackerInput.down && !attackerInput.up && !attackerInput.jump &&
+    return attacker.blockstun<=0 && !defender.wakeupProtected && !attackerInput.down && !attackerInput.up && !attackerInput.jump &&
       !attackerInput.roll && !attacker.crouching && !attacker.knockedOut &&
       attacker.stunned<=0 && defender.stunned<=0 &&
       !attacker.airborne && !attacker.knockedDown && !attacker.isRolling &&
@@ -922,6 +922,7 @@ export class ArenaScene extends Phaser.Scene {
       const throwDamage=g.attacker.throwDamage;
       const actualDamage=g.defender.receiveThrow(throwDamage,face);
       g.attacker.rewardDamage(actualDamage);
+      this.hitstopTime=Math.max(this.hitstopTime,.10);
       g.attacker.grabPose='throw';
       g.attacker.grabRecovery=.40;
       g.defender.grabPose=null;
@@ -1090,6 +1091,7 @@ export class ArenaScene extends Phaser.Scene {
     },winner.face,true);
     winner.rewardDamage(hit.damage);
     winner.gainSplash(SPLASH_DUEL_WIN_GAIN);
+    this.hitstopTime=Math.max(this.hitstopTime,.10);
     this.cameras.main.shake(165,.008);
     this.spawnSparks(loser.x,GROUND_Y-103,false);
     this.combatNotice('DUEL WIN!',loser.x,GROUND_Y-240,0xffd18c);
