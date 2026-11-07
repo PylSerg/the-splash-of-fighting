@@ -29,9 +29,7 @@ for(const fighter of ['evi','runa','lyra','kai']){
 assert.notEqual(getMoveGuide('evi').name,getMoveGuide('runa').name);
 assert.notEqual(getMoveGuide('evi').notes,getMoveGuide('runa').notes);
 assert.notEqual(
-  getMoveGuide('evi').sections[1].moves.find(x=>x.buttons.includes('SPLASH') &&
-    x.description.includes('енергії'))?.description,
-  getMoveGuide('runa').sections[1].moves.find(x=>x.buttons.includes('SPLASH') &&
-    x.description.includes('енергії'))?.description,
+  getMoveGuide('evi').sections[1].moves.find(x=>x.buttons==='↑ + X + Y')?.description,
+  getMoveGuide('runa').sections[1].moves.find(x=>x.buttons==='↑ + X + Y')?.description,
   'unique SPLASH move belongs to the selected fighter');
 console.log('✓ Full per-character move guides, all six combo routes and corrected heights: passed.');
