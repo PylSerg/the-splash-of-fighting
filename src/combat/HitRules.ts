@@ -1,5 +1,10 @@
 /** Arcade attack lanes: high passes over crouching fighters, low reaches feet. */
 export type HitLevel = 'high' | 'mid' | 'low';
+
+/** Single source of truth for the three standing attacks. */
+export const STANDING_ATTACK_LANES = {
+  heavy:'high', light:'mid', kick:'low',
+} as const satisfies Record<'heavy'|'light'|'kick',HitLevel>;
 export type GuardStance = 'standing' | 'crouching' | 'none';
 
 /** An active low/standing guard holds its initial facing, including the

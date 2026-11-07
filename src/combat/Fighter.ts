@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { InputState } from '../input/Controls';
-import { stopsHit, strikeBand, strikeDamage, canAutoTurn, type HitLevel, type GuardStance } from './HitRules';
+import { stopsHit, strikeBand, strikeDamage, canAutoTurn, STANDING_ATTACK_LANES, type HitLevel, type GuardStance } from './HitRules';
 import { crouchMoveForPress } from './CrouchRules';
 import { blockedGrabRecoil } from './GrabRules';
 import { earnSpecialMeter, SPECIAL_METER_COST, MAX_HEALTH } from './CombatFeedback';
@@ -57,9 +57,9 @@ const ROLL_COOLDOWN = .88;
 const ROLL_IFRAME_START = .095;
 const ROLL_IFRAME_END = .31;
 export const ATTACKS: Record<AttackName, AttackSpec> = {
-  light: { duration: .27, reach: 92, damage: 5, level: 'low', stun: .18, push: 110, gain: 7 },
-  heavy: { duration: .48, reach: 116, damage: 11, level: 'high', stun: .32, push: 185, gain: 12 },
-  kick: { duration: .40, reach: 135, damage: 9, level: 'mid', stun: .27, push: 150, gain: 10 },
+  light: { duration: .27, reach: 92, damage: 5, level: STANDING_ATTACK_LANES.light, stun: .18, push: 110, gain: 7 },
+  heavy: { duration: .48, reach: 116, damage: 11, level: STANDING_ATTACK_LANES.heavy, stun: .32, push: 185, gain: 12 },
+  kick: { duration: .40, reach: 135, damage: 9, level: STANDING_ATTACK_LANES.kick, stun: .27, push: 150, gain: 10 },
   // Supers keep their own damage but behave as a mid-level strike defensively.
   special: { duration: .82, reach: 205, damage: 20, level: 'mid', stun: .40, push: 290, gain: 0 },
   // Crouching B: low trip. Knockdown triggers ONLY on an unblocked hit.

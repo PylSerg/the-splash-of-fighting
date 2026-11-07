@@ -1,5 +1,5 @@
-import { deriveCommandChords } from './CommandRules';
-import { splashChord } from '../combat/SplashRules';
+import { deriveCommandChords, visualChords } from './CommandRules';
+import { splashRequested } from '../combat/SplashRules';
 
 export type Action = 'left' | 'right' | 'up' | 'down' | 'jump' | 'light' | 'heavy' | 'kick' | 'block' | 'grab' | 'special' | 'duel' | 'roll' | 'splash';
 export type InputState = Record<Action, boolean>;
@@ -63,6 +63,9 @@ export class Controls {
   private keys = new Set<string>();
   private touches = new Map<number, Action>();
   private buttons = new Map<Action, HTMLButtonElement>();
+  /** One-tap splash works reliably on phones, with no three-finger chord. */
+  private splashButton: HTMLButtonElement | null = null;
+  private splashReady=false;
   // One-finger duel swipe: drag a held B (kick) onto Y (heavy), or the reverse.
   // The gesture remains active for the pointer lifetime, like a two-button chord.
   private comboSwipePointers = new Set<number>();
@@ -107,6 +110,8 @@ export class Controls {
 
     this.bindJoystick();
     this.bindAttackButtons();
+    this.splashButton=document.querySelector<HTMLButtonElement>('#btn-splash');
+    this.setSplashReady(false);
   }
 
   private bindJoystick(): void {
@@ -252,17 +257,37 @@ export class Controls {
   }
 
   private updateVisuals(): void {
-    const pressed = new Set(this.touches.values());
-    for (const [action, button] of this.buttons) {
-      button.classList.toggle('pressed', pressed.has(action));
+    const pressed=new Set(this.touches.values());
+    const diamond=document.querySelector('.touch-attacks');
+    const chord=visualChords({
+      light:pressed.has('light'),heavy:pressed.has('heavy'),
+      kick:pressed.has('kick'),block:pressed.has('block'),
+      specialSwipe:this.specialSwipePointers.size>0 ||
+        performance.now()<this.specialSwipePulseUntil,
+      duelSwipe:this.comboSwipePointers.size>0 ||
+        performance.now()<this.comboSwipePulseUntil,
+      grabSwipe:this.grabSwipePointers.size>0,
+    });
+    for(const [action,button] of this.buttons){
+      button.classList.toggle('pressed',pressed.has(action) &&
+        !(action==='heavy' && chord.special));
     }
-    const diamond = document.querySelector('.touch-attacks');
-    diamond?.classList.toggle('combo-active',
-      (pressed.has('kick') && pressed.has('heavy')) ||
-      (pressed.has('light') && pressed.has('heavy')) || this.comboSwipePointers.size > 0 ||
-      (pressed.has('kick') && pressed.has('block')) || this.specialSwipePointers.size > 0);
-    diamond?.classList.toggle('grab-active',
-      (pressed.has('light') && pressed.has('block')) || this.grabSwipePointers.size > 0);
+    // A+B MUST highlight A and B, never Y. The old shared combo-active
+    // class incorrectly made Y appear pressed on the special chord.
+    diamond?.classList.toggle('duel-active',chord.duel);
+    diamond?.classList.toggle('special-active',chord.special);
+    diamond?.classList.toggle('grab-active',chord.grab);
+  }
+
+  setSplashReady(ready:boolean):void {
+    if(!this.splashButton)return;
+    if(ready===this.splashReady && this.splashButton.disabled===!ready)return;
+    this.splashReady=ready;
+    this.splashButton.disabled=!ready;
+    this.splashButton.classList.toggle('is-ready',ready);
+    this.splashButton.setAttribute('aria-label',ready
+      ? 'SPLASH готовий: натисни для здібності на всю арену'
+      : 'SPLASH: накопич 100 енергії для запуску');
   }
 
   clear(): void {
@@ -325,12 +350,16 @@ export class Controls {
     });
     state.duel=commands.duel;
     state.special=commands.special;
-    state.splash=splashChord({
+    state.splash=splashRequested(Boolean(touched?.has('splash')),{
       up:state.up,light:state.light,heavy:state.heavy,l1:l1Down,r1:r1Down,
     });
     if(state.splash){
-      // Up+X+Y and Up+L1+R1 supersede their component duel/grab keys.
+      // The dedicated button and Up+X+Y / Up+L1+R1 take priority.
       state.duel=false;state.special=false;
+    } else if(state.special){
+      // A+B is never also a Y attack. Shield accidental overlaps with
+      // the nearby Y touch region without suppressing a genuine splash.
+      state.heavy=false;
     }
     const touchGrabSwipe = player === 0 &&
       (this.grabSwipePointers.size > 0 ||

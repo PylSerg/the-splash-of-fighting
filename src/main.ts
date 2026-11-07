@@ -6,6 +6,7 @@ import { ArenaScene } from './scenes/ArenaScene';
 import { TouchLayoutEditor } from './ui/TouchLayoutEditor';
 import { CharacterSelector, type MatchMode } from './ui/CharacterSelector';
 import { StageSelector } from './ui/StageSelector';
+import { getMoveGuide } from './ui/MoveGuide';
 import { CHARACTERS, getCharacter, portraitSvg } from './characters/Roster';
 import gamePackage from '../package.json';
 import { getStage, type StageId } from './stages/Stages';
@@ -14,7 +15,7 @@ import type { TrainingBehavior } from './combat/TrainingRules';
 
 type Pair = { first: FighterId; second: FighterId; mode: MatchMode; training:boolean };
 type Screen = 'home' | 'characters' | 'stages' | 'battle' | 'menu' | 'layout';
-type MenuTab = 'game' | 'controls' | 'display' | 'help';
+type MenuTab = 'game' | 'moves' | 'controls' | 'display' | 'help';
 type DisruptiveAction = 'restart' | 'characters' | 'stage' | 'exit';
 const get = <T extends HTMLElement>(selector: string): T => {
   const el=document.querySelector<T>(selector);
@@ -72,6 +73,7 @@ let stageOrigin: 'new' | 'menu' | 'after-fighters'='new';
 let activePair: Pair | null=null;
 let pendingPair: Pair | null=null;
 let activeStage: StageId='city';
+let guidePlayer:0|1=0;
 let requestedTraining=false;
 let logicalWidth=960;
 let gamepadStartHeld=false;
@@ -157,7 +159,7 @@ function setScreen(next: Screen): void {
 }
 function selectMenuTab(tab: MenuTab): void {
   // The front-screen settings panel has no fight actions.
-  if (menuOrigin==='home' && tab==='game') tab='controls';
+  if (menuOrigin==='home' && (tab==='game'||tab==='moves')) tab='controls';
   for(const button of document.querySelectorAll<HTMLButtonElement>('[data-menu-tab]')){
     const chosen=button.dataset.menuTab===tab;
     button.classList.toggle('selected',chosen);
@@ -167,6 +169,51 @@ function selectMenuTab(tab: MenuTab): void {
     pane.hidden=pane.dataset.menuPane!==tab;
   }
 }
+/** Create the move list from real combo routes and fighter profiles.
+ * Both players may inspect their selected fighter without leaving the fight.
+ */
+function paintMoveGuide():void {
+  if(!activePair)return;
+  const data=getMoveGuide(guidePlayer===0?activePair.first:activePair.second);
+  for(const button of document.querySelectorAll<HTMLButtonElement>('[data-guide-fighter]')){
+    const slot=Number(button.dataset.guideFighter);
+    const selected=slot===guidePlayer;
+    button.classList.toggle('selected',selected);
+    button.setAttribute('aria-pressed',String(selected));
+    button.textContent=(slot===0?'P1: ':'P2: ')+getCharacter(
+      slot===0?activePair.first:activePair.second).name;
+  }
+  const root=get<HTMLElement>('#combo-guide');
+  root.replaceChildren();
+  const heading=document.createElement('div');
+  heading.className='combo-guide-identity';
+  const name=document.createElement('strong');
+  name.textContent=data.name+' · '+data.subtitle;
+  const notes=document.createElement('p');
+  notes.textContent=data.notes;
+  heading.append(name,notes);
+  root.append(heading);
+  for(const section of data.sections){
+    const block=document.createElement('section');
+    block.className='combo-guide-section';
+    const title=document.createElement('h3');
+    title.textContent=section.title;
+    block.append(title);
+    for(const move of section.moves){
+      const row=document.createElement('div');
+      row.className='combo-guide-move';
+      const keys=document.createElement('strong');
+      keys.className='combo-guide-keys';
+      keys.textContent=move.buttons;
+      const detail=document.createElement('span');
+      detail.textContent=move.description;
+      row.append(keys,detail);
+      block.append(row);
+    }
+    root.append(block);
+  }
+}
+
 function goHome(): void {
   controls.clear();
   // Before the very first matchup, Arena is intentionally inert. Do not
@@ -196,6 +243,11 @@ function showMenu(origin:'home'|'battle', tab:MenuTab='game'): void {
   // The first "Бій" tab exists only when a match has been paused.
   // Three remaining settings tabs stretch across the full tab bar.
   get<HTMLButtonElement>('[data-menu-tab="game"]').hidden=origin==='home';
+  get<HTMLButtonElement>('[data-menu-tab="moves"]').hidden=origin==='home';
+  if(origin==='battle'){
+    guidePlayer=0;
+    paintMoveGuide();
+  }
   get<HTMLElement>('.pause-tabs').classList.toggle('settings-only',origin==='home');
   setScreen('menu');
   selectMenuTab(tab);
@@ -431,6 +483,12 @@ layoutEditButton.addEventListener('click',editLayout);
 get<HTMLButtonElement>('#btn-layout-done').addEventListener('click',finishLayout);
 debugButton.addEventListener('click',toggleDebug);
 fullscreenButton.addEventListener('click',()=>{void toggleFullscreen();});
+for(const button of document.querySelectorAll<HTMLButtonElement>('[data-guide-fighter]')){
+  button.addEventListener('click',()=>{
+    guidePlayer=button.dataset.guideFighter==='1'?1:0;
+    paintMoveGuide();
+  });
+}
 for(const button of document.querySelectorAll<HTMLButtonElement>('[data-menu-tab]')){
   button.addEventListener('click',()=>selectMenuTab(button.dataset.menuTab as MenuTab));
 }

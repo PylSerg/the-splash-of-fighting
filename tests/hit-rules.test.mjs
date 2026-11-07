@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { stopsHit, strikeBand, isBackStrike, strikeDamage, canAutoTurn, BACK_STRIKE_MULTIPLIER } from '../src/combat/HitRules.ts';
+import { stopsHit, strikeBand, isBackStrike, strikeDamage, canAutoTurn, BACK_STRIKE_MULTIPLIER, STANDING_ATTACK_LANES } from '../src/combat/HitRules.ts';
 
 const expected = {
   standing: { high: true, mid: true, low: false },
@@ -43,6 +43,16 @@ assert.equal(canAutoTurn(1,{...guardInputs,block:false},false,0,false),true,
   'releasing the guard permits an immediate turn');
 assert.equal(canAutoTurn(1,{...guardInputs,right:true},false,0,false),true,
   'a forward-moving input is not an active defensive stance');
+assert.deepEqual(STANDING_ATTACK_LANES,{heavy:'high',light:'mid',kick:'low'},
+  'Y high, X mid, B low for all fighters');
+assert.equal(stopsHit('standing',STANDING_ATTACK_LANES.kick),false,
+  'standing block cannot guard B');
+assert.equal(stopsHit('crouching',STANDING_ATTACK_LANES.kick),true,
+  'crouching block guards B');
+assert.equal(stopsHit('crouching',STANDING_ATTACK_LANES.light),true,
+  'crouching block guards X');
+assert.equal(stopsHit('crouching',STANDING_ATTACK_LANES.heavy),false,
+  'high Y clears crouching targets');
 assert.equal(BACK_STRIKE_MULTIPLIER,1.5);
 assert.equal(isBackStrike(90,100,1),true,'left side of a right-facing guard is exposed');
 assert.equal(isBackStrike(110,100,1),false,'right side is the guarded front');
