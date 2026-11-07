@@ -1,12 +1,16 @@
 import assert from 'node:assert/strict';
 import {awardRound,MATCH_MAX_ROUNDS,MATCH_WINS_REQUIRED,
   ROUND_ANNOUNCE_SECONDS,FIGHT_ANNOUNCE_SECONDS,ROUND_INTRO_TOTAL,roundIntroText,
+  winnerByRemainingHealth,
 } from '../src/combat/MatchRules.ts';
 assert.equal(MATCH_MAX_ROUNDS,3);
 assert.equal(MATCH_WINS_REQUIRED,2);
 assert.equal(ROUND_ANNOUNCE_SECONDS,1);
 assert.equal(FIGHT_ANNOUNCE_SECONDS,1);
 assert.equal(ROUND_INTRO_TOTAL,2);
+assert.equal(winnerByRemainingHealth(120,80),0,'higher P1 HP wins on timeout');
+assert.equal(winnerByRemainingHealth(80,120),1,'higher P2 HP wins on timeout');
+assert.equal(winnerByRemainingHealth(80,80),null,'equal HP is a draw and replay');
 for(const round of [1,2,3]){
   assert.equal(roundIntroText(2,round),'ROUND '+round);
   assert.equal(roundIntroText(1.01,round),'ROUND '+round);
