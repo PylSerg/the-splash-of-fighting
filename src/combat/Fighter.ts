@@ -6,6 +6,7 @@ import { blockedGrabRecoil } from './GrabRules';
 import { earnSpecialMeter, MAX_HEALTH } from './CombatFeedback';
 import { scaleDamage } from './CombatScale.ts';
 import { canLaunchSpecial, specialDamageAt, spendSpecialCharge } from './SpecialRules.ts';
+import { frameForEvi, EVI_CINEMATIC_SECONDS } from './EviSpriteStates.ts';
 import { earnSplashEnergy, SPLASH_METER_MAX, SPLASH_INPUT_GRACE, splashFacing } from './SplashRules';
 import {
   FIGHTER_STYLES, ATTACK_ACTIVE, WAKEUP_PROTECTION,
@@ -101,6 +102,10 @@ export class Fighter {
   blocking = false;
   crouching = false;
   walking = false;
+  private movingForward = true;
+  /** The 2s opening/closing display is purely visual and never changes hitboxes. */
+  private cinematic: {kind:'intro'|'victory';elapsed:number}|null=null;
+  private pixelSprite?: Phaser.GameObjects.Image;
   attack: ActiveAttack | null = null;
   // Two-stage throw animations are controlled by the arena's grapple state.
   grabPose: 'reach' | 'hold' | 'held' | 'throw' | null = null;
@@ -145,7 +150,7 @@ export class Fighter {
   private hair: Phaser.GameObjects.Graphics;
   private weapon: Phaser.GameObjects.Graphics;
 
-  constructor(scene: Phaser.Scene, id: FighterId, initialX: number, face: 1 | -1) {
+  constructor(private readonly scene: Phaser.Scene, id: FighterId, initialX: number, face: 1 | -1) {
     this.id = id;
     this.x = initialX;
     this.face = face;
@@ -296,6 +301,44 @@ export class Fighter {
       this.guardAura,this.cape,this.backArm,this.leftLeg,this.rightLeg,
       this.body,this.weapon,this.frontArm,this.hair,this.head
     ]);
+    this.refreshSpriteArt();
+    this.draw(0);
+  }
+
+  /** Dynamic local sprite import can happen while the battle is paused.
+   * Other fighters, or Evi before her art is supplied, retain vector rigs.
+   */
+  refreshSpriteArt():void {
+    this.pixelSprite?.destroy();this.pixelSprite=undefined;
+    const graphics=[
+      this.cape,this.backArm,this.leftLeg,this.rightLeg,this.body,
+      this.weapon,this.frontArm,this.hair,this.head,
+    ];
+    const ready=this.id==='evi' && this.scene.textures.exists('evi-combat');
+    for(const visual of graphics)visual.setVisible(!ready);
+    if(ready){
+      this.pixelSprite=this.scene.add.image(0,0,'evi-combat','f0')
+        .setOrigin(.5,1).setDisplaySize(125,195);
+      this.pixelSprite.setPosition(0,10);
+      this.rig.add(this.pixelSprite);
+    }
+    this.draw(0);
+  }
+
+  beginCinematic(kind:'intro'|'victory'):void {
+    this.cinematic={kind,elapsed:0};
+    this.attack=null;
+    this.walking=false;this.blocking=false;this.crouching=false;
+    this.draw(0);
+  }
+  advanceCinematic(dt:number):void {
+    if(!this.cinematic)return;
+    this.cinematic.elapsed=Math.min(EVI_CINEMATIC_SECONDS,
+      this.cinematic.elapsed+Math.max(0,dt));
+    this.draw(dt);
+  }
+  endCinematic():void {
+    this.cinematic=null;
     this.draw(0);
   }
 
@@ -865,6 +908,7 @@ export class Fighter {
     const moveSpeed=baseMoveSpeed*(this.blocking?style.guardingMovement:
       this.attack?style.attackingMovement:style.movement);
     this.walking = move!==0 && !this.airborne;
+    this.movingForward=move*this.face>=0;
     this.x += move*moveSpeed*dt;
     this.x = Phaser.Math.Clamp(this.x,STAGE_MIN_X,STAGE_MAX_X);
     this.advanceGravity(dt);
