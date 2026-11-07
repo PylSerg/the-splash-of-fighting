@@ -115,9 +115,9 @@ export class Fighter {
   hitFlash = 0;
   private blockFlash = 0;
   private impactVelocity = 0;
-  // A short chord window prevents B and Y being mistaken for separate
-  // kick/heavy attacks when the player presses them nearly together.
-  private queuedSolo: { name: 'kick' | 'heavy'; remaining: number } | null = null;
+  // Give Up+X and Up+Y a short chance to become a real SPLASH chord before
+  // either component triggers a solo hit. Normal X stays immediate.
+  private queuedSolo: { name: 'light' | 'kick' | 'heavy'; remaining: number } | null = null;
   private queuedSpecial = 0;
   private comboHistory: ComboMove[] = [];
   private comboClean = true;
@@ -350,11 +350,14 @@ export class Fighter {
       !this.stunned && this.blockstun<=0 && (!this.attack || earlyChordComponent) &&
       !this.comboRecovery && !this.grabRecovery && !this.duelWhiffRecovery;
   }
-  /** X+Y may arrive a frame apart. Only an unconnected early X/Y is cancellable. */
+  /** X+Y may arrive several frames apart on mobile touchscreens.
+   * An unconnected X/Y can cancel into a charged SPLASH during startup.
+   */
   tryStartSplash(): boolean {
     const earlyComponent=Boolean(this.attack &&
       (this.attack.name==='light' || this.attack.name==='heavy') &&
-      this.attack.comboStage===1 && !this.attack.connected && this.attack.elapsed<.16);
+      this.attack.comboStage===1 && !this.attack.connected &&
+      this.attack.elapsed<this.attack.spec.duration);
     if(this.splashEnergy<SPLASH_METER_MAX || this.knockedOut || this.knockedDown ||
        this.crouching || this.isRolling || this.grabPose ||
        this.stunned>0 || this.blockstun>0 || this.grabRecovery>0 || this.comboRecovery>0 ||
@@ -808,13 +811,21 @@ export class Fighter {
       this.queuedSpecial=0;
       this.begin('special');
     } else if (!canLinkCombo && canAct && !this.attack) {
-      if (just.light) {
+      // With a full SPLASH meter, pressing Up plus either X or Y gives
+      // the second finger a short grace period. Otherwise X remains
+      // immediate, and the original B/Y solo queue stays unchanged.
+      const awaitingSplash=input.up && this.splashEnergy>=SPLASH_METER_MAX;
+      if (just.light && !awaitingSplash) {
         this.queuedSolo=null;
         this.begin('light');
       } else {
         if (!input.special && !this.queuedSolo) {
-          if (just.heavy) this.queuedSolo={name:'heavy',remaining:.075};
-          else if (just.kick) this.queuedSolo={name:'kick',remaining:.075};
+          if(just.light && awaitingSplash)
+            this.queuedSolo={name:'light',remaining:.24};
+          else if(just.heavy)
+            this.queuedSolo={name:'heavy',remaining:awaitingSplash?.24:.075};
+          else if(just.kick)
+            this.queuedSolo={name:'kick',remaining:.075};
         }
         if (this.queuedSolo) {
           this.queuedSolo.remaining-=dt;
