@@ -1,7 +1,7 @@
 import type { FighterId } from '../combat/Fighter';
 import { CHARACTERS, getCharacter, portraitSvg } from '../characters/Roster';
 import { characterFigureSvg } from '../characters/Figures';
-import { EVI_IDLE_FRAME_MS, preloadEviIdle } from './EviIdleAnimation';
+import { EVI_IDLE_FRAME_MS, preloadEviIdle, advanceEviIdleFrame } from './EviIdleAnimation';
 
 export type MatchMode = 'cpu' | 'versus';
 type Player = 0 | 1;
@@ -50,6 +50,7 @@ export class CharacterSelector {
   private suppressClicks: [number, number] = [0, 0];
   private idleUrls: string[] = [];
   private idleFrame = 0;
+  private idleDirection:1|-1=1;
   private idleTimer: ReturnType<typeof setInterval> | null = null;
   private idleInstallGeneration=0;
 
@@ -198,6 +199,8 @@ export class CharacterSelector {
     this.swipe = [null, null];
     this.suppressClicks = [0, 0];
     this.root.hidden = false;
+    this.idleFrame=0;
+    this.idleDirection=1;
     this.startIdle();
     this.paint();
     this.areas[0].focus({ preventScroll: true });
@@ -223,6 +226,7 @@ export class CharacterSelector {
     const previous=this.idleUrls;
     this.idleUrls=urls;
     this.idleFrame=0;
+    this.idleDirection=1;
     this.renderIdleFrame();
     previous.forEach(url=>URL.revokeObjectURL(url));
     if(this.isOpen)this.startIdle();
@@ -234,6 +238,7 @@ export class CharacterSelector {
     this.idleUrls.forEach(url=>URL.revokeObjectURL(url));
     this.idleUrls=[];
     this.idleFrame=0;
+    this.idleDirection=1;
     this.renderIdleFrame();
   }
 
@@ -253,7 +258,9 @@ export class CharacterSelector {
     if(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
     this.idleTimer=setInterval(()=>{
       if(this.root.hidden || !this.idleUrls.length)return;
-      this.idleFrame=(this.idleFrame+1)%this.idleUrls.length;
+      const next=advanceEviIdleFrame(this.idleFrame,this.idleDirection,this.idleUrls.length);
+      this.idleFrame=next.frame;
+      this.idleDirection=next.direction;
       this.renderIdleFrame();
     },EVI_IDLE_FRAME_MS);
   }
