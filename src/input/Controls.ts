@@ -258,9 +258,6 @@ export class Controls {
 
   private updateVisuals(): void {
     const pressed=new Set(this.touches.values());
-    for(const [action,button] of this.buttons){
-      button.classList.toggle('pressed',pressed.has(action));
-    }
     const diamond=document.querySelector('.touch-attacks');
     const chord=visualChords({
       light:pressed.has('light'),heavy:pressed.has('heavy'),
@@ -271,6 +268,10 @@ export class Controls {
         performance.now()<this.comboSwipePulseUntil,
       grabSwipe:this.grabSwipePointers.size>0,
     });
+    for(const [action,button] of this.buttons){
+      button.classList.toggle('pressed',pressed.has(action) &&
+        !(action==='heavy' && chord.special));
+    }
     // A+B MUST highlight A and B, never Y. The old shared combo-active
     // class incorrectly made Y appear pressed on the special chord.
     diamond?.classList.toggle('duel-active',chord.duel);
