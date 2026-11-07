@@ -23,12 +23,12 @@ export interface GroundedRollVisual {
 export function groundedRollVisual(progress:number,backwards=false):GroundedRollVisual {
   const q=Number.isFinite(progress)?Math.min(1,Math.max(0,progress)):0;
   // Smoothly fold at the beginning and unfold before the end.
-  const tuck=Math.pow(Math.sin(Math.PI*q),2);
+  const tuck=q===0||q===1?0:Math.pow(Math.sin(Math.PI*q),2);
   const direction=backwards?-1:1;
   return {
     progress:q,
     tuck,
-    lift:-3*tuck,
+    lift:tuck===0?0:-3*tuck,
     fallbackScaleY:1-.35*tuck,
     fallbackLean:direction*.06*Math.sin(2*Math.PI*q),
     shadowScale:1-.23*tuck,
