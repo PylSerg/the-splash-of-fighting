@@ -15,8 +15,8 @@ for (const [stance, levels] of Object.entries(expected)) {
 // Each playable fighter has an independently calibrated torso/head box.
 // Cosmetic hair, flowing fabric, fans and extended feet need not be hittable.
 const profiles={
-  evi:{standing:{halfWidth:33,top:-210,bottom:-2},
-       low:{halfWidth:28,top:-81,bottom:-1}},
+  evi:{standing:{halfWidth:25,top:-210,bottom:-2},
+       low:{halfWidth:23,top:-81,bottom:-1}},
   runa:{standing:{halfWidth:29,top:-184,bottom:-2},
         low:{halfWidth:27,top:-79,bottom:-1}},
   lyra:{standing:{halfWidth:28,top:-190,bottom:-2},
@@ -64,6 +64,10 @@ for(const [fighter,poses] of Object.entries(profiles)){
       fighter+' crouched body can be struck at '+level);
   }
 }
+assert.equal(FIGHTER_HURTBOX.evi.standing.halfWidth,25,
+  'Evi shoulder-width standing hurtbox is 50px');
+assert.equal(FIGHTER_HURTBOX.evi.low.halfWidth,23,
+  'Evi low stance hurtbox is 46px');
 assert.equal(FIGHTER_HURTBOX.evi.standing.top,-210,
   'Evi upright top follows the actual visible hairline, not the old -222');
 assert.deepEqual(strikeBand('high'),{top:-232,height:140},
