@@ -90,7 +90,10 @@ export function eviHandTargets(input:EviMotionInput,_pose:EviPose):HandTargets{
 export function solveEviArm(right:boolean,wrist:Vec3){
   return solveTwoBoneLeg(shoulderPosition(right),wrist,
     EVI_UPPER_ARM_LENGTH,EVI_FOREARM_LENGTH,
-    {x:right?.20:-.20,y:.28,z:.65});
+    // Bend toward the waist and slightly outward. The old +Y/+Z pole
+    // inverted the elbow toward the face, even in an idle guard.
+    // This is an anatomical pole in chest-local space, not screen space.
+    {x:right?.40:-.40,y:-.90,z:-.35});
 }
 
 /** Smooth the hand targets without affecting hitstop. */
