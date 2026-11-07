@@ -21,6 +21,14 @@ npm run build
 npm run preview
 ```
 
+## Alpha 1.22.13 · Fighter scale and floor perspective
+
+- Placed both fighters **27 world pixels forward on the existing foreground platform**: feet and shadows now rest at y=470, rather than straddling the decorative back edge at y=443. City floor tiles and lagoon sand/water retain their original back-edge art position.
+- Enlarged **all fighters by 12%**, scaled uniformly around each fighter's feet. This applies to Evi's six PNG combat-idle frames, the procedural fighters, puppet mode, imported sprite sheets, jumping, attacks, knockdowns and grounded rolls, without accidentally lifting the feet.
+- The extra forward depth compensates for the increased body height, so fighters' heads stay at roughly the previous screen height while their feet move down onto the perspective floor.
+- Shadows are widened proportionally. Strike/hurtboxes, effects and the fighter root continue to use the **same shared GROUND_Y**; attack ranges, frame timing, collision rules and input remain unchanged.
+- Added regression tests for the shared fighter baseline, preserved rear stage edge, uniform visual scaling across normal/roll poses and stable sprite foot origins.
+
 ## Alpha 1.22.12 · True sprite-based fighting stance
 
 - Split the six poses from the user-approved **1536 × 1024** RGBA collage into individual, lossless **512 × 768 RGBA PNGs** at `public/assets/evi/combat-idle/fight_idle_001.png` … `fight_idle_006.png`. Each frame has its torso horizontally aligned, visible feet at the same source pixel row (741), real alpha transparency and its own SHA-256 regression check.
