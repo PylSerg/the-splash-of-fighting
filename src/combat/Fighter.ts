@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { InputState } from '../input/Controls';
-import { stopsHit, strikeBand, strikeDamage, type HitLevel, type GuardStance } from './HitRules';
+import { stopsHit, strikeBand, strikeDamage, canAutoTurn, type HitLevel, type GuardStance } from './HitRules';
 import { crouchMoveForPress } from './CrouchRules';
 import { blockedGrabRecoil } from './GrabRules';
 import { earnSpecialMeter, SPECIAL_METER_COST, MAX_HEALTH } from './CombatFeedback';
@@ -554,9 +554,8 @@ export class Fighter {
     // orientation: a roll behind the fighter exposes their back.
     // Include the current held input so defense cannot auto-turn in
     // the same frame that the player first presses A.
-    const guardHeld = input.block && !this.airborne && !input.up &&
-      !forwardHeld(this.face,input.left,input.right) && this.stunned<=0;
-    if (!this.knockedDown && !guardHeld) this.face = opponentX >= this.x ? 1 : -1;
+    if (canAutoTurn(this.face,input,this.airborne,this.stunned,this.knockedDown))
+      this.face = opponentX >= this.x ? 1 : -1;
     this.hitFlash = Math.max(0, this.hitFlash-dt);
     this.blockFlash = Math.max(0, this.blockFlash-dt);
     this.rollCooldown = Math.max(0, this.rollCooldown-dt);
