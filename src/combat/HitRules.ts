@@ -57,23 +57,55 @@ export function stopsHit(guard: GuardStance, attack: HitLevel): boolean {
   return false;
 }
 
-/** Body collision relative to the fighter's feet (all Y values negative
- * above ground). The larger 1.12× sprites have heads about 220px above
- * their foot pivot. Previously the 145px tall box began at the SHOULDERS,
- * leaving both characters' heads outside the green debug rectangle.
+/** Per-character hurtboxes are independent of the art's entire bounding
+ * rectangle: hair, loose fabric, weapons and extended hands are NOT the body.
+ * Values are in world pixels relative to each fighter's grounded foot pivot.
+ * The normal stance follows the torso/head and the low stance stays below Y.
  *
- * Use one shared source for actual collision and debug overlays. The small
- * crouching/rolling profile remains low enough to duck under high attacks.
+ * Evi's new 512×768 six-frame combat artwork needs top -210, not -222:
+ * the old shared box extended visibly ABOVE her head. Runa's larger hair
+ * silhouette is decoration, not damageable flesh. Lyra and Kai each have
+ * their own provisional values until their authored sprites are added.
+ *
+ * The debug green rectangles and real strike/duel checks read the SAME data.
  */
-export const FIGHTER_HURTBOX = {
-  standing: { halfWidth: 32, top: -222, bottom: -2 },
-  low:      { halfWidth: 29, top: -84,  bottom: -1 },
-} as const;
+import type { FighterId } from './Fighter';
 
-export function fighterHurtboxBand(low:boolean):{
-  halfWidth:number;top:number;height:number;
-}{
-  const hit=low?FIGHTER_HURTBOX.low:FIGHTER_HURTBOX.standing;
+export interface HurtboxProfile {
+  readonly halfWidth:number;
+  readonly top:number;
+  readonly bottom:number;
+}
+export type FighterHurtboxProfile = {
+  readonly standing:HurtboxProfile;
+  readonly low:HurtboxProfile;
+};
+
+/** One calibrated upright + crouch/roll profile per playable fighter. */
+export const FIGHTER_HURTBOX:Readonly<Record<FighterId,FighterHurtboxProfile>> = {
+  evi: {
+    standing:{halfWidth:33,top:-210,bottom:-2},
+    low:     {halfWidth:28,top:-81,bottom:-1},
+  },
+  runa: {
+    standing:{halfWidth:29,top:-184,bottom:-2},
+    low:     {halfWidth:27,top:-79,bottom:-1},
+  },
+  lyra: {
+    standing:{halfWidth:28,top:-190,bottom:-2},
+    low:     {halfWidth:26,top:-78,bottom:-1},
+  },
+  kai: {
+    standing:{halfWidth:26,top:-179,bottom:-2},
+    low:     {halfWidth:24,top:-76,bottom:-1},
+  },
+};
+
+export function fighterHurtboxBand(
+  fighter:FighterId,low:boolean,
+):{halfWidth:number;top:number;height:number}{
+  const hit=low?FIGHTER_HURTBOX[fighter].low:
+    FIGHTER_HURTBOX[fighter].standing;
   return {halfWidth:hit.halfWidth,top:hit.top,height:hit.bottom-hit.top};
 }
 
