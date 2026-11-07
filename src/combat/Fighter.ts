@@ -308,8 +308,15 @@ export class Fighter {
   /** Dynamic local sprite import can happen while the battle is paused.
    * Other fighters, or Evi before her art is supplied, retain vector rigs.
    */
-  refreshSpriteArt():void {
+  clearSpriteArt():void {
     this.pixelSprite?.destroy();this.pixelSprite=undefined;
+    for(const element of [
+      this.cape,this.backArm,this.leftLeg,this.rightLeg,this.body,
+      this.weapon,this.frontArm,this.hair,this.head,
+    ])element.setVisible(true);
+  }
+  refreshSpriteArt():void {
+    this.clearSpriteArt();
     const graphics=[
       this.cape,this.backArm,this.leftLeg,this.rightLeg,this.body,
       this.weapon,this.frontArm,this.hair,this.head,
@@ -1233,16 +1240,8 @@ export class Fighter {
         ?(this.cinematic?.kind==='victory'?20:0):chosen.frame;
       this.pixelSprite.setTexture(kind,'f'+frame);
       this.pixelSprite.setTint(this.hitFlash>0?0xffcad8:0xffffff);
-      this.pixelSprite.setAlpha(this.knockedOut?.76:1);
+      this.pixelSprite.setAlpha(this.knockedOut?0.76:1);
       this.pixelSprite.setPosition(0,10);
-    }
-    if(this.cinematic && !this.pixelSprite){
-      // Every roster fighter gets a 2s entrance/victory pose even while
-      // their custom pixel sheets have not been drawn yet.
-      const progress=Math.min(1,this.cinematic.elapsed/EVI_CINEMATIC_SECONDS);
-      const flourish=Math.sin(progress*Math.PI);
-      this.frontArm.rotation=-1.1-flourish*.5;
-      this.weapon.rotation=-1.0-flourish*1.7;
     }
     const motion=this.walking?Math.sin(this.time*15):Math.sin(this.time*2.5)*.11;
     const swing=this.walking?Math.sin(this.time*15)*.30:0;
@@ -1351,6 +1350,17 @@ export class Fighter {
       }
     }
     if(this.stunned>0 && !this.splashPose) this.frontArm.rotation=-.5;
+    if(this.cinematic && !this.pixelSprite) {
+      // Temporary entrance and victory movement for fighters with no
+      // hand-drawn sprite art yet; this never modifies their hitboxes.
+      const p=Math.min(1,this.cinematic.elapsed/EVI_CINEMATIC_SECONDS);
+      const flourish=Math.sin(p*Math.PI);
+      this.frontArm.rotation=-1.1-flourish*.7;
+      this.backArm.rotation=-.35-flourish*.5;
+      this.weapon.rotation=-1.1-flourish*2.3;
+      this.body.y=-5*flourish;
+      this.head.y=this.body.y;this.hair.y=this.body.y;
+    }
     if (this.knockedDown) {
       this.leftLeg.rotation=-.45;
       this.rightLeg.rotation=.5;
