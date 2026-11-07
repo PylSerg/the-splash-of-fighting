@@ -60,11 +60,18 @@ const strike=eviHandTargets({name:'heavy',time:.42,elapsed:.42,startup:.42,durat
   neutralEviPose());
 const windup=eviHandTargets({name:'heavy',time:.25,elapsed:.25,startup:.42,duration:.9},
   neutralEviPose());
-assert.ok(strike.right.x>windup.right.x+.60,
-  'right wrist sweeps SIDEWAYS across the rival, not a forward poke');
-assert.ok(strike.right.z-windup.right.z<.35,
-  'the blade swing uses only shallow depth instead of a spear thrust');
-assert.ok(strike.right.y>.58,
+// X alone is misleading in a 3/4 stance: +Z projects toward the
+// opponent after the ~60-degree root yaw. Check the SCREEN silhouette.
+const projectedX=p=>p.x*Math.cos(1.04)+p.z*Math.sin(1.04);
+assert.ok(windup.right.z<-.18,
+  'actual windup pulls the fan behind the shoulder plane');
+assert.ok(windup.right.y>.68,
+  'fan rises next to the head BEFORE the high strike');
+assert.ok(projectedX(windup.right)<projectedX(base.right)-.35,
+  'the windup visibly pulls the fan behind the idle silhouette');
+assert.ok(projectedX(strike.right)>projectedX(windup.right)+.60,
+  'the fan cuts across a wide visible screen-space arc');
+assert.ok(strike.right.y>.62,
   'the high Y fan cut rises to the head lane');
 assert.ok(Math.abs(strike.right.y-windup.right.y)<.10,
   'high slash tracks a consistent near-horizontal hand plane');
@@ -77,11 +84,13 @@ const slashWindup=eviFanSwingAngles({name:'heavy',time:.28,elapsed:.28,
 const slashImpact=eviFanSwingAngles({name:'heavy',time:.42,elapsed:.42,
   startup:.42,duration:.65});
 assert.ok(slashWindup.yaw<0 && slashImpact.yaw>0,
-  'fan turns across the opponent during a slash');
-assert.ok(slashWindup.roll<0 && slashImpact.roll>0,
-  'opened blade slices through an arc instead of pointing steadily forward');
-assert.deepEqual(eviFanSwingAngles(idle),{yaw:0,roll:0},
-  'fan stays stable in the idle guard');
+  'fan rotates from wound-back to forward during a slash');
+assert.ok(slashWindup.roll>1 && slashImpact.roll<0,
+  'opened blade rises by over one radian before striking, then slices down');
+assert.ok(slashWindup.torsoYaw<-.25 && slashImpact.torsoYaw>.15,
+  'upper body visibly coils back then turns into the hit');
+assert.deepEqual(eviFanSwingAngles(idle),{yaw:0,roll:0,torsoYaw:0},
+  'fan and upper body stay stable in the idle guard');
 const tucked=eviHandTargets({name:'roll',time:.23,progress:.5},neutralEviPose());
 assert.ok(tucked.right.x>0 && tucked.left.x<0,
   'during the roll each hand keeps its anatomical shoulder');

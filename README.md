@@ -21,6 +21,13 @@ npm run build
 npm run preview
 ```
 
+## Alpha 1.22.6 · Visible backswing before fan attacks
+
+- Fixed an animation that technically swept sideways but did not show a readable **windup**. In the 3/4 camera angle, the earlier windup wrist moved across the front of the torso and disappeared into its silhouette.
+- For X, Y, duel, special, and crouch-X, Evi now visibly pulls her right wrist **out, up and behind the shoulder**, coils the chest away, and then releases a large forward cutting arc. The fan's open blade tilts up beside the head before cutting down through its target lane.
+- The regression tests now measure actual **screen-space** windup/cut reach after 3D yaw (not just local X), the open fan's backswing angle, torso recoil and correct hit height.
+- Right-wrist fan attachment, all combat hitboxes, attack timing, damage, blocking, duels, kicks and rolls are unchanged.
+
 ## Alpha 1.22.5 · Actual fan slashes and head-level hits
 
 - The 3D right wrist now sweeps **sideways across the opponent** instead of stabbing forward; the fan itself turns through the blade arc and its trail follows the cutting edge.

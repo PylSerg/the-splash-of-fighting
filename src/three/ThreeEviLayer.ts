@@ -428,13 +428,14 @@ class EviThreeCharacter{
     // combat guard rather than presenting the costume straight at camera.
     // All values below are visual and never affect hitboxes, walk or damage.
     const stance=threeEviStance(frame.face,input);
+    const blade=eviFanSwingAngles(input);
     const pos=screenToThree(frame.x,443+frame.yOffset);
     this.root.position.set(pos.x,pos.y,0);
     this.root.scale.set(frame.face,1,1);
     this.root.rotation.y=stance.rootYaw;
     this.pelvis.position.y=-p.hipY/100;
     this.pelvis.rotation.y=stance.pelvisYaw;
-    this.chest.rotation.y=stance.chestYaw;
+    this.chest.rotation.y=stance.chestYaw+blade.torsoYaw;
     this.chest.rotation.z=-p.torsoTilt*.8;
     this.chest.rotation.x=.06*Math.sin(input.time*2.3);
     this.head.rotation.y=stance.headYaw;
@@ -475,7 +476,6 @@ class EviThreeCharacter{
     // Preserve the anatomical right-hand attachment, but rotate the
     // OPEN blade through the cutting arc. Constant forward yaw made the
     // old motion look like repeated spear thrusts rather than fan slashes.
-    const blade=eviFanSwingAngles(input);
     this.fan.rotation.set(.16,stance.fanYaw+blade.yaw,.06+blade.roll,'XYZ');
     this.fan.scale.setScalar(.94+.1*p.fanScale);
     for(let i=0;i<this.hem.length;i++){
