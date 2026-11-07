@@ -101,15 +101,31 @@ export function eviPoseFor(input:EviMotionInput):EviPose{
         skirtTilt:.20,hairSwing:.15,
       });
     case 'roll':{
-      const bend=Math.sin(Math.PI*p);
+      // Genuine low 2D tuck, not a barrel roll of the entire Fighter rig.
+      // All joint offsets start AND finish at the idle pose, so completing
+      // the 0.46s dodge cannot snap the limbs back from a fixed crouch.
+      const tuck=Math.pow(Math.sin(Math.PI*p),2);
+      const sway=Math.sin(2*Math.PI*p);
+      const heading=input.backwards?-1:1;
       return merged(base,{
-        hipY:28*bend,torsoTilt:-.76*bend,
-        headTilt:-.37*bend,
-        armL:-1.85,armR:-1.72,
-        elbowL:-1.4,elbowR:-1.33,
-        legL:-1.1*bend,legR:1.0*bend,
-        kneeL:1.7*bend,kneeR:-1.62*bend,
-        skirtTilt:.3*bend,fanAngle:-1.0,bodySquash:1-.40*bend,
+        hipY:28*tuck,
+        torsoTilt:heading*(.82*tuck+.08*sway),
+        headTilt:-heading*.30*tuck,
+        armL:base.armL-1.65*tuck,
+        armR:base.armR-1.45*tuck,
+        elbowL:base.elbowL-.78*tuck,
+        elbowR:base.elbowR-.55*tuck,
+        legL:base.legL-.98*tuck,
+        legR:base.legR+.92*tuck,
+        kneeL:base.kneeL+1.38*tuck,
+        kneeR:base.kneeR-1.30*tuck,
+        footL:base.footL-.18*tuck,
+        footR:base.footR+.18*tuck,
+        skirtTilt:.24*heading*tuck,
+        hairSwing:-heading*.20*tuck,
+        fanAngle:base.fanAngle-.86*tuck,
+        fanScale:base.fanScale-.12*tuck,
+        bodySquash:1-.29*tuck,
       });
     }
     case 'hit':case 'splashVictim':
