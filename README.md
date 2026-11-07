@@ -21,33 +21,13 @@ npm run build
 npm run preview
 ```
 
-## Alpha 1.22.7 · True anatomical right hand and fully extended fan swing
+## Alpha 1.22.8 · Back to 2D sprite artwork
 
-- Corrected the **3D shoulder/hand convention**: with the model facing local +Z, anatomical right is -X, not +X. Both shoulder chains, the IK origin, every hand animation and the right-wrist-owned fan now agree; no more left-handed fan disguised as a right-wrist joint.
-- Replaced a lerped wrist stab with a **fixed-radius, shoulder-led swing**: the right arm moves far **backward** behind the torso, visibly holds that loaded pose during startup, and then sweeps toward the enemy while the elbow stays nearly straight (reach .727 of the .75 arm length) throughout the strike.
-- Attack wrist targets are applied **without delayed smoothing**; a separate early windup and hold guarantee the actual extended pose is reached at Phaser's hit frame. The non-attacking hands continue to animate smoothly.
-- Tests verify both facing directions, anatomical hand, screen-space travel, held windup, near-straight elbow through all five fan attacks, and right-wrist-only weapon ownership.
-- Gameplay rules, hitboxes, damage, startup duration, active windows and the grounded roll remain unchanged.
-
-## Alpha 1.22.6 · Visible backswing before fan attacks
-
-- Fixed an animation that technically swept sideways but did not show a readable **windup**. In the 3/4 camera angle, the earlier windup wrist moved across the front of the torso and disappeared into its silhouette.
-- For X, Y, duel, special, and crouch-X, Evi now visibly pulls her right wrist **out, up and behind the shoulder**, coils the chest away, and then releases a large forward cutting arc. The fan's open blade tilts up beside the head before cutting down through its target lane.
-- The regression tests now measure actual **screen-space** windup/cut reach after 3D yaw (not just local X), the open fan's backswing angle, torso recoil and correct hit height.
-- Right-wrist fan attachment, all combat hitboxes, attack timing, damage, blocking, duels, kicks and rolls are unchanged.
-
-## Alpha 1.22.5 · Actual fan slashes and head-level hits
-
-- The 3D right wrist now sweeps **sideways across the opponent** instead of stabbing forward; the fan itself turns through the blade arc and its trail follows the cutting edge.
-- Upper Y and duel slashes rise to **head height**. The high attack collision band includes the visible head silhouette, while its lower edge is still above crouching defenders.
-- Evi's high fan attacks gain a modest 8% reach correction to match the extended blade. The mid/low attacks keep their separate height lanes and damage/combo rules remain unchanged.
-- Regression tests cover the lateral hand arc, blade rotation, head-level collision band and crouch evasion.
-
-## Alpha 1.22.4 · Natural downward elbow bend
-
-- Fixed the 3D IK pole direction for **both arms**: the elbows now bend down toward the waist and outward instead of pointing above the shoulders in guard/idle poses.
-- Anatomical right-hand ownership of the fan, the 3D somersault, wrist reach, fixed bone lengths and all combat mechanics are unchanged.
-- Added a regression check covering all motion target samples to prevent the upside-down elbow from returning.
+- Removed the experimental Three.js renderer, the entire 3D fighter rig and animation system, the separate WebGL canvas and all 3D-only test suites and documentation.
+- **Phaser remains the only rendering engine.** Evi starts in the existing 2D pixel-puppet mode. Imported PNG/WebP combat and cinematic sprite sheets and the original procedural fallback remain available in **Settings → Graphics**.
+- Removed `three` and `@types/three` from dependencies. No extra animation frame loop or second WebGL context is created.
+- Existing combat mechanics, strike height lanes, high-strike reach, collisions, clash rules, combos, blocks, throws, duels, SPLASH, UI and mobile controls remain unchanged.
+- The sprite atlas import, local IndexedDB artwork storage and all 2D art regression tests are preserved for the next animation workflow.
 
 ## Alpha 1.2.1 · Accurate build version labels
 
