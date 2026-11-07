@@ -1,4 +1,4 @@
-import { deriveCommandChords, visualChords } from './CommandRules';
+import { deriveCommandChords, visualChords, resolveXYTouch } from './CommandRules';
 import { splashChord } from '../combat/SplashRules';
 
 export type Action = 'left' | 'right' | 'up' | 'down' | 'jump' | 'light' | 'heavy' | 'kick' | 'block' | 'grab' | 'special' | 'duel' | 'roll' | 'splash';
@@ -333,10 +333,11 @@ export class Controls {
     // Two physical X/Y touches are independent pointer IDs. A continuous
     // X↔Y swipe also logically holds both, so SPLASH only needs two
     // fingers on a phone: one Up and one across X/Y.
-    if(player===0 && (this.splashSwipePointers.size>0 ||
-        performance.now()<this.splashSwipePulseUntil)){
-      state.light=true;
-      state.heavy=true;
+    if(player===0){
+      const xy=resolveXYTouch(this.touches,this.splashSwipePointers.size>0 ||
+        performance.now()<this.splashSwipePulseUntil);
+      state.light ||= xy.light;
+      state.heavy ||= xy.heavy;
     }
     const l1Down=Boolean(pads[player]?.buttons[4]?.pressed);
     const r1Down=Boolean(pads[player]?.buttons[5]?.pressed);
