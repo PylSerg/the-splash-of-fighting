@@ -323,10 +323,12 @@ export class EviPixelPuppet {
 
   update(input:EviMotionInput,dt:number,hitFlash=false):void {
     const next=eviPoseFor(input);
-    const newAttack=input.name!==this.lastName ||
-      (isEviFanSlash(input.name) &&
+    const restartedSlash=isEviFanSlash(input.name) &&
+      (input.name!==this.lastName ||
        (input.elapsed??0)<this.previousSlashElapsed-.02);
-    if(newAttack)this.slashTrail.length=0;
+    if(restartedSlash)this.slashTrail.length=0;
+    // Switching into idle/guard does not erase the afterglow instantly:
+    // the last contact ribbon naturally fades during the next .17s.
     this.lastName=input.name;
     this.previousSlashElapsed=input.elapsed??0;
     this.pose=blendEviPose(this.pose,next,dt);
