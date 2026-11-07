@@ -28,7 +28,7 @@ import {
 } from '../combat/DuelRules';
 import { getStage, type StageId } from '../stages/Stages';
 import { SPLASH_WINDUP, SPLASH_MOVES, SPLASH_DUEL_WIN_GAIN,
-  comboSplashBonus, canSplashGuard, guidedSplashPosition, splashWindupActive } from '../combat/SplashRules';
+  comboSplashBonus, specialSplashBonus, canSplashGuard, guidedSplashPosition, splashWindupActive } from '../combat/SplashRules';
 import { awardRound, winnerByRemainingHealth, MATCH_MAX_ROUNDS, ROUND_INTRO_TOTAL, roundIntroText } from '../combat/MatchRules';
 
 type GameMode = 'cpu' | 'versus';
@@ -1429,8 +1429,14 @@ export class ArenaScene extends Phaser.Scene {
       target.receiveSweep(attacker.face);
       this.combatNotice('SWEEP!',target.x,GROUND_Y-143,0xffd596);
     }
-    attacker.rewardDamage(hit.damage);
-    attacker.gainSplash(comboSplashBonus(comboHits));
+    if(strike.name==='special'){
+      // A special NEVER refills its own ordinary meter. Its successful
+      // damage instead contributes only to the separate SPLASH gauge.
+      attacker.gainSplash(specialSplashBonus(hit.damage));
+    }else{
+      attacker.rewardDamage(hit.damage);
+      attacker.gainSplash(comboSplashBonus(comboHits));
+    }
     if(comboHits===2) {
       this.combatNotice('2 HIT!',target.x,GROUND_Y-206,0x8ce9fa);
     } else if(comboHits===3) {
