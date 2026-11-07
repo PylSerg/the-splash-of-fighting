@@ -3,7 +3,7 @@ import type { InputState } from '../input/Controls';
 import { stopsHit, strikeBand, type HitLevel, type GuardStance } from './HitRules';
 import { crouchMoveForPress } from './CrouchRules';
 import { blockedGrabRecoil } from './GrabRules';
-import { earnSpecialMeter, SPECIAL_METER_COST } from './CombatFeedback';
+import { earnSpecialMeter, SPECIAL_METER_COST, MAX_HEALTH } from './CombatFeedback';
 import { earnSplashEnergy, SPLASH_METER_MAX } from './SplashRules';
 import {
   DUEL_WHIFF_RECOVERY, DUEL_RESULT_ANIMATION, forwardHeld,
@@ -86,7 +86,7 @@ export class Fighter {
   yOffset = 0;
   vy = 0;
   face: 1 | -1;
-  hp = 100;
+  hp = MAX_HEALTH;
   energy = 0;
   /** Separate, slow splash meter persists between rounds in one match. */
   splashEnergy = 0;
@@ -528,7 +528,7 @@ export class Fighter {
   }
 
   reset(x: number, face: 1 | -1, preserveSplash=false): void {
-    this.x=x; this.face=face; this.hp=100; this.energy=0;
+    this.x=x; this.face=face; this.hp=MAX_HEALTH; this.energy=0;
     if(!preserveSplash) this.splashEnergy=0;
     this.yOffset=0; this.vy=0; this.stunned=0; this.blocking=false;
     this.crouching=false; this.walking=false; this.attack=null;
