@@ -1,5 +1,5 @@
 import { deriveCommandChords, visualChords } from './CommandRules';
-import { splashChord } from '../combat/SplashRules';
+import { splashRequested } from '../combat/SplashRules';
 
 export type Action = 'left' | 'right' | 'up' | 'down' | 'jump' | 'light' | 'heavy' | 'kick' | 'block' | 'grab' | 'special' | 'duel' | 'roll' | 'splash';
 export type InputState = Record<Action, boolean>;
@@ -349,7 +349,7 @@ export class Controls {
     });
     state.duel=commands.duel;
     state.special=commands.special;
-    state.splash=Boolean(touched?.has('splash')) || splashChord({
+    state.splash=splashRequested(Boolean(touched?.has('splash')),{
       up:state.up,light:state.light,heavy:state.heavy,l1:l1Down,r1:r1Down,
     });
     if(state.splash){
