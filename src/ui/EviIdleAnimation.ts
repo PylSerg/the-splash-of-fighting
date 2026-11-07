@@ -8,6 +8,26 @@ export const EVI_IDLE_FRAMES=6;
 export const EVI_IDLE_WIDTH=512;
 export const EVI_IDLE_HEIGHT=768;
 export const EVI_IDLE_FRAME_MS=185;
+
+/** Back-and-forth idle playback: 0→1→…→last→…→1→0.
+ * Return the next direction at both endpoints so neither endpoint gets
+ * duplicated and the last-to-first jump is never rendered.
+ * Pure on purpose: the selection controller and regression tests share
+ * exactly the same stepping rules.
+ */
+export function advanceEviIdleFrame(
+  frame:number,direction:1|-1,count=EVI_IDLE_FRAMES,
+):{frame:number;direction:1|-1}{
+  if(count<=1)return {frame:0,direction:1};
+  const current=Math.max(0,Math.min(count-1,Math.trunc(frame)));
+  const next=current+direction;
+  if(next>=count)return {frame:count-2,direction:-1};
+  if(next<0)return {frame:1,direction:1};
+  return {
+    frame:next,
+    direction:next===count-1?-1:next===0?1:direction,
+  };
+}
 const MAX_ZIP_BYTES=12*1024*1024;
 const MAX_FRAME_BYTES=5*1024*1024;
 
