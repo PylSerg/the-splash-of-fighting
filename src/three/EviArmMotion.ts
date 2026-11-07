@@ -25,8 +25,15 @@ export function eviHandTargets(input:EviMotionInput,_pose:EviPose):HandTargets{
   const name=input.name;
   if(isEviFanSlash(name)){
     const phase=sideSlashBlend(input.elapsed??0,input.startup??.42,input.duration??.9);
-    const back:Vec3={x:.48,y:.30,z:-.12};
-    const strike:Vec3={x:.30,y:.30,z:.69};
+    // A FAN CUT must cross the opponent's silhouette, not stab along +Z.
+    // Sweep the right wrist sideways across the chest, carrying the
+    // opened blade in a shallow forward arc. High Y/duel cuts travel
+    // through head height; X and crouch-X occupy lower guard lanes.
+    const high=name==='heavy'||name==='duel';
+    const low=name==='crouchMid';
+    const cutHeight=high?.62:low?.22:name==='special'?.46:.40;
+    const back:Vec3={x:-.10,y:high?.55:low?.25:name==='special'?.43:.38,z:.25};
+    const strike:Vec3={x:.59,y:cutHeight,z:.51};
     const prepared=blend(right,back,phase.windup);
     return {
       right:blend(blend(prepared,strike,phase.release),right,phase.recovery),
@@ -82,6 +89,18 @@ export function eviHandTargets(input:EviMotionInput,_pose:EviPose):HandTargets{
       return {right:{x:.26,y:.32,z:.38},left:{x:-.24,y:.34,z:.32}};
     default:return {right,left};
   }
+}
+
+/** Blade follows the sideways arm sweep with a wrist turn, rather than
+ * pointing at the rival like a spear. Returns neutral orientation at rest.
+ * The original fan yaw still points toward the fighter's current opponent.
+ */
+export function eviFanSwingAngles(input:EviMotionInput):{yaw:number;roll:number}{
+  if(!isEviFanSlash(input.name))return {yaw:0,roll:0};
+  const phase=sideSlashBlend(input.elapsed??0,input.startup??.42,input.duration??.9);
+  const yaw=(-.60*phase.windup+.84*phase.release)*(1-phase.recovery);
+  const roll=(-.48*phase.windup+.88*phase.release)*(1-phase.recovery);
+  return {yaw,roll};
 }
 
 /** Mirror-safe shoulder/elbow targets: the anatomical right-hand is always
