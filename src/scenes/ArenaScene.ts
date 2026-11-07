@@ -361,6 +361,7 @@ export class ArenaScene extends Phaser.Scene {
   getThreeBattleFrame():{
     fighters:[ReturnType<Fighter['getThreeSnapshot']>,ReturnType<Fighter['getThreeSnapshot']>];
     logicalWidth:number;
+    frozen:boolean;
   } | null {
     if(!this.hasMatch||!this.player1||!this.player2)return null;
     return {
