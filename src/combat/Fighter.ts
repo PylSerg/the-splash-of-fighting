@@ -10,6 +10,8 @@ import {
   frameForEvi,eviFrameTextureKey,EVI_CINEMATIC_SECONDS,
   EVI_RENDER_WIDTH,EVI_RENDER_HEIGHT,EVI_FEET_ORIGIN_Y,
 } from './EviSpriteStates.ts';
+import { type EviMotionInput } from './EviRigMotion.ts';
+import { EviPixelPuppet } from './EviPixelPuppet.ts';
 import { earnSplashEnergy, SPLASH_METER_MAX, SPLASH_INPUT_GRACE, splashFacing } from './SplashRules';
 import {
   FIGHTER_STYLES, ATTACK_ACTIVE, WAKEUP_PROTECTION,
@@ -109,6 +111,8 @@ export class Fighter {
   /** The 2s opening/closing display is purely visual and never changes hitboxes. */
   private cinematic: {kind:'intro'|'victory';elapsed:number}|null=null;
   private pixelSprite?: Phaser.GameObjects.Image;
+  private pixelPuppet?:EviPixelPuppet;
+  private eviVisualMode:'puppet'|'sheet'|'legacy'='puppet';
   attack: ActiveAttack | null = null;
   // Two-stage throw animations are controlled by the arena's grapple state.
   grabPose: 'reach' | 'hold' | 'held' | 'throw' | null = null;
@@ -304,6 +308,10 @@ export class Fighter {
       this.guardAura,this.cape,this.backArm,this.leftLeg,this.rightLeg,
       this.body,this.weapon,this.frontArm,this.hair,this.head
     ]);
+    if(this.id==='evi'){
+      this.pixelPuppet=new EviPixelPuppet(scene);
+      this.rig.add(this.pixelPuppet.root);
+    }
     this.refreshSpriteArt();
     this.draw(0);
   }
@@ -318,6 +326,11 @@ export class Fighter {
       this.weapon,this.frontArm,this.hair,this.head,
     ])element.setVisible(true);
   }
+  setEviVisualMode(mode:'puppet'|'sheet'|'legacy'):void {
+    this.eviVisualMode=mode;
+    this.refreshSpriteArt();
+  }
+
   refreshSpriteArt():void {
     this.clearSpriteArt();
     const graphics=[
@@ -325,9 +338,13 @@ export class Fighter {
       this.weapon,this.frontArm,this.hair,this.head,
     ];
     const key=eviFrameTextureKey('combat',0);
-    const ready=this.id==='evi' && this.scene.textures.exists(key);
-    for(const visual of graphics)visual.setVisible(!ready);
-    if(ready){
+    const imported=this.id==='evi'&&this.scene.textures.exists(key);
+    const useSheet=imported&&this.eviVisualMode==='sheet';
+    const usePuppet=this.id==='evi'&&(
+      this.eviVisualMode==='puppet'||(this.eviVisualMode==='sheet'&&!imported));
+    this.pixelPuppet?.setVisible(usePuppet);
+    for(const visual of graphics)visual.setVisible(!useSheet&&!usePuppet);
+    if(useSheet){
       this.pixelSprite=this.scene.add.image(0,0,key)
         .setOrigin(.5,EVI_FEET_ORIGIN_Y)
         .setDisplaySize(EVI_RENDER_WIDTH,EVI_RENDER_HEIGHT);
@@ -1222,7 +1239,53 @@ export class Fighter {
     this.energy=earnSpecialMeter(this.energy,actualDamage);
   }
 
+  private eviMotionInput():EviMotionInput {
+    const time=this.time;
+    if(this.cinematic)return {
+      name:this.cinematic.kind,time,elapsed:this.cinematic.elapsed,
+      duration:EVI_CINEMATIC_SECONDS,
+    };
+    if(this.splashPose){
+      const names={
+        startup:'splashStart',attack:'splashAttack',
+        victim:'splashVictim',guard:'splashGuard',
+      } as const;
+      return {name:names[this.splashPose],time,progress:this.splashProgress};
+    }
+    if(this.knockdownPhase){
+      const phase=this.knockdownPhase;
+      return {name:phase==='flying'?'fall':phase==='rising'?'rise':'prone',
+        time,progress:phase==='flying'
+          ?Math.min(1,this.knockdownFlightAge/.48)
+          :phase==='rising'?1-this.knockdownTimer/.5:1};
+    }
+    if(this.grabPose){
+      const moves={
+        reach:'grabReach',hold:'grabHold',held:'grabHeld',throw:'throw',
+      } as const;
+      return {name:moves[this.grabPose],time};
+    }
+    if(this.isRolling)return {
+      name:'roll',time,progress:this.rollElapsed/ROLL_DURATION,
+    };
+    if(this.attack){
+      const a=this.attack;
+      return {name:a.name,time,elapsed:a.elapsed,
+        startup:a.spec.duration,
+        duration:a.spec.duration+ATTACK_ACTIVE[a.name]+
+          attackRecovery(this.id,a.name)};
+    }
+    if(this.stunned>0)return {name:'hit',time};
+    if(this.blocking)return {name:this.crouching?'guardLow':'guard',time};
+    if(this.crouching)return {name:'crouch',time};
+    if(this.airborne)return {name:'jump',time};
+    if(this.walking)return {name:'walk',time,backwards:!this.movingForward};
+    return {name:'idle',time};
+  }
+
   private draw(_dt: number): void {
+    // Art has no influence on collisions, startup, active frames or recovery.
+    this.pixelPuppet?.update(this.eviMotionInput(),_dt,this.hitFlash>0);
     if(this.pixelSprite){
       const chosen=frameForEvi({
         cinematic:this.cinematic,
