@@ -71,15 +71,35 @@ const touchLayout=new TouchLayoutEditor();
 
 const spriteStatus=get<HTMLElement>('#evi-sprite-status');
 const importedSheets=new Set<EviSheetKind>();
+type EviDisplayMode='puppet'|'sheet'|'legacy';
+let activeEviMode:EviDisplayMode='puppet';
 function describeSpriteState():void {
-  if(!importedSheets.size){
-    spriteStatus.textContent='Тимчасові моделі активні. Завантаж спрайти для Еві.';
-    return;
+  const extras=importedSheets.size
+    ? ' Старі аркуші: '+(importedSheets.has('combat')?'бойові ✓':'бойові ✗')+
+      ', '+(importedSheets.has('cinematic')?'кінематографічні ✓':'кінематографічні ✗')+'.'
+    : ' Старі аркуші ще не імпортовані.';
+  spriteStatus.textContent=activeEviMode==='puppet'
+    ?'🌸 Активна піксельна модель Еві. Плавні 2D-анімації працюють без завантажень.'+extras
+    :activeEviMode==='sheet'
+      ?'🧩 Режим старих аркушів. '+
+        (importedSheets.has('combat')?'Бойові спрайти активні.':
+          'Бойових спрайтів немає: тимчасово показую піксельну модель.')+extras
+      :'↺ Активна початкова процедурна модель Еві.'+extras;
+}
+function selectEviMode(mode:EviDisplayMode):void {
+  activeEviMode=mode;
+  arena.setEviVisualMode(mode);
+  for(const button of document.querySelectorAll<HTMLButtonElement>('[data-evi-mode]')){
+    const selected=button.dataset.eviMode===mode;
+    button.classList.toggle('selected',selected);
+    button.setAttribute('aria-pressed',String(selected));
   }
-  spriteStatus.textContent='На цьому пристрої встановлено: '+
-    (importedSheets.has('combat')?'🥊 бойові пози':'🥊 бойові пози відсутні')+
-    ', '+(importedSheets.has('cinematic')?'🎬 вступ/перемога':'🎬 вступ/перемога відсутні')+
-    '. Продовж бій або почни матч, щоб переглянути.';
+  describeSpriteState();
+}
+for(const button of document.querySelectorAll<HTMLButtonElement>('[data-evi-mode]')){
+  button.addEventListener('click',()=>{
+    selectEviMode(button.dataset.eviMode as EviDisplayMode);
+  });
 }
 async function waitForArenaBoot():Promise<void>{
   if(arena.textures)return;
@@ -90,7 +110,8 @@ async function applyEviSheet(kind:EviSheetKind,blob:Blob,remember:boolean):Promi
   await waitForArenaBoot();
   arena.installEviSheet(kind,image);
   importedSheets.add(kind);
-  describeSpriteState();
+  if(remember)selectEviMode('sheet'); // Explicit import previews artwork immediately.
+  else describeSpriteState(); // Stored sheets never override the new default rig.
   if(remember){
     try{await storeEviSheet(kind,blob);}
     catch{spriteStatus.textContent+=' Не вдалося зберегти на пристрої, але у цій сесії спрайти працюють.';}
@@ -108,7 +129,7 @@ for(const kind of ['combat','cinematic'] as const){
   });
 }
 get<HTMLButtonElement>('#btn-evi-reset-art').addEventListener('click',()=>{
-  arena.removeEviSheets();importedSheets.clear();describeSpriteState();
+  arena.removeEviSheets();importedSheets.clear();selectEviMode('puppet');
   void clearEviSheets().catch(()=>{
     spriteStatus.textContent+=' Збережені файли не вдалося очистити.';
   });
