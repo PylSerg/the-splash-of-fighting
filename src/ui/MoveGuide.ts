@@ -36,7 +36,7 @@ export function getMoveGuide(fighter:FighterId):MoveGuide {
     sections:[
       {title:'Основні атаки',moves:[
         {buttons:'Y',description:'Висока сильна атака · '+heavyDamage+' HP. Промахується над присілим суперником.'},
-        {buttons:'X',description:'Середня швидка атака · '+scaleDamage(5)+' HP ('+short(damagePercent(scaleDamage(5)).toFixed(1))+'% HP).'},
+        {buttons:'X',description:'Середня швидка атака · '+scaleDamage(5)+' HP ('+short(Number(damagePercent(scaleDamage(5)).toFixed(1)))+'% HP).'},
         {buttons:'B',description:'Нижня атака ногою · '+scaleDamage(9)+' HP. Проходить під стоячим блоком.'},
         {buttons:'↓ + X',description:'Середній швидкий удар навприсядки · '+scaleDamage(runa?5:4)+' HP.'},
         {buttons:'↓ + B',description:'Нижня підсічка · '+scaleDamage(runa?6:5)+' HP. Збиває з ніг, якщо не заблокована.'},
