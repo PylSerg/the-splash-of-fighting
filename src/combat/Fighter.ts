@@ -544,6 +544,23 @@ export class Fighter {
    * position or energy. Clear all defeat/knockdown states too, since zero HP
    * normally initiates the permanent knockout animation on impact.
    */
+  /** Clear any leftover CPU attack/guard from the previous training policy.
+   * Does NOT reset HP, normal/SPLASH energy, position, or active grapple.
+   */
+  becomePassiveTrainingDummy():void {
+    this.attack=null;
+    this.queuedSolo=null;
+    this.queuedSpecial=0;
+    this.clearCombo();
+    this.blocking=false;
+    this.crouching=false;
+    this.walking=false;
+    this.stunned=0;
+    this.blockstun=0;
+    this.impactVelocity=0;
+    this.draw(0);
+  }
+
   restoreTrainingHealth():boolean {
     if(this.hp>0)return false;
     this.hp=MAX_HEALTH;
