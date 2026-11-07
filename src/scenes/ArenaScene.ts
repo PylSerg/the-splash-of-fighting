@@ -1157,6 +1157,62 @@ export class ArenaScene extends Phaser.Scene {
     });
   }
 
+  /** Practice never ends on KO: refill HP immediately while keeping
+   * fighters, current stage and both energy meters. Fighter cleans up
+   * knockout/fall state so a lethal strike cannot leave a permanent corpse.
+   */
+  private restoreTrainingHealth():void {
+    const healed:string[]=[];
+    if(shouldRestoreTrainingHealth(this.training,this.player1.hp) &&
+       this.player1.restoreTrainingHealth()){
+      healed.push(getCharacter(this.player1.id).name);
+      this.healthTrail1=makeHealthTrail(MAX_HEALTH);
+      this.combatNotice('HP REFILL!',this.player1.x,GROUND_Y-190,0x8cf4c0);
+    }
+    if(shouldRestoreTrainingHealth(this.training,this.player2.hp) &&
+       this.player2.restoreTrainingHealth()){
+      healed.push(getCharacter(this.player2.id).name);
+      this.healthTrail2=makeHealthTrail(MAX_HEALTH);
+      this.combatNotice('HP REFILL!',this.player2.x,GROUND_Y-190,0x8cf4c0);
+    }
+    if(healed.length)this.onStatus('ТРЕНУВАННЯ: '+
+      healed.join(' і ')+' відновлює 200 HP. Тренування триває!');
+  }
+
+  /** The normal CPU stays unchanged in arcade mode. Practice exposes four
+   * deliberately different, selectable input policies for the dummy.
+   */
+  private trainingCpuInput(dt:number):InputState {
+    if(!this.training)return this.cpuInput(dt);
+    if(this.trainingBehavior==='passive')return emptyInput();
+    if(this.trainingBehavior==='guard'){
+      const input=emptyInput();
+      input.block=true;
+      input.down=trainingCrouchGuard(this.player1.attack?.spec.level??null);
+      return input; // No locomotion or attacks in guard-only mode.
+    }
+    const input=this.cpuInput(dt);
+    if(this.trainingBehavior==='attack'){
+      // Offensive-only dummy still closes the gap and throws, but never
+      // raises a normal block, including against a telegraphed attack.
+      if(this.grapple?.defender===this.player2){
+        input.block=false;input.down=false;input.light=true;
+        return input;
+      }
+      const wasBlocking=input.block;
+      input.block=false;
+      if(wasBlocking){
+        input.down=false;
+        const forward=this.player1.x>this.player2.x?'right':'left';
+        if(Math.abs(this.player1.x-this.player2.x)>105){
+          input[forward]=true;
+          input[forward==='left'?'right':'left']=false;
+        }
+      }
+    }
+    return input;
+  }
+
   private cpuInput(dt: number): InputState {
     const input=emptyInput();
     const distance=Math.abs(this.player1.x-this.player2.x);
