@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { deriveCommandChords, visualChords } from '../src/input/CommandRules.ts';
+import { deriveCommandChords, visualChords, resolveXYTouch } from '../src/input/CommandRules.ts';
 const b={block:false,kick:false,heavy:false,r1Solo:false,
   r1AndR2:false,duelSwipe:false,specialSwipe:false};
 const d=change=>deriveCommandChords({...b,...change});
@@ -40,4 +40,19 @@ assert.deepEqual(v({light:true,block:true}),
 assert.deepEqual(v({specialSwipe:true,duelSwipe:true}),
   {duel:false,special:true,grab:false},
   'A+B swipe overrides lingering B+Y swipe');
-console.log('✓ Touch A+B highlight and priority, keyboard/gamepad special/duel: passed.');
+const fingers=new Map([[101,'light'],[202,'heavy']]);
+assert.deepEqual(resolveXYTouch(fingers,false),
+  {light:true,heavy:true},'different physical pointer IDs hold X and Y at once');
+assert.deepEqual(resolveXYTouch(new Map([[202,'heavy'],[101,'light']]),false),
+  {light:true,heavy:true},'press order cannot affect X+Y combination');
+assert.deepEqual(resolveXYTouch(new Map([[101,'light']]),false),
+  {light:true,heavy:false},'only X alone is not a SPLASH chord');
+assert.deepEqual(resolveXYTouch(new Map([[202,'heavy']]),false),
+  {light:false,heavy:true},'only Y alone is not a SPLASH chord');
+assert.deepEqual(resolveXYTouch(new Map([[101,'light']]),true),
+  {light:true,heavy:true},'X→Y swipe holds both virtual buttons');
+assert.deepEqual(resolveXYTouch(new Map([[202,'heavy']]),true),
+  {light:true,heavy:true},'Y→X swipe holds both virtual buttons');
+assert.deepEqual(resolveXYTouch(new Map([[101,'block'],[202,'kick']]),false),
+  {light:false,heavy:false},'A+B never impersonates X+Y');
+console.log('✓ Independent X+Y multi-touch, two swipe directions, A+B and duel precedence: passed.');
