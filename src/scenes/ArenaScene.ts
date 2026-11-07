@@ -286,7 +286,7 @@ export class ArenaScene extends Phaser.Scene {
     this.rightName.setText(getCharacter(second).name);
     this.restartMatch();
     this.onStatus(training
-      ? 'ТРЕНУВАННЯ: обидва бійці автоматично відновлюють 200 HP. Поведінку суперника можна змінити в меню бою.'
+      ? 'ТРЕНУВАННЯ: обидва бійці автоматично відновлюють '+MAX_HEALTH+' HP. Поведінку суперника можна змінити в меню бою.'
       :mode==='cpu'
         ? getCharacter(first).name+' проти '+getCharacter(second).name+' (CPU)!'
         : getCharacter(first).name+' проти '+getCharacter(second).name+' (PvP)!');
@@ -1190,7 +1190,7 @@ export class ArenaScene extends Phaser.Scene {
       this.combatNotice('HP REFILL!',this.player2.x,GROUND_Y-190,0x8cf4c0);
     }
     if(healed.length)this.onStatus('ТРЕНУВАННЯ: '+
-      healed.join(' і ')+' відновлює 200 HP. Тренування триває!');
+      healed.join(' і ')+' відновлює '+MAX_HEALTH+' HP. Тренування триває!');
   }
 
   /** The normal CPU stays unchanged in arcade mode. Practice exposes four
