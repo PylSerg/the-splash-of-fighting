@@ -1514,8 +1514,6 @@ export class ArenaScene extends Phaser.Scene {
     const p2Color=Number.parseInt(getCharacter(this.player2.id).color.slice(1),16);
     this.drawSplashMeter(left,492,this.player1.splashEnergy,p1Color);
     this.drawSplashMeter(right+100,492,this.player2.splashEnergy,p2Color);
-    this.controls.setSplashReady(this.player1.splashEnergy>=100 &&
-      !this.roundOver && !this.player1.knockedOut);
     this.splashLabel1.setText(this.player1.splashEnergy>=100?'SPLASH READY!':'SPLASH');
     this.splashLabel2.setText(this.player2.splashEnergy>=100?'SPLASH READY!':'SPLASH');
     // Two victory pips at each side; no round is awarded for a draw.
