@@ -21,7 +21,7 @@ import {
 export type FighterId = 'evi' | 'runa' | 'lyra' | 'kai';
 export type AttackName = 'light' | 'heavy' | 'kick' | 'special' | 'sweep' | 'crouchMid' | 'duel';
 export interface AttackSpec {
-  /** Wind-up/swing completes at this time; collision is tested exactly once then. */
+  /** End of startup, before a short ACTIVE hitbox window and RECOVERY. */
   duration: number;
   reach: number;
   damage: number;
