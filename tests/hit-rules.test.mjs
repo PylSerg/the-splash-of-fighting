@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { stopsHit, strikeBand, isBackStrike, strikeDamage, BACK_STRIKE_MULTIPLIER } from '../src/combat/HitRules.ts';
+import { stopsHit, strikeBand, isBackStrike, strikeDamage, canAutoTurn, BACK_STRIKE_MULTIPLIER } from '../src/combat/HitRules.ts';
 
 const expected = {
   standing: { high: true, mid: true, low: false },
@@ -33,6 +33,16 @@ for (const level of ['high','mid','low']) {
   assert.ok(strikeBand(level).height > 0,
     `${level} hitbox must have positive height`);
 }
+const guardInputs={block:true,left:false,right:false,up:false};
+assert.equal(canAutoTurn(1,guardInputs,false,0,false),false,
+  'standing guard may not auto-turn to a rolling attacker behind');
+assert.equal(canAutoTurn(-1,{...guardInputs,up:false},false,0,false),false);
+assert.equal(canAutoTurn(1,{...guardInputs,right:false,left:true},false,0,false),false,
+  'retreating guard also keeps its direction');
+assert.equal(canAutoTurn(1,{...guardInputs,block:false},false,0,false),true,
+  'releasing the guard permits an immediate turn');
+assert.equal(canAutoTurn(1,{...guardInputs,right:true},false,0,false),true,
+  'a forward-moving input is not an active defensive stance');
 assert.equal(BACK_STRIKE_MULTIPLIER,1.5);
 assert.equal(isBackStrike(90,100,1),true,'left side of a right-facing guard is exposed');
 assert.equal(isBackStrike(110,100,1),false,'right side is the guarded front');
