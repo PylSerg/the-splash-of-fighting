@@ -1174,7 +1174,7 @@ export class Fighter {
     // Same silhouette used by green debug boxes and the real combat
     // detector: the old 145px box stopped below the heads of BOTH fighters.
     const low=this.crouching||this.isRolling;
-    const {halfWidth,top,height}=fighterHurtboxBand(low);
+    const {halfWidth,top,height}=fighterHurtboxBand(this.id,low);
     return {
       x:this.x-halfWidth,
       y:GROUND_Y+this.yOffset+top,
