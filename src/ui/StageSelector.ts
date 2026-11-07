@@ -12,6 +12,17 @@ export class StageSelector {
   private currentName: HTMLElement;
   private currentDescription: HTMLElement;
   private counter: HTMLElement;
+  private loreButton: HTMLButtonElement;
+  private loreOverlay: HTMLElement;
+  private loreArt: HTMLElement;
+  private loreName: HTMLElement;
+  private loreSubtitle: HTMLElement;
+  private loreStory: HTMLElement;
+  private loreAtmosphere: HTMLElement;
+  private loreLandmark: HTMLElement;
+  private loreClose: HTMLButtonElement;
+  private loreReturn: HTMLButtonElement;
+  private lorePreviousFocus: HTMLElement | null = null;
   private index = 0;
   private drag: { id: number; x: number; y: number; target: StageId | null } | null = null;
   private suppressClickUntil = 0;
@@ -33,6 +44,31 @@ export class StageSelector {
     this.currentName=get('#stage-active-name');
     this.currentDescription=get('#stage-active-description');
     this.counter=get('#stage-counter');
+    this.loreButton=get('#btn-stage-lore');
+    this.loreOverlay=get('#stage-lore-dialog');
+    this.loreArt=get('#stage-lore-art');
+    this.loreName=get('#stage-lore-name');
+    this.loreSubtitle=get('#stage-lore-title');
+    this.loreStory=get('#stage-lore-story');
+    this.loreAtmosphere=get('#stage-lore-atmosphere');
+    this.loreLandmark=get('#stage-lore-landmark');
+    this.loreClose=get('#stage-lore-close');
+    this.loreReturn=get('#stage-lore-return');
+    this.loreButton.addEventListener('click',()=>this.inspect());
+    this.loreClose.addEventListener('click',()=>this.closeLore());
+    this.loreReturn.addEventListener('click',()=>this.closeLore());
+    this.loreOverlay.addEventListener('click',event=>{
+      if(event.target===this.loreOverlay)this.closeLore();
+    });
+    this.loreOverlay.addEventListener('keydown',event=>{
+      // Match the fighter biography: keyboard focus stays inside the lore.
+      if(event.key!=='Tab')return;
+      if(event.shiftKey && document.activeElement===this.loreClose){
+        event.preventDefault();this.loreReturn.focus();
+      }else if(!event.shiftKey && document.activeElement===this.loreReturn){
+        event.preventDefault();this.loreClose.focus();
+      }
+    });
 
     STAGES.forEach(stage => {
       const button=document.createElement('button');
@@ -55,7 +91,7 @@ export class StageSelector {
         if(target !== this.index){
           this.index=target;
           this.paint();
-        } // An already selected stage does not launch a fight.
+        } else this.inspect(); // Inspect the chosen stage, just like a fighter bio.
       });
       this.roster.append(button);
     });
@@ -85,6 +121,7 @@ export class StageSelector {
         this.suppressClickUntil=performance.now()+350;
         const index=STAGES.findIndex(stage=>stage.id===tapped);
         if(index>=0 && index!==this.index){ this.index=index; this.paint(); }
+        else if(index===this.index)this.inspect();
       }
     });
     this.carousel.addEventListener('pointercancel',()=>{this.drag=null;});
@@ -98,6 +135,7 @@ export class StageSelector {
   }
 
   show(preselect: StageId | null): void {
+    this.closeLore(false);
     const found=STAGES.findIndex(stage=>stage.id===preselect);
     this.index=found<0?0:found;
     this.root.hidden=false;
@@ -106,17 +144,54 @@ export class StageSelector {
     this.paint();
     this.carousel.focus({preventScroll:true});
   }
-  hide():void { this.root.hidden=true;this.drag=null; }
+  hide():void { this.closeLore(false);this.root.hidden=true;this.drag=null; }
   get isOpen():boolean { return !this.root.hidden; }
-  goBack():void { if(this.isOpen)this.onBack(); }
+  get isLoreOpen():boolean { return !this.loreOverlay.hidden; }
+  goBack():void {
+    if(this.isLoreOpen){this.closeLore();return;}
+    if(this.isOpen)this.onBack();
+  }
+
+  /** Inspecting a selected stage opens the same style of panel as the
+   * fighter's story. Closing never selects an arena or starts combat.
+   */
+  inspect():void {
+    if(!this.isOpen || this.isLoreOpen)return;
+    const stage=STAGES[this.index];
+    if(!stage)return;
+    this.lorePreviousFocus=document.activeElement instanceof HTMLElement
+      ?document.activeElement:this.loreButton;
+    this.loreOverlay.style.setProperty('--bio-accent',stage.id==='lagoon'?'#8fe4da':'#efa4db');
+    this.loreName.textContent=stage.name;
+    this.loreSubtitle.textContent=stage.description;
+    this.loreStory.textContent=stage.story;
+    this.loreAtmosphere.textContent=stage.atmosphere;
+    this.loreLandmark.textContent=stage.landmark;
+    const preview=this.roster.querySelector<HTMLButtonElement>(
+      '.stage-slide[data-stage="'+stage.id+'"] .stage-art');
+    this.loreArt.replaceChildren(
+      preview?.cloneNode(true)??document.createElement('span'));
+    this.root.inert=true;
+    this.loreOverlay.hidden=false;
+    this.loreClose.focus({preventScroll:true});
+  }
+  closeLore(restoreFocus=true):void {
+    if(!this.isLoreOpen)return;
+    this.loreOverlay.hidden=true;
+    this.root.inert=false;
+    const previous=this.lorePreviousFocus;
+    this.lorePreviousFocus=null;
+    if(restoreFocus && previous?.isConnected)
+      previous.focus({preventScroll:true});
+  }
 
   navigate(direction:-1|1):void {
-    if(!this.isOpen || STAGES.length<2) return;
+    if(!this.isOpen || this.isLoreOpen || STAGES.length<2) return;
     this.index=(this.index+STAGES.length+direction)%STAGES.length;
     this.paint();
   }
   confirm():void {
-    if(!this.isOpen)return;
+    if(!this.isOpen || this.isLoreOpen)return;
     const stage=STAGES[this.index];
     if(stage)this.onConfirm(stage.id);
   }
@@ -127,6 +202,8 @@ export class StageSelector {
     this.currentDescription.textContent=stage?.description??'';
     this.counter.textContent=(this.index+1)+' / '+STAGES.length;
     this.confirmButton.disabled=!stage;
+    this.loreButton.disabled=!stage;
+    this.loreButton.setAttribute('aria-label','Прочитати історію арени '+(stage?.name??''));
     this.root.style.setProperty('--active-stage',stage?.id==='lagoon'?'#8fe4da':'#efa4db');
     for(const button of this.roster.querySelectorAll<HTMLButtonElement>('.stage-slide')){
       const i=STAGES.findIndex(s=>s.id===button.dataset.stage);
@@ -140,7 +217,9 @@ export class StageSelector {
         slot=relative===1?'right':relative===STAGES.length-1?'left':'hidden';
       }
       button.dataset.slot=slot;
-      button.tabIndex=-1;
+      button.tabIndex=slot==='center'?0:-1;
+      button.setAttribute('aria-label','Арена '+STAGES[i].name+
+        (slot==='center'?'. Натисни ще раз, щоб прочитати історію.':'. Вибрати арену.'));
       button.setAttribute('aria-hidden',String(slot==='hidden'));
       button.setAttribute('aria-pressed',String(slot==='center'));
     }
