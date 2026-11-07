@@ -6,11 +6,20 @@ export type TrainingBehavior = 'passive' | 'guard' | 'attack' | 'both';
 export const TRAINING_BEHAVIORS: ReadonlyArray<{
   id:TrainingBehavior;label:string;description:string
 }> = [
-  {id:'passive',label:'Пасивна',description:'Не рухається, не блокує й не атакує'},
+  {id:'passive',label:'Пасивна',description:'Нічого не робить, не відбиває захват і не відповідає в дуелі'},
   {id:'guard',label:'Блокує',description:'Тримає захист та змінює висоту блоку'},
   {id:'attack',label:'Атакує',description:'Зближується й атакує без звичайного блоку'},
   {id:'both',label:'Блокує та атакує',description:'Повноцінний CPU із захистом та атаками'},
 ];
+
+/** Passive means no defense, counterpunch, or secret duel response.
+ * Attackers retain their normal choice; the dummy itself does nothing.
+ */
+export function passiveTrainingDefender(
+  training:boolean,behavior:TrainingBehavior,isDefenderDummy:boolean,
+):boolean {
+  return training && isDefenderDummy && behavior==='passive';
+}
 
 export function shouldRestoreTrainingHealth(training:boolean,hp:number):boolean {
   return training && hp<=0;
