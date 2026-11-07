@@ -1,4 +1,4 @@
-import { deriveCommandChords } from './CommandRules';
+import { deriveCommandChords, visualChords } from './CommandRules';
 import { splashChord } from '../combat/SplashRules';
 
 export type Action = 'left' | 'right' | 'up' | 'down' | 'jump' | 'light' | 'heavy' | 'kick' | 'block' | 'grab' | 'special' | 'duel' | 'roll' | 'splash';
@@ -262,17 +262,20 @@ export class Controls {
       button.classList.toggle('pressed',pressed.has(action));
     }
     const diamond=document.querySelector('.touch-attacks');
-    const special=(pressed.has('kick') && pressed.has('block')) ||
-      this.specialSwipePointers.size>0 || performance.now()<this.specialSwipePulseUntil;
-    const duel=!special && ((pressed.has('kick')&&pressed.has('heavy')) ||
-      this.comboSwipePointers.size>0 || performance.now()<this.comboSwipePulseUntil);
-    const grab=(pressed.has('light') && pressed.has('block')) ||
-      this.grabSwipePointers.size>0;
+    const chord=visualChords({
+      light:pressed.has('light'),heavy:pressed.has('heavy'),
+      kick:pressed.has('kick'),block:pressed.has('block'),
+      specialSwipe:this.specialSwipePointers.size>0 ||
+        performance.now()<this.specialSwipePulseUntil,
+      duelSwipe:this.comboSwipePointers.size>0 ||
+        performance.now()<this.comboSwipePulseUntil,
+      grabSwipe:this.grabSwipePointers.size>0,
+    });
     // A+B MUST highlight A and B, never Y. The old shared combo-active
     // class incorrectly made Y appear pressed on the special chord.
-    diamond?.classList.toggle('duel-active',duel);
-    diamond?.classList.toggle('special-active',special);
-    diamond?.classList.toggle('grab-active',!special && grab);
+    diamond?.classList.toggle('duel-active',chord.duel);
+    diamond?.classList.toggle('special-active',chord.special);
+    diamond?.classList.toggle('grab-active',chord.grab);
   }
 
   setSplashReady(ready:boolean):void {
