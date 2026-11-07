@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import {SPLASH_METER_MAX,SPLASH_WINDUP,SPLASH_MOVES,
+  earnSplashEnergy,comboSplashBonus,splashChord,canSplashGuard,
+  SPLASH_DUEL_WIN_GAIN} from '../src/combat/SplashRules.ts';
+assert.equal(SPLASH_WINDUP,0.5);
+assert.equal(Object.keys(SPLASH_MOVES).length,4);
+assert.equal(new Set(Object.values(SPLASH_MOVES).map(x=>x.name)).size,4);
+for(const move of Object.values(SPLASH_MOVES)){
+  assert.ok(move.duration>SPLASH_WINDUP);
+  assert.ok(move.pulses>3 && move.damage>30);
+}
+assert.equal(earnSplashEnergy(90,30),SPLASH_METER_MAX);
+assert.equal(earnSplashEnergy(25,0),25);
+assert.equal(earnSplashEnergy(25,-10),25);
+assert.equal(earnSplashEnergy(74,SPLASH_DUEL_WIN_GAIN),100);
+assert.equal(comboSplashBonus(1),0);
+assert.equal(comboSplashBonus(2),8);
+assert.equal(comboSplashBonus(3),16);
+assert.equal(splashChord({up:true,light:true,heavy:true,l1:false,r1:false}),true);
+assert.equal(splashChord({up:true,light:false,heavy:false,l1:true,r1:true}),true);
+assert.equal(splashChord({up:false,light:true,heavy:true,l1:false,r1:false}),false);
+const guard={down:true,block:true,airborne:false,knockedDown:false,
+  knockedOut:false,stunned:0,guarding:true};
+assert.equal(canSplashGuard(guard),true);
+assert.equal(canSplashGuard({...guard,down:false}),false);
+assert.equal(canSplashGuard({...guard,block:false}),false);
+assert.equal(canSplashGuard({...guard,guarding:false}),false);
+assert.equal(canSplashGuard({...guard,stunned:0.2}),false);
+assert.equal(canSplashGuard({...guard,airborne:true}),false);
+console.log('Splash rules: OK');
