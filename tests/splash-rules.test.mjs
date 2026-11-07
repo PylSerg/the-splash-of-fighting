@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
-import {SPLASH_METER_MAX,SPLASH_WINDUP,SPLASH_MOVES,
+import {SPLASH_METER_MAX,SPLASH_WINDUP,SPLASH_INPUT_GRACE,SPLASH_MOVES,
   earnSplashEnergy,comboSplashBonus,splashChord,canSplashGuard,
   SPLASH_DUEL_WIN_GAIN,guidedSplashPosition,splashWindupActive,splashFacing} from '../src/combat/SplashRules.ts';
 assert.equal(SPLASH_WINDUP,0.5);
+assert.ok(SPLASH_INPUT_GRACE>=.2 && SPLASH_INPUT_GRACE<=.3,
+  'short input buffer prevents solo X/Y from stealing the SPLASH chord');
 assert.equal(splashFacing(300,400,-1,'attacker'),1,'caster turns right toward opponent');
 assert.equal(splashFacing(400,300,1,'attacker'),-1,'caster turns left toward opponent');
 assert.equal(splashFacing(300,300,-1,'attacker'),-1,'caster keeps face while overlapping');
