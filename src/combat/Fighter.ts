@@ -6,6 +6,10 @@ import { blockedGrabRecoil } from './GrabRules';
 import { earnSpecialMeter, SPECIAL_METER_COST, MAX_HEALTH } from './CombatFeedback';
 import { earnSplashEnergy, SPLASH_METER_MAX, splashFacing } from './SplashRules';
 import {
+  FIGHTER_STYLES, ATTACK_ACTIVE, WAKEUP_PROTECTION,
+  attackRecovery, phaseOfAttack, styledAttack, blockstunSeconds,
+} from './CombatRhythm';
+import {
   DUEL_WHIFF_RECOVERY, DUEL_RESULT_ANIMATION, forwardHeld,
   canDuelCatchTarget, type DuelStrike,
 } from './DuelRules';
@@ -44,9 +48,6 @@ export function setStageViewportWidth(width: number): void {
   STAGE_MIN_X = 60 - extraHalf;
   STAGE_MAX_X = 900 + extraHalf;
 }
-
-// A short non-damaging recovery after the impact frame prevents animation snaps.
-const ATTACK_RECOVERY = .12;
 
 // A roll travels at floor level. Only its middle frames evade attacks;
 // the beginning and end can be punished by a well-timed strike.
@@ -91,6 +92,10 @@ export class Fighter {
   /** Separate, slow splash meter persists between rounds in one match. */
   splashEnergy = 0;
   stunned = 0;
+  /** Guard remains committed briefly after absorbing a normal attack. */
+  blockstun = 0;
+  /** Short invulnerability once a fallen fighter finishes standing up. */
+  private wakeupGrace = 0;
   blocking = false;
   crouching = false;
   walking = false;
@@ -310,6 +315,7 @@ export class Fighter {
       this.rollElapsed < ROLL_IFRAME_END;
   }
   get knockedDown(): boolean { return this.knockdownPhase !== null; }
+  get wakeupProtected():boolean { return this.wakeupGrace>0 && !this.knockedOut; }
   get knockoutSettled(): boolean { return this.knockedOut && this.knockdownPhase === 'ko'; }
   get isComboRecovering(): boolean { return this.comboRecovery > 0; }
   get isDuelRecovering(): boolean { return this.duelWhiffRecovery > 0; }
@@ -319,7 +325,7 @@ export class Fighter {
    * attack, block, roll, crouch, jump, grapple, stun or knockback state.
    */
   get isDuelTargetEligible(): boolean {
-    return canDuelCatchTarget({
+    return !this.wakeupProtected && this.blockstun<=0 && canDuelCatchTarget({
       airborne:this.airborne, crouching:this.crouching, isRolling:this.isRolling,
       knockedDown:this.knockedDown, knockedOut:this.knockedOut,
       blocking:this.blocking, attackActive:this.attack!==null,
@@ -341,7 +347,7 @@ export class Fighter {
       this.attack.elapsed<.16);
     return !this.knockedOut && !this.knockedDown && !this.airborne &&
       !this.crouching && !this.isRolling && !this.grabPose &&
-      !this.stunned && (!this.attack || earlyChordComponent) &&
+      !this.stunned && this.blockstun<=0 && (!this.attack || earlyChordComponent) &&
       !this.comboRecovery && !this.grabRecovery && !this.duelWhiffRecovery;
   }
   /** X+Y may arrive a frame apart. Only an unconnected early X/Y is cancellable. */
@@ -351,7 +357,7 @@ export class Fighter {
       this.attack.comboStage===1 && !this.attack.connected && this.attack.elapsed<.16);
     if(this.splashEnergy<SPLASH_METER_MAX || this.knockedOut || this.knockedDown ||
        this.crouching || this.isRolling || this.grabPose ||
-       this.stunned>0 || this.grabRecovery>0 || this.comboRecovery>0 ||
+       this.stunned>0 || this.blockstun>0 || this.grabRecovery>0 || this.comboRecovery>0 ||
        this.duelWhiffRecovery>0 || (this.attack && !earlyComponent)) return false;
     this.splashEnergy=0;
     // Stick-up is also jump: the chord must still work when Up preceded X/Y.
@@ -475,7 +481,7 @@ export class Fighter {
   }
   /** Only valid next strikes are exposed to the CPU and training UI. */
   get comboOptions(): ComboMove[] {
-    return this.comboLinkRemaining>0 && !this.comboRecovery
+    return this.comboLinkRemaining>0 && !this.comboRecovery && !this.blockstun
       ? (['light','kick','heavy'] as ComboMove[]).filter(
           move=>comboAllows(this.comboHistory,move))
       : [];
@@ -510,14 +516,14 @@ export class Fighter {
     if(strike.comboStage===1) {
       this.comboHistory=[strike.name as ComboMove];
       this.comboClean=clean;
-      this.comboLinkRemaining=COMBO_LINK_WINDOW;
+      this.comboLinkRemaining=FIGHTER_STYLES[this.id].comboWindow;
       return clean?1:0;
     }
     if(strike.comboStage===2 && this.comboHistory.length===1 &&
        comboAllows(this.comboHistory,strike.name as ComboMove)) {
       this.comboHistory.push(strike.name as ComboMove);
       this.comboClean &&= clean;
-      this.comboLinkRemaining=COMBO_LINK_WINDOW;
+      this.comboLinkRemaining=FIGHTER_STYLES[this.id].comboWindow;
       return this.comboClean?2:0;
     }
     if(strike.comboStage===3 && this.comboHistory.length===2 &&
@@ -533,7 +539,8 @@ export class Fighter {
   reset(x: number, face: 1 | -1, preserveSplash=false): void {
     this.x=x; this.face=face; this.hp=MAX_HEALTH; this.energy=0;
     if(!preserveSplash) this.splashEnergy=0;
-    this.yOffset=0; this.vy=0; this.stunned=0; this.blocking=false;
+    this.yOffset=0; this.vy=0; this.stunned=0; this.blockstun=0;
+    this.wakeupGrace=0; this.blocking=false;
     this.crouching=false; this.walking=false; this.attack=null;
     this.hitFlash=0; this.blockFlash=0; this.impactVelocity=0; this.time=0;
     this.queuedSolo=null; this.queuedSpecial=0;
@@ -573,6 +580,18 @@ export class Fighter {
       return;
     }
     if (this.knockedOut) { this.draw(dt); return; }
+    this.wakeupGrace=Math.max(0,this.wakeupGrace-dt);
+    if(this.blockstun>0){
+      // Freeze attacks and movement without dropping the guarded stance.
+      // Leaving A during this recovery does not cause an accidental gap.
+      this.blockstun=Math.max(0,this.blockstun-dt);
+      this.attack=null;
+      this.blocking=true;
+      this.walking=false;
+      this.advanceGravity(dt);
+      this.draw(dt);
+      return;
+    }
     if (this.stunned>0) this.stunned=Math.max(0,this.stunned-dt);
     if(this.duelWhiffRecovery>0) {
       this.duelWhiffRecovery=Math.max(0,this.duelWhiffRecovery-dt);
@@ -628,7 +647,15 @@ export class Fighter {
 
     if (this.attack) {
       this.attack.elapsed += dt;
-      if (this.attack.elapsed >= this.attack.spec.duration + ATTACK_RECOVERY) {
+      const phase=phaseOfAttack(this.attack.name,this.attack.elapsed,
+        this.attack.spec.duration,attackRecovery(this.id,this.attack.name));
+      // Missed active windows must expire before a combo is abandoned;
+      // hitting late in active frames is valid, but never damages twice.
+      if(phase==='recovery' && !this.attack.connected){
+        this.attack.connected=true;
+        if(this.attack.comboStage>0)this.clearCombo();
+      }
+      if (phase==='finished') {
         const justFinishedCombo=this.attack.comboStage===3;
         const justFinishedDuel=this.attack.name==='duel';
         this.attack=null;
@@ -777,7 +804,9 @@ export class Fighter {
     // Hitstun and crouching still prevent movement as combat states.
     // Runa is the grounded powerhouse: 20% slower than the other fighters.
     const baseMoveSpeed = this.blocking ? 90 : this.attack ? 115 : 185;
-    const moveSpeed = baseMoveSpeed * (this.id === 'runa' ? .8 : 1);
+    const style=FIGHTER_STYLES[this.id];
+    const moveSpeed=baseMoveSpeed*(this.blocking?style.guardingMovement:
+      this.attack?style.attackingMovement:style.movement);
     this.walking = move!==0 && !this.airborne;
     this.x += move*moveSpeed*dt;
     this.x = Phaser.Math.Clamp(this.x,STAGE_MIN_X,STAGE_MAX_X);
@@ -788,7 +817,7 @@ export class Fighter {
   private startRoll(direction: 1 | -1): void {
     this.rollElapsed = 0;
     this.rollDirection = direction;
-    this.rollCooldown = ROLL_COOLDOWN;
+    this.rollCooldown = ROLL_COOLDOWN*FIGHTER_STYLES[this.id].rollCooldown;
     this.attack = null;
     this.queuedSolo = null;
     this.queuedSpecial = 0;
@@ -805,7 +834,7 @@ export class Fighter {
     this.rollElapsed = Math.min(ROLL_DURATION,this.rollElapsed + dt);
     const after = Phaser.Math.Clamp(this.rollElapsed / ROLL_DURATION,0,1);
     const ease = (t:number) => t*t*(3-2*t);
-    const distance = ROLL_DISTANCE * (this.id === 'runa' ? .84 : 1);
+    const distance = ROLL_DISTANCE*FIGHTER_STYLES[this.id].rollDistance;
     this.x = Phaser.Math.Clamp(this.x +
       this.rollDirection * distance * (ease(after)-ease(before)),
       STAGE_MIN_X, STAGE_MAX_X);
@@ -847,6 +876,7 @@ export class Fighter {
           this.knockdownPhase=null;
           this.knockdownFlightAge=0;
           this.stunned=0;
+          this.wakeupGrace=WAKEUP_PROTECTION;
         }
       }
     }
@@ -950,7 +980,8 @@ export class Fighter {
 
   /** Unique spec is selected at wind-up; the shared engine still resolves hits. */
   private begin(name: AttackName, linkedStage = 0): void {
-    const spec = this.id === 'runa' ? RUNA_ATTACKS[name] : ATTACKS[name];
+    const base = this.id === 'runa' ? RUNA_ATTACKS[name] : ATTACKS[name];
+    const spec=styledAttack(this.id,name,base);
     const regular=name==='light'||name==='kick'||name==='heavy';
     if(linkedStage===0) this.clearCombo();
     this.attack={name,spec,elapsed:0,connected:false,
@@ -962,11 +993,11 @@ export class Fighter {
 
   getActiveStrike(): ActiveAttack | null {
     const a=this.attack;
-    // No damage during the wind-up. At completion, permit ONE collision test.
-    // A light X can cancel Y or special before this frame is reached.
+    // Startup is harmless; collision stays active for several simulation
+    // frames after full extension. One attack may hit only once.
     return a && !a.connected &&
-      a.elapsed >= a.spec.duration &&
-      a.elapsed < a.spec.duration + ATTACK_RECOVERY ? a : null;
+      phaseOfAttack(a.name,a.elapsed,a.spec.duration,
+        attackRecovery(this.id,a.name))==='active' ? a : null;
   }
 
   strikeBox(): {x:number;y:number;w:number;h:number} | null {
@@ -996,7 +1027,7 @@ export class Fighter {
 
   receiveHit(
     spec: AttackSpec, attackerFace: 1|-1, unblockable = false,
-    context: {rear?:boolean;guardBreaker?:boolean} = {},
+    context: {rear?:boolean;guardBreaker?:boolean;attackName?:AttackName} = {},
   ): {damage:number;blocked:boolean;interrupted:boolean;guardBroken:boolean} {
     const guardValid=!unblockable && !context.rear &&
       stopsHit(this.guardStance,spec.level);
@@ -1017,6 +1048,8 @@ export class Fighter {
       // are checked before receiveHit() in ArenaScene.resolveStrike().
       this.rollElapsed=-1;
       this.stunned=spec.stun;
+      this.blockstun=0;
+      this.wakeupGrace=0;
       if(guardBroken){this.blocking=false;this.crouching=false;}
       this.attack=null;
       this.queuedSolo=null;
@@ -1026,6 +1059,8 @@ export class Fighter {
       // Keep the guard up through successive hits; guard stun must not
       // create a tiny opening that lets the next hit bypass a held A.
       this.stunned=0;
+      this.blockstun=Math.max(this.blockstun,
+        blockstunSeconds(context.attackName??'kick'));
       this.blockFlash=.18;
     }
     if(this.knockedOut) this.startKnockout(attackerFace);
@@ -1093,7 +1128,8 @@ export class Fighter {
       const ratio=Phaser.Math.Clamp(a.elapsed/a.spec.duration,0,1);
       const swing=ratio < .54 ? -.28*(ratio/.54) : -.28+1.28*((ratio-.54)/.46);
       const followThrough=Phaser.Math.Clamp(
-        1-Math.max(0,a.elapsed-a.spec.duration)/ATTACK_RECOVERY,0,1);
+        1-Math.max(0,a.elapsed-a.spec.duration-ATTACK_ACTIVE[a.name])/
+        attackRecovery(this.id,a.name),0,1);
       const recoil=swing*followThrough;
       if(a.name==='duel') {
         // Readable, real high Y wind-up, but initiation itself deals ZERO HP.
