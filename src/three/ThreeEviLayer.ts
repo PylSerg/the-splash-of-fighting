@@ -15,12 +15,13 @@ export interface ThreeFighterFrame {
 export interface ThreeBattleFrame {
   fighters:readonly [ThreeFighterFrame,ThreeFighterFrame];
   logicalWidth:number;
+  frozen?:boolean;
 }
 const skin=0xe5ad89,skinLight=0xffd1ad;
 const cream=0xfff4e6,white=0xffffff,lace=0xf4e6f1;
 const gold=0xdab668,goldLight=0xffdc88,pink=0xf4a5bc;
 const blonde=0xf6d28f,blondeShade=0xc99b59;
-const ink=0x323149,blue=0x64b4e5,iris=0x408cc9;
+const ink=0x323149,iris=0x408cc9;
 
 function material(color:number,metalness=0,roughness=.65):THREE.MeshStandardMaterial{
   return new THREE.MeshStandardMaterial({color,metalness,roughness,side:THREE.DoubleSide});
@@ -85,7 +86,6 @@ class EviThreeCharacter{
   private pose:EviPose=neutralEviPose();
   private lastAction='idle';
   private lastElapsed=0;
-  private height=0;
 
   constructor(private readonly scene:THREE.Scene){
     this.pivot.position.y=THREE_ROLL_PIVOT;
