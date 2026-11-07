@@ -79,9 +79,14 @@ button:focus-visible,summary:focus-visible{outline:3px solid #7bd3f9;outline-off
 .attack.kick{grid-column:3;grid-row:2;background:linear-gradient(140deg,#69dce6e5,#1d819fdf)}
 .attack.block{grid-column:2;grid-row:3;width:68px;height:68px;background:linear-gradient(145deg,#82d59eea,#368b65e8)}
 .attack.pressed{filter:brightness(1.45);scale:.92;box-shadow:inset 0 3px 12px #ffffff72,0 0 20px #e9bdffbb}
-.touch-attacks.combo-active .attack.heavy,.touch-attacks.combo-active .attack.kick{
+.touch-attacks.duel-active .attack.heavy,.touch-attacks.duel-active .attack.kick{
   box-shadow:inset 0 3px 12px #ffffffb3,0 0 20px #e3b1ffff;
   border-color:#fff1ff;
+}
+/* Never illuminate Y for A+B: the special only uses A and B. */
+.touch-attacks.special-active .attack.block,.touch-attacks.special-active .attack.kick{
+  box-shadow:inset 0 3px 12px #ffffffb3,0 0 20px #a5ffe4fc;
+  border-color:#cafff0;
 }
 .touch-attacks.grab-active .attack.light,.touch-attacks.grab-active .attack.block{
   box-shadow:inset 0 3px 12px #ffffffc0,0 0 23px #9de4c9ff;
@@ -434,7 +439,7 @@ button:focus-visible,summary:focus-visible{outline:3px solid #7bd3f9;outline-off
 /* Pause menu's tab pages: no controls spill beneath the game viewport. */
 .pause-panel{width:min(720px,100%)}
 .pause-context-label{font:700 12px Rajdhani,sans-serif;color:#aee2e4}
-.pause-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:9px 0 11px}
+.pause-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:9px 0 11px}
 .pause-tab{
   border:1px solid #737ea7;border-radius:9px;
   padding:8px 5px;background:#242b4a;color:#d9e0f4;
@@ -771,4 +776,72 @@ body { min-height:0; }
 @media (orientation:landscape) and (max-height:295px){
   .home-buttons{gap:4px}
   .home-buttons button{min-height:29px;padding:3px 10px;font-size:clamp(14px,5dvh,18px)}
+}
+
+/* Alpha 1.16.1: Dedicated splash button for phones. A triple chord is
+   still supported, but one tap is reliable with thumbs and touch gestures. */
+.touch-splash{
+  position:absolute;z-index:3;left:clamp(255px,32vw,450px);
+  bottom:calc(23px + env(safe-area-inset-bottom,0px));
+  min-width:86px;min-height:39px;padding:7px 11px;
+  pointer-events:auto;touch-action:none;user-select:none;
+  color:#b7b7d2;border:1.5px solid #6263819c;border-radius:999px;
+  background:linear-gradient(120deg,#2c2a46b0,#252842c8);
+  font:800 clamp(12px,2vmin,16px)/1 Rajdhani,sans-serif;
+  letter-spacing:.7px;box-shadow:inset 0 1px #ffffff19;
+  opacity:.65;
+}
+.touch-splash:disabled{cursor:not-allowed}
+.touch-splash.is-ready{
+  opacity:1;color:#21152d;border-color:#fff1d6;
+  background:linear-gradient(120deg,#fff0bb,#fcb1dc 48%,#c4aafa);
+  box-shadow:0 0 20px #ffb4dd96,inset 0 2px 6px #ffffffa0;
+  animation:splash-ready-breathe 1.4s ease-in-out infinite alternate;
+}
+.touch-splash.is-ready.pressed{transform:scale(.94);filter:brightness(1.2)}
+@keyframes splash-ready-breathe{
+  from{box-shadow:0 0 8px #f6b6dd79}
+  to{box-shadow:0 0 27px #f6b6ddf0}
+}
+@media(any-pointer:coarse) and (orientation:landscape) and (max-height:500px){
+  .touch-splash{
+    left:clamp(244px,32vw,420px);
+    bottom:calc(14px + env(safe-area-inset-bottom,0px));
+    min-height:34px;min-width:82px;padding:5px 9px;
+  }
+}
+@media(any-pointer:coarse) and (orientation:landscape) and (max-width:780px){
+  .touch-splash{left:31.5%;bottom:calc(9px + env(safe-area-inset-bottom,0px))}
+}
+
+/* Fighter-specific combo reference is scrollable INSIDE the paused menu. */
+.combo-guide-header{display:flex;align-items:flex-start;justify-content:space-between;
+  flex-wrap:wrap;gap:9px;padding:2px 2px 9px}
+.combo-guide-header h2{font:800 clamp(19px,3vmin,25px) Rajdhani,sans-serif;color:#ffe0f3;margin:0}
+.combo-guide-header p{font:500 12px/1.4 Inter,system-ui,sans-serif;color:#b8c8e6;margin:4px 0 0}
+.combo-guide-players{display:flex;gap:6px;align-items:center}
+.combo-guide-players .pill{font:700 15px Rajdhani,sans-serif;padding:7px 11px}
+.combo-guide-content{max-height:min(58dvh,390px);overflow-y:auto;overscroll-behavior:contain;
+  border:1px solid #7283a75d;border-radius:12px;padding:10px;
+  background:#101b31a8;scrollbar-width:thin}
+.combo-guide-identity{background:linear-gradient(115deg,#55335d9c,#21505e92);
+  padding:10px 12px;border:1px solid #c8a1d55f;border-radius:10px;margin-bottom:9px}
+.combo-guide-identity strong{color:#ffe3f5;font:800 clamp(16px,2.9vmin,21px) Rajdhani,sans-serif}
+.combo-guide-identity p{color:#d4e6e7;font:500 12px/1.45 Inter,sans-serif;margin:5px 0 0}
+.combo-guide-section{margin:0 0 12px}
+.combo-guide-section h3{color:#baf5e0;margin:9px 0 7px;
+  font:800 clamp(15px,2.6vmin,19px) Rajdhani,sans-serif}
+.combo-guide-move{display:grid;grid-template-columns:minmax(125px,35%) 1fr;
+  align-items:center;gap:9px;padding:8px 9px;
+  border-bottom:1px solid #9bb3d225;line-height:1.32}
+.combo-guide-move:nth-of-type(even){background:#ffffff07;border-radius:7px}
+.combo-guide-keys{font:800 clamp(13px,2.1vmin,17px) Rajdhani,sans-serif;
+  color:#ffd5ef;letter-spacing:.2px}
+.combo-guide-move span{font:500 clamp(11px,1.8vmin,13px)/1.35 Inter,sans-serif;color:#dce7fa}
+@media(max-width:550px),(max-height:340px){
+  .pause-tab{font-size:clamp(10px,1.8vmin,14px);padding:5px 2px}
+  .combo-guide-content{max-height:min(49dvh,240px);padding:7px}
+  .combo-guide-header p{font-size:10px}
+  .combo-guide-move{grid-template-columns:minmax(100px,38%) 1fr;padding:5px;gap:5px}
+  .combo-guide-players .pill{font-size:12px;padding:5px 7px}
 }
