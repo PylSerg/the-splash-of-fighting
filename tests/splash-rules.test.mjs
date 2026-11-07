@@ -1,8 +1,18 @@
 import assert from 'node:assert/strict';
 import {SPLASH_METER_MAX,SPLASH_WINDUP,SPLASH_MOVES,
   earnSplashEnergy,comboSplashBonus,splashChord,canSplashGuard,
-  SPLASH_DUEL_WIN_GAIN} from '../src/combat/SplashRules.ts';
+  SPLASH_DUEL_WIN_GAIN,guidedSplashPosition,splashWindupActive} from '../src/combat/SplashRules.ts';
 assert.equal(SPLASH_WINDUP,0.5);
+assert.equal(splashWindupActive(0),true);
+assert.equal(splashWindupActive(.49),true,'counter can interrupt until last windup frame');
+assert.equal(splashWindupActive(.5),false,'no interruption after the first half-second');
+assert.equal(splashWindupActive(.8),false);
+for(const targetX of [70,180,500,970,1600]){
+  assert.deepEqual(guidedSplashPosition({x:90,y:280},{x:targetX,y:355},1),
+    {x:targetX,y:355},'guided splash arrives at any target distance');
+}
+assert.deepEqual(guidedSplashPosition({x:90,y:280},{x:600,y:355},0),
+  {x:90,y:280},'splash ability starts at its caster');
 assert.equal(Object.keys(SPLASH_MOVES).length,4);
 assert.equal(new Set(Object.values(SPLASH_MOVES).map(x=>x.name)).size,4);
 for(const move of Object.values(SPLASH_MOVES)){

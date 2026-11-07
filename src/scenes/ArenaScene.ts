@@ -8,7 +8,7 @@ import {
   isSimultaneousClash, type ClashAttempt, type ClashRect,
 } from '../combat/StrikeClashRules';
 import { getCharacter } from '../characters/Roster';
-import { HIT_LEVEL_NAMES } from '../combat/HitRules';
+import { HIT_LEVEL_NAMES, isBackStrike } from '../combat/HitRules';
 import { sweepTrips } from '../combat/CrouchRules';
 import {
   advanceHealthTrail, healthFillRect, makeHealthTrail,
@@ -22,8 +22,8 @@ import {
 } from '../combat/DuelRules';
 import { getStage, type StageId } from '../stages/Stages';
 import { SPLASH_WINDUP, SPLASH_MOVES, SPLASH_DUEL_WIN_GAIN,
-  comboSplashBonus, canSplashGuard } from '../combat/SplashRules';
-import { awardRound, MATCH_MAX_ROUNDS, ROUND_INTRO_TOTAL, roundIntroText } from '../combat/MatchRules';
+  comboSplashBonus, canSplashGuard, guidedSplashPosition, splashWindupActive } from '../combat/SplashRules';
+import { awardRound, winnerByRemainingHealth, MATCH_MAX_ROUNDS, ROUND_INTRO_TOTAL, roundIntroText } from '../combat/MatchRules';
 
 type GameMode = 'cpu' | 'versus';
 interface DuelPending {
@@ -117,6 +117,8 @@ export class ArenaScene extends Phaser.Scene {
   private duelPending: DuelPending | null = null;
   private duelAftermath: DuelAftermath | null = null;
   private splash: SplashSession | null = null;
+  /** Procedural long-range ability preview; sprite effects can replace it later. */
+  private splashFx?: Phaser.GameObjects.Graphics;
   private matchWins:[number,number]=[0,0];
   private roundsPlayed=0;
   private matchWinner:0|1|null=null;
@@ -135,6 +137,7 @@ export class ArenaScene extends Phaser.Scene {
     this.player1 = new Fighter(this,'evi',250,1);
     this.player2 = new Fighter(this,'runa',710,-1);
     this.debugDraw = this.add.graphics().setDepth(12);
+    this.splashFx = this.add.graphics().setDepth(17);
     this.hud = this.add.graphics().setDepth(20);
     const labelStyle = {fontFamily:'Rajdhani, Arial, sans-serif',fontSize:'27px',color:'#f7f4ff',fontStyle:'bold',stroke:'#12132d',strokeThickness:4};
     this.leftName = this.add.text(112,11,'ЕВІ',labelStyle).setDepth(21);
@@ -395,6 +398,7 @@ export class ArenaScene extends Phaser.Scene {
     this.duelPending=null;
     this.duelAftermath=null;
     this.splash=null;
+    this.splashFx?.clear();
     this.roundTransition=0;
     this.aiCooldown=.85;this.aiCount=0;this.frameCount=0;this.accumulator=0;
     this.centerLabel.setText(roundIntroText(this.readyTime,this.roundsPlayed+1) ?? '')
@@ -492,7 +496,7 @@ export class ArenaScene extends Phaser.Scene {
           SPLASH_MOVES[attacker.id].color);
         this.onStatus(getCharacter(attacker.id).name+': '+
           SPLASH_MOVES[attacker.id].name+
-          '! У суперника 0,5 с на ↓+A, звичайний блок не діє!');
+          '! Здібність влучає на будь-якій відстані. 0,5 с на ↓+A або удар, що перерве підготовку!');
         this.stepSplash(dt);
         return;
       }
@@ -560,7 +564,7 @@ export class ArenaScene extends Phaser.Scene {
     session.elapsed=Math.min(move.duration,session.elapsed+dt);
     const justEntered=oldElapsed<SPLASH_WINDUP && session.elapsed>=SPLASH_WINDUP;
 
-    if(oldElapsed<SPLASH_WINDUP){
+    if(splashWindupActive(oldElapsed)){
       // Until the attack begins, defender input (including walking and guard)
       // stays live. The splash attacker is committed and cannot be controlled.
       const defensiveInput=defender===this.player1 ? this.controls.read(0) :
@@ -569,12 +573,42 @@ export class ArenaScene extends Phaser.Scene {
       const just=justPressed(defensiveInput,oldInput);
       if(defender===this.player1)this.prev1=defensiveInput;
       else this.prev2=defensiveInput;
+      // An opposing fully charged ability can meet a splash during its
+      // reactable 0.5s windup. Treat this like a simultaneous SPLASH CLASH.
+      if(just.splash && defender.tryStartSplash()){
+        attacker.endSplashPose();
+        defender.endSplashPose();
+        attacker.stunned=Math.max(attacker.stunned,.5);
+        defender.stunned=Math.max(defender.stunned,.5);
+        this.splashFx?.clear();
+        this.splash=null;
+        this.combatNotice('SPLASH CLASH!',(attacker.x+defender.x)/2,GROUND_Y-215,0x9af4f4);
+        this.onStatus('Контрсплеш під час підготовки! Обидві здібності зірвано, 0 шкоди.');
+        return;
+      }
       defender.step(dt,defensiveInput,just,attacker.x);
+      // Ordinary attacks and specials can ALSO break the windup, but only
+      // after a genuine collision that removes HP. This is not a free cancel.
+      const pendingHit=defender.getActiveStrike();
+      if(pendingHit && pendingHit.name!=='duel'){
+        const hpBefore=attacker.hp;
+        this.resolveStrike(defender,attacker,pendingHit,defender.strikeBox());
+        if(attacker.hp<hpBefore){
+          attacker.endSplashPose();
+          this.splashFx?.clear();
+          this.splash=null;
+          this.combatNotice('SPLASH INTERRUPTED!',attacker.x,GROUND_Y-235,0xffce7d);
+          this.onStatus(getCharacter(defender.id).name+
+            ' перериває підготовку сплешу точним ударом! Заряд уже витрачено.');
+          return;
+        }
+      }
       session.guarded ||= canSplashGuard({
         down:defensiveInput.down,block:defensiveInput.block,
         airborne:defender.airborne,knockedDown:defender.knockedDown,
         knockedOut:defender.knockedOut,stunned:defender.stunned,
-        guarding:defender.blocking && defender.crouching,
+        guarding:defender.blocking && defender.crouching &&
+          !isBackStrike(attacker.x,defender.x,defender.face),
       });
       attacker.stepSplashPose(dt,'startup',
         Math.min(1,session.elapsed/SPLASH_WINDUP),defender.x);
@@ -582,6 +616,7 @@ export class ArenaScene extends Phaser.Scene {
     if(session.elapsed>=SPLASH_WINDUP){
       const progress=Math.min(1,(session.elapsed-SPLASH_WINDUP)/
         (move.duration-SPLASH_WINDUP));
+      this.drawSplashAbility(session,progress);
       if(justEntered){
         this.combatNotice(session.guarded?'SPLASH GUARD!':'SPLASH HIT!',
           defender.x,GROUND_Y-218,session.guarded?0x78e5ed:move.color);
@@ -608,7 +643,9 @@ export class ArenaScene extends Phaser.Scene {
       if(!session.guarded){
         const hit=defender.receiveHit({
           ...ATTACKS.special,damage:move.damage,stun:.56,push:380,
-        },attacker.face,true);
+        },attacker.face,true,{
+          rear:isBackStrike(attacker.x,defender.x,defender.face),
+        });
         damage=hit.damage;
         this.cameras.main.shake(200,.009);
       }else{
@@ -620,19 +657,102 @@ export class ArenaScene extends Phaser.Scene {
         ? getCharacter(defender.id).name+
           ' вчасно натискає ↓+A! Увесь сплеш заблоковано, 0 HP.'
         : getCharacter(attacker.id).name+' виконує '+move.name+
-          ' і завдає '+damage+' HP!'+(defender.knockedOut?' НОКАУТ!':''));
+          ' і завдає '+damage+' HP!'+(isBackStrike(attacker.x,defender.x,defender.face)?' Удар у спину ×1,5!':'')+
+          (defender.knockedOut?' НОКАУТ!':''));
       this.splash=null;
+      this.splashFx?.clear();
       // Holding the cinematic chord must not queue a regular hit afterwards.
       this.prev1=this.controls.read(0);
       this.prev2=this.mode==='cpu'?emptyInput():this.controls.read(1);
     }
   }
 
-  /** CPU has a human-like reaction delay and does not always find ↓+A. */
+  /** Ranged ability preview, independent of ordinary fist/weapon hitboxes.
+   * Guided effects always reach the victim, even on a widened arena;
+   * only the preparation counter or a correctly facing ↓+A can stop damage.
+   * Later these four effects can be replaced by character-specific sprites.
+   */
+  private drawSplashAbility(session: SplashSession, progress:number):void {
+    const g=this.splashFx;
+    if(!g)return;
+    g.clear();
+    const {attacker,defender}=session;
+    const start={x:attacker.x+attacker.face*42,y:GROUND_Y-130};
+    const end={x:defender.x,y:GROUND_Y+defender.yOffset-102};
+    const p=guidedSplashPosition(start,end,progress);
+    const spin=progress*Math.PI*16;
+    switch(attacker.id) {
+      case 'evi': {
+        // A crystalline folding FAN leaves Evi's hand and curves exactly
+        // toward the opponent, rotating through a shower of pink shards.
+        g.fillStyle(0xffa8dd,.22).fillCircle(p.x,p.y,48);
+        for(let i=-4;i<=4;i++){
+          const a=spin-1.1+i*.27;
+          const radius=31+(i%2===0?9:0);
+          g.lineStyle(4,i%2===0?0xfff6ff:0xff8acb,.96);
+          g.lineBetween(p.x,p.y,
+            p.x+Math.cos(a)*radius,p.y+Math.sin(a)*radius);
+        }
+        g.fillStyle(0xfff9fc,.95).fillCircle(p.x,p.y,7);
+        g.lineStyle(2,0xf59cdd,.88).strokeCircle(p.x,p.y,43);
+        break;
+      }
+      case 'runa': {
+        // Bronze bastion shockwave: a heavy magical ring, not another punch.
+        const radius=27+24*Math.sin(Math.PI*progress)+progress*45;
+        g.fillStyle(0xffbb78,.22).fillEllipse(p.x,p.y,145,75);
+        g.lineStyle(10,0xefac76,.86).strokeCircle(p.x,p.y,radius);
+        g.lineStyle(3,0xffecc3,.96).strokeCircle(p.x,p.y,radius+14);
+        g.fillStyle(0xffe2a0,.8).fillCircle(p.x,p.y,11);
+        break;
+      }
+      case 'lyra': {
+        // Whirling columns of fire converge from every side on the target.
+        g.fillStyle(0xff663c,.14).fillCircle(p.x,p.y,66);
+        for(let i=0;i<11;i++){
+          const a=spin*.67+i*2*Math.PI/11;
+          const r=25+30*Math.sin(Math.PI*progress)+i%4*5;
+          const fx=p.x+Math.cos(a)*r,fy=p.y+Math.sin(a)*r;
+          g.lineStyle(6,i%2===0?0xffc36d:0xff6348,.88)
+            .lineBetween(p.x,p.y,fx,fy);
+          g.fillStyle(0xffe9a5,.88).fillCircle(fx,fy,4+i%3);
+        }
+        break;
+      }
+      case 'kai': {
+        // A zig-zag lightning bolt seeks the opponent across the arena.
+        let bx=start.x,by=start.y;
+        const segments=9;
+        for(let i=1;i<=segments;i++){
+          const t=i/segments;
+          const nx=start.x+(p.x-start.x)*t;
+          const ny=start.y+(p.y-start.y)*t+
+            (i===segments?0:Math.sin(i*17+spin)*21);
+          g.lineStyle(i%2===0?5:3,i%2===0?0x6ce5f7:0xf2ffff,.98)
+            .lineBetween(bx,by,nx,ny);
+          bx=nx;by=ny;
+        }
+        g.fillStyle(0xc8ffff,.75).fillCircle(p.x,p.y,15);
+        g.lineStyle(2,0x67e7ff,.9).strokeCircle(p.x,p.y,29);
+        break;
+      }
+    }
+  }
+
+  /** CPU may guard, attempt a fast nearby counter, or counter-splash.
+   * Unlike a scripted immunity, every attempt follows the human input rules.
+   */
   private cpuSplashDefense(session:SplashSession):InputState {
     const input=emptyInput();
     if(session.elapsed>=.20 && this.aiCount%3===0){
       input.down=true;input.block=true;
+    } else if(session.elapsed>=.11 && this.aiCount%5===1 &&
+       Math.abs(this.player1.x-this.player2.x)<95){
+      // X starts early enough that its normal startup can complete in 0.5s.
+      input.light=true;
+    } else if(session.elapsed>=.21 && this.aiCount%7===2 &&
+       session.defender.splashEnergy>=100) {
+      input.up=true;input.splash=true;
     }
     return input;
   }
@@ -1164,8 +1284,11 @@ export class ArenaScene extends Phaser.Scene {
     // Only a third strike PREPARED by two successful unblocked hits
     // ignores guard. It must still genuinely overlap the target's hurtbox.
     const unblockable=attacker.isUnblockableFinisher(strike);
+    const rear=isBackStrike(attacker.x,target.x,target.face);
     const failedHighGuard=target.guardStance==='standing' && strike.spec.level==='low';
-    const hit=target.receiveHit(strike.spec,attacker.face,unblockable);
+    const hit=target.receiveHit(strike.spec,attacker.face,unblockable,{
+      rear,guardBreaker:strike.name==='special',
+    });
     const comboHits=attacker.recordComboImpact(strike,true,hit.blocked,hit.damage);
     const sweepLanded=sweepTrips(strike.name,hit.blocked,target.airborne,target.knockedOut);
     if(sweepLanded) {
@@ -1184,6 +1307,11 @@ export class ArenaScene extends Phaser.Scene {
     if(unblockable && hit.damage>0) {
       this.combatNotice('UNBLOCKABLE!',target.x,GROUND_Y-252,0xff9fab);
     }
+    if(hit.guardBroken) {
+      this.combatNotice('GUARD BREAK!',target.x,GROUND_Y-240,0xffce7d);
+    } else if(rear && hit.damage>0) {
+      this.combatNotice('BACK HIT ×1.5!',target.x,GROUND_Y-240,0xffca75);
+    }
     this.spawnSparks(target.x,GROUND_Y+target.yOffset-(strike.spec.level==='low'?37:85),hit.blocked);
     if(hit.interrupted) {
       this.combatNotice('INTERRUPT!',target.x,GROUND_Y+target.yOffset-173,0xffd898);
@@ -1193,15 +1321,21 @@ export class ArenaScene extends Phaser.Scene {
     }
     if(!hit.blocked)this.cameras.main.shake(sweepLanded?105:75,sweepLanded?.004:.003);
     const level=HIT_LEVEL_NAMES[strike.spec.level];
-    this.onStatus(comboHits===3
-      ? getCharacter(attacker.id).name+' завершує 3-ударне комбо! Третій удар неможливо заблокувати. -'+hit.damage+' HP.'
-      :hit.blocked
-        ? getCharacter(target.id).name+' блокує '+level+' атаку! Шкоди немає.'
-      :sweepLanded
-        ? getCharacter(attacker.id).name+' виконує підсічку! -'+hit.damage+
-          ' HP, '+getCharacter(target.id).name+' падає на землю.'
-        :getCharacter(attacker.id).name+' влучає ('+level+' атака)! -'+hit.damage+
-          ' HP '+getCharacter(target.id).name+'.');
+    this.onStatus(hit.guardBroken
+      ? getCharacter(attacker.id).name+' розбиває блок спецприйомом! -'+hit.damage+
+        ' HP (половина від звичайної шкоди), захист зірвано.'
+      :rear && hit.damage>0
+        ? getCharacter(attacker.id).name+' атакує в спину! -'+hit.damage+
+          ' HP (бонус ×1,5), блок не діє.'
+        :comboHits===3
+          ? getCharacter(attacker.id).name+' завершує 3-ударне комбо! Третій удар неможливо заблокувати. -'+hit.damage+' HP.'
+          :hit.blocked
+            ? getCharacter(target.id).name+' блокує '+level+' атаку! Шкоди немає.'
+          :sweepLanded
+            ? getCharacter(attacker.id).name+' виконує підсічку! -'+hit.damage+
+              ' HP, '+getCharacter(target.id).name+' падає на землю.'
+            :getCharacter(attacker.id).name+' влучає ('+level+' атака)! -'+hit.damage+
+              ' HP '+getCharacter(target.id).name+'.');
   }
 
   private spawnSparks(x:number,y:number,blocked:boolean): void {
@@ -1221,8 +1355,7 @@ export class ArenaScene extends Phaser.Scene {
   private finishRound(): void {
     if(this.roundOver)return;
     this.roundOver=true;
-    const winnerIndex:0|1|null=this.player1.hp===this.player2.hp?null:
-      this.player1.hp>this.player2.hp?0:1;
+    const winnerIndex=winnerByRemainingHealth(this.player1.hp,this.player2.hp);
     const result=awardRound({wins:this.matchWins,roundsPlayed:this.roundsPlayed},winnerIndex);
     this.matchWins=result.wins;
     this.roundsPlayed=result.roundsPlayed;

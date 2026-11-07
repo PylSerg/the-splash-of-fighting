@@ -10,6 +10,12 @@ export function roundIntroText(remaining:number,roundNumber:number):string|null 
   if(remaining>0)return 'FIGHT!';
   return null;
 }
+/** When the round clock expires, compare actual remaining HP.
+ * Equal health is a replayed draw, never an arbitrary P1/P2 victory.
+ */
+export function winnerByRemainingHealth(hp1:number,hp2:number):0|1|null {
+  return hp1===hp2?null:hp1>hp2?0:1;
+}
 export interface MatchScore {
   wins: [number,number];
   roundsPlayed:number;

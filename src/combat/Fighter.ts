@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { InputState } from '../input/Controls';
-import { stopsHit, strikeBand, type HitLevel, type GuardStance } from './HitRules';
+import { stopsHit, strikeBand, strikeDamage, canAutoTurn, type HitLevel, type GuardStance } from './HitRules';
 import { crouchMoveForPress } from './CrouchRules';
 import { blockedGrabRecoil } from './GrabRules';
 import { earnSpecialMeter, SPECIAL_METER_COST, MAX_HEALTH } from './CombatFeedback';
@@ -371,7 +371,9 @@ export class Fighter {
   /** A cutscene pose is animated independently of ordinary attack hitboxes. */
   stepSplashPose(dt:number,phase:'startup'|'attack'|'victim'|'guard',progress:number,opponentX:number):void {
     this.time+=dt;
-    this.face=opponentX>=this.x?1:-1;
+    // A crouch guard retains the fighter's facing; only an unguarded
+    // fighter tracks the rival during a cinematic ability.
+    if(phase==='startup' || phase==='attack')this.face=opponentX>=this.x?1:-1;
     this.splashPose=phase;
     this.splashProgress=Phaser.Math.Clamp(progress,0,1);
     this.attack=null;
@@ -548,7 +550,12 @@ export class Fighter {
   step(dt: number, input: InputState, just: InputState, opponentX: number): void {
     this.time += dt;
     // Keep the original orientation while tumbling behind the thrower.
-    if (!this.knockedDown) this.face = opponentX >= this.x ? 1 : -1;
+    // Facing follows the opponent normally. While guarding, lock the
+    // orientation: a roll behind the fighter exposes their back.
+    // Include the current held input so defense cannot auto-turn in
+    // the same frame that the player first presses A.
+    if (canAutoTurn(this.face,input,this.airborne,this.stunned,this.knockedDown))
+      this.face = opponentX >= this.x ? 1 : -1;
     this.hitFlash = Math.max(0, this.hitFlash-dt);
     this.blockFlash = Math.max(0, this.blockFlash-dt);
     this.rollCooldown = Math.max(0, this.rollCooldown-dt);
@@ -984,13 +991,19 @@ export class Fighter {
     this.blockFlash=Math.max(this.blockFlash,.18);
   }
 
-  receiveHit(spec: AttackSpec, attackerFace: 1|-1, unblockable = false): {damage:number;blocked:boolean;interrupted:boolean} {
-    const blocked=!unblockable && stopsHit(this.guardStance,spec.level);
+  receiveHit(
+    spec: AttackSpec, attackerFace: 1|-1, unblockable = false,
+    context: {rear?:boolean;guardBreaker?:boolean} = {},
+  ): {damage:number;blocked:boolean;interrupted:boolean;guardBroken:boolean} {
+    const guardValid=!unblockable && !context.rear &&
+      stopsHit(this.guardStance,spec.level);
+    const guardBroken=guardValid && Boolean(context.guardBreaker);
+    const blocked=guardValid && !guardBroken;
     const interrupted=!blocked && Boolean(this.attack && !this.attack.connected &&
       this.attack.elapsed < this.attack.spec.duration);
     // A correct guard negates the entire hit. A low attack beats standing A;
     // middle attacks are covered by both A and Down+A.
-    const attemptedDamage=blocked ? 0 : spec.damage;
+    const attemptedDamage=blocked ? 0 : strikeDamage(spec.damage,Boolean(context.rear),guardBroken);
     // Meter and damage notifications use HP actually removed, not overkill.
     const damage=Math.min(this.hp,attemptedDamage);
     this.hp=Math.max(0,this.hp-damage);
@@ -1001,6 +1014,7 @@ export class Fighter {
       // are checked before receiveHit() in ArenaScene.resolveStrike().
       this.rollElapsed=-1;
       this.stunned=spec.stun;
+      if(guardBroken){this.blocking=false;this.crouching=false;}
       this.attack=null;
       this.queuedSolo=null;
       this.queuedSpecial=0;
@@ -1013,7 +1027,7 @@ export class Fighter {
     }
     if(this.knockedOut) this.startKnockout(attackerFace);
     this.x=Phaser.Math.Clamp(this.x,STAGE_MIN_X,STAGE_MAX_X);
-    return {damage,blocked,interrupted};
+    return {damage,blocked,interrupted,guardBroken};
   }
 
   /** Mark a round loss with a visible fall that never automatically gets up. */
