@@ -368,22 +368,13 @@ export class Fighter {
   gainSplash(amount:number):void {
     this.splashEnergy=earnSplashEnergy(this.splashEnergy,amount);
   }
-  /** SPLASH explicitly overrides the normal guard-facing lock, including
-   * during its reactable windup. Do not alter ordinary block behavior.
-   */
-  faceOpponentDuringSplash(opponentX:number):void {
-    const next=splashFacing(this.x,opponentX,this.face);
-    if(next!==this.face){
-      this.face=next;
-      this.draw(0);
-    }
-  }
   /** A cutscene pose is animated independently of ordinary attack hitboxes. */
   stepSplashPose(dt:number,phase:'startup'|'attack'|'victim'|'guard',progress:number,opponentX:number):void {
     this.time+=dt;
-    // SPLASH is the only exception to guard-facing lock: both the caster
-    // and defender turn toward the opponent, including protected ↓+A.
-    this.face=splashFacing(this.x,opponentX,this.face);
+    // Only the caster can auto-face. Guarding or trapped defenders
+    // retain their original orientation throughout the cinematic.
+    const role=phase==='startup' || phase==='attack'?'attacker':'defender';
+    this.face=splashFacing(this.x,opponentX,this.face,role);
     this.splashPose=phase;
     this.splashProgress=Phaser.Math.Clamp(progress,0,1);
     this.attack=null;
@@ -557,14 +548,16 @@ export class Fighter {
     this.draw(0);
   }
 
-  step(dt: number, input: InputState, just: InputState, opponentX: number): void {
+  step(dt: number, input: InputState, just: InputState, opponentX: number,
+    preserveFacing=false): void {
     this.time += dt;
     // Keep the original orientation while tumbling behind the thrower.
     // Facing follows the opponent normally. While guarding, lock the
     // orientation: a roll behind the fighter exposes their back.
     // Include the current held input so defense cannot auto-turn in
     // the same frame that the player first presses A.
-    if (canAutoTurn(this.face,input,this.airborne,this.stunned,this.knockedDown))
+    if (!preserveFacing &&
+        canAutoTurn(this.face,input,this.airborne,this.stunned,this.knockedDown))
       this.face = opponentX >= this.x ? 1 : -1;
     this.hitFlash = Math.max(0, this.hitFlash-dt);
     this.blockFlash = Math.max(0, this.blockFlash-dt);
