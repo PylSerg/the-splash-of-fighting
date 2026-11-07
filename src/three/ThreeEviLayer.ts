@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {eviPoseFor,blendEviPose,neutralEviPose,type EviPose,type EviMotionInput} from '../combat/EviRigMotion.ts';
 import {eviSlashGlow} from '../combat/EviFanSlash.ts';
 import {threeGroundedRoll,screenToThree,threeViewDimensions,THREE_ROLL_PIVOT} from './ThreeFighterRules.ts';
+import {threeEviStance} from './ThreeEviStance.ts';
 import type {FighterId} from '../combat/Fighter.ts';
 
 export interface ThreeFighterFrame {
@@ -77,6 +78,8 @@ class EviThreeCharacter{
   private readonly rightHip=new THREE.Group();
   private readonly leftKnee=new THREE.Group();
   private readonly rightKnee=new THREE.Group();
+  private readonly leftFoot=new THREE.Group();
+  private readonly rightFoot=new THREE.Group();
   private readonly fan=new THREE.Group();
   private readonly hem:THREE.Group[]=[];
   private readonly irises:THREE.Mesh[]=[];
@@ -180,7 +183,7 @@ class EviThreeCharacter{
     for(const side of [-1,1]){
       const hip=side<0?this.leftHip:this.rightHip;
       const knee=side<0?this.leftKnee:this.rightKnee;
-      hip.position.set(side*.132,.97,0);
+      hip.position.set(side*.142,.97,0);
       this.pelvis.add(hip);
       taper(hip,skin,0,-.28,0,.145,.108,.56);
       ellipsoid(hip,skin,0,-.02,0,.14,.10,.125);
@@ -191,9 +194,14 @@ class EviThreeCharacter{
       // Decorative over-knee white lace boots.
       ring(knee,gold,0,-.08,.015,.107,.008);
       ellipsoid(knee,gold,0,-.49,.055,.034,.03,.025,trim);
-      ellipsoid(knee,white,side*.02,-.57,.095,.133,.07,.219,satin);
-      ellipsoid(knee,cream,side*.01,-.59,-.05,.105,.055,.17,satin);
-      ellipsoid(knee,gold,side*.01,-.617,.11,.120,.018,.15,trim);
+      // The boots are individual toe/heel joints. Both feet can turn
+      // along the fighting line instead of being glued to the camera plane.
+      const foot=side<0?this.leftFoot:this.rightFoot;
+      foot.position.set(side*.01,-.57,.05);
+      knee.add(foot);
+      ellipsoid(foot,white,side*.01,0,.045,.133,.07,.219,satin);
+      ellipsoid(foot,cream,0,-.02,-.10,.105,.055,.17,satin);
+      ellipsoid(foot,gold,0,-.047,.06,.120,.018,.15,trim);
       for(let j=0;j<3;j++){
         const py=-.14-j*.116;
         ellipsoid(knee,goldLight,.098,py,.028,.008,.019,.012,trim);
@@ -312,26 +320,53 @@ class EviThreeCharacter{
     const newPose=eviPoseFor(input);
     this.pose=blendEviPose(this.pose,newPose,dt);
     const p=this.pose;
-    // The camera always sees the model's 3D face, while X mirroring
-    // preserves the original 2D facing and knockback rules.
+    // Camera is +Z; the opponent is ±X. Face the rival in a genuine 3/4
+    // combat guard rather than presenting the costume straight at camera.
+    // All values below are visual and never affect hitboxes, walk or damage.
+    const stance=threeEviStance(frame.face,input);
     const pos=screenToThree(frame.x,443+frame.yOffset);
     this.root.position.set(pos.x,pos.y,0);
     this.root.scale.set(frame.face,1,1);
-    this.root.rotation.y=frame.face===1?-.19:.19;
+    this.root.rotation.y=stance.rootYaw;
     this.pelvis.position.y=-p.hipY/100;
+    this.pelvis.rotation.y=stance.pelvisYaw;
+    this.chest.rotation.y=stance.chestYaw;
     this.chest.rotation.z=-p.torsoTilt*.8;
     this.chest.rotation.x=.06*Math.sin(input.time*2.3);
+    this.head.rotation.y=stance.headYaw;
     this.head.rotation.z=-p.headTilt*.55;
+
+    // Fan hand is the leading guard, the left hand protects the torso.
+    // Arm depth, elbow pitch and nonparallel shoulders add real 3D shape.
     this.leftShoulder.rotation.z=-p.armL;
     this.rightShoulder.rotation.z=-p.armR;
+    this.leftShoulder.rotation.x=stance.rearArmPitch;
+    this.rightShoulder.rotation.x=stance.leadArmPitch;
     this.leftElbow.rotation.z=-p.elbowL*.78;
     this.rightElbow.rotation.z=-p.elbowR*.78;
-    this.leftHip.rotation.z=-p.legL*.8;
-    this.rightHip.rotation.z=-p.legR*.8;
+    this.leftElbow.rotation.x=stance.rearElbowPitch;
+    this.rightElbow.rotation.x=stance.leadElbowPitch;
+
+    // The front foot is closer to the enemy in 3D depth; the rear leg
+    // carries the weight. Mirror the entire formation when face flips.
+    this.leftHip.position.z=stance.rearHipDepth;
+    this.rightHip.position.z=stance.leadHipDepth;
+    this.leftHip.rotation.z=-p.legL*.8-.09;
+    this.rightHip.rotation.z=-p.legR*.8+.12;
+    this.leftHip.rotation.x=stance.rearLegPitch;
+    this.rightHip.rotation.x=stance.leadLegPitch;
     this.leftKnee.rotation.z=-p.kneeL*.66;
     this.rightKnee.rotation.z=-p.kneeR*.66;
+    this.leftKnee.rotation.x=stance.rearKneePitch;
+    this.rightKnee.rotation.x=stance.leadKneePitch;
+    this.leftFoot.rotation.y=stance.rearFootYaw;
+    this.rightFoot.rotation.y=stance.leadFootYaw;
+
+    // Point the opened blade toward the fighter across the arena,
+    // cancelling torso and camera-facing yaw at the fan joint.
     this.fan.rotation.z=-(this.rightShoulder.rotation.z+
       this.rightElbow.rotation.z+this.chest.rotation.z)+.08;
+    this.fan.rotation.y=stance.fanYaw;
     this.fan.rotation.x=.21;
     this.fan.scale.setScalar(.94+.1*p.fanScale);
     for(let i=0;i<this.hem.length;i++){
