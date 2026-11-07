@@ -1,19 +1,20 @@
 import { deriveCommandChords } from './CommandRules';
+import { splashChord } from '../combat/SplashRules';
 
-export type Action = 'left' | 'right' | 'up' | 'down' | 'jump' | 'light' | 'heavy' | 'kick' | 'block' | 'grab' | 'special' | 'duel' | 'roll';
+export type Action = 'left' | 'right' | 'up' | 'down' | 'jump' | 'light' | 'heavy' | 'kick' | 'block' | 'grab' | 'special' | 'duel' | 'roll' | 'splash';
 export type InputState = Record<Action, boolean>;
 type Direction = 'left' | 'right' | 'up' | 'down';
 
-const ACTIONS: Action[] = ['left', 'right', 'up', 'down', 'jump', 'light', 'heavy', 'kick', 'block', 'grab', 'special', 'duel', 'roll'];
+const ACTIONS: Action[] = ['left', 'right', 'up', 'down', 'jump', 'light', 'heavy', 'kick', 'block', 'grab', 'special', 'duel', 'roll', 'splash'];
 const DIRECTIONS: Direction[] = ['left', 'right', 'up', 'down'];
 
 export const emptyInput = (): InputState => ({
   left: false, right: false, up: false, down: false, jump: false,
-  light: false, heavy: false, kick: false, block: false, grab: false, special: false, duel: false, roll: false,
+  light: false, heavy: false, kick: false, block: false, grab: false, special: false, duel: false, roll: false, splash: false,
 });
 
 // Roll has no dedicated keyboard key: down+direction+block+light is its chord.
-const KEYMAPS: Record<Exclude<Action,'roll'|'duel'|'special'>, string>[] = [
+const KEYMAPS: Record<Exclude<Action,'roll'|'duel'|'special'|'splash'>, string>[] = [
   {
     left: 'KeyA', right: 'KeyD', up: 'KeyW', down: 'KeyS', jump: 'Space',
     light: 'KeyJ', heavy: 'KeyK', kick: 'KeyL', block: 'KeyH', grab: 'KeyG',
@@ -257,7 +258,8 @@ export class Controls {
     }
     const diamond = document.querySelector('.touch-attacks');
     diamond?.classList.toggle('combo-active',
-      (pressed.has('kick') && pressed.has('heavy')) || this.comboSwipePointers.size > 0 ||
+      (pressed.has('kick') && pressed.has('heavy')) ||
+      (pressed.has('light') && pressed.has('heavy')) || this.comboSwipePointers.size > 0 ||
       (pressed.has('kick') && pressed.has('block')) || this.specialSwipePointers.size > 0);
     diamond?.classList.toggle('grab-active',
       (pressed.has('light') && pressed.has('block')) || this.grabSwipePointers.size > 0);
@@ -286,7 +288,7 @@ export class Controls {
     const map = KEYMAPS[player];
     const touched = player === 0 ? new Set(this.touches.values()) : null;
     for (const action of ACTIONS) {
-      if (action === 'roll' || action === 'duel' || action === 'special') continue;
+      if (action === 'roll' || action === 'duel' || action === 'special' || action === 'splash') continue;
       state[action] = this.keys.has(map[action]) || Boolean(touched?.has(action));
     }
     if (player === 0) {
@@ -302,6 +304,7 @@ export class Controls {
     for (const action of ACTIONS) {
       state[action] ||= pad[action];
     }
+    const l1Down=Boolean(pads[player]?.buttons[4]?.pressed);
     const r1Down=Boolean(pads[player]?.buttons[5]?.pressed);
     const r2Down=Boolean(pads[player]?.buttons[7]?.pressed) ||
       (pads[player]?.buttons[7]?.value ?? 0)>.5;
@@ -322,10 +325,18 @@ export class Controls {
     });
     state.duel=commands.duel;
     state.special=commands.special;
+    state.splash=splashChord({
+      up:state.up,light:state.light,heavy:state.heavy,l1:l1Down,r1:r1Down,
+    });
+    if(state.splash){
+      // Up+X+Y and Up+L1+R1 supersede their component duel/grab keys.
+      state.duel=false;state.special=false;
+    }
     const touchGrabSwipe = player === 0 &&
       (this.grabSwipePointers.size > 0 ||
        performance.now() < this.grabSwipePulseUntil);
     state.grab ||= state.light && state.block || touchGrabSwipe;
+    if(state.splash)state.grab=false;
 
     // Preserve the held X+A/L1 input during a grapple, including diagonals.
     // Outside a grapple, ArenaScene gives a roll priority over a new grab.
