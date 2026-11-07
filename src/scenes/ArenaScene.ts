@@ -22,7 +22,7 @@ import {
 } from '../combat/DuelRules';
 import { getStage, type StageId } from '../stages/Stages';
 import { SPLASH_WINDUP, SPLASH_MOVES, SPLASH_DUEL_WIN_GAIN,
-  comboSplashBonus, canSplashGuard } from '../combat/SplashRules';
+  comboSplashBonus, canSplashGuard, guidedSplashPosition } from '../combat/SplashRules';
 import { awardRound, MATCH_MAX_ROUNDS, ROUND_INTRO_TOTAL, roundIntroText } from '../combat/MatchRules';
 
 type GameMode = 'cpu' | 'versus';
@@ -573,12 +573,42 @@ export class ArenaScene extends Phaser.Scene {
       const just=justPressed(defensiveInput,oldInput);
       if(defender===this.player1)this.prev1=defensiveInput;
       else this.prev2=defensiveInput;
+      // An opposing fully charged ability can meet a splash during its
+      // reactable 0.5s windup. Treat this like a simultaneous SPLASH CLASH.
+      if(just.splash && defender.tryStartSplash()){
+        attacker.endSplashPose();
+        defender.endSplashPose();
+        attacker.stunned=Math.max(attacker.stunned,.5);
+        defender.stunned=Math.max(defender.stunned,.5);
+        this.splashFx?.clear();
+        this.splash=null;
+        this.combatNotice('SPLASH CLASH!',(attacker.x+defender.x)/2,GROUND_Y-215,0x9af4f4);
+        this.onStatus('Контрсплеш під час підготовки! Обидві здібності зірвано, 0 шкоди.');
+        return;
+      }
       defender.step(dt,defensiveInput,just,attacker.x);
+      // Ordinary attacks and specials can ALSO break the windup, but only
+      // after a genuine collision that removes HP. This is not a free cancel.
+      const pendingHit=defender.getActiveStrike();
+      if(pendingHit && pendingHit.name!=='duel'){
+        const hpBefore=attacker.hp;
+        this.resolveStrike(defender,attacker,pendingHit,defender.strikeBox());
+        if(attacker.hp<hpBefore){
+          attacker.endSplashPose();
+          this.splashFx?.clear();
+          this.splash=null;
+          this.combatNotice('SPLASH INTERRUPTED!',attacker.x,GROUND_Y-235,0xffce7d);
+          this.onStatus(getCharacter(defender.id).name+
+            ' перериває підготовку сплешу точним ударом! Заряд уже витрачено.');
+          return;
+        }
+      }
       session.guarded ||= canSplashGuard({
         down:defensiveInput.down,block:defensiveInput.block,
         airborne:defender.airborne,knockedDown:defender.knockedDown,
         knockedOut:defender.knockedOut,stunned:defender.stunned,
-        guarding:defender.blocking && defender.crouching,
+        guarding:defender.blocking && defender.crouching &&
+          !isBackStrike(attacker.x,defender.x,defender.face),
       });
       attacker.stepSplashPose(dt,'startup',
         Math.min(1,session.elapsed/SPLASH_WINDUP),defender.x);
@@ -586,6 +616,7 @@ export class ArenaScene extends Phaser.Scene {
     if(session.elapsed>=SPLASH_WINDUP){
       const progress=Math.min(1,(session.elapsed-SPLASH_WINDUP)/
         (move.duration-SPLASH_WINDUP));
+      this.drawSplashAbility(session,progress);
       if(justEntered){
         this.combatNotice(session.guarded?'SPLASH GUARD!':'SPLASH HIT!',
           defender.x,GROUND_Y-218,session.guarded?0x78e5ed:move.color);
@@ -612,7 +643,9 @@ export class ArenaScene extends Phaser.Scene {
       if(!session.guarded){
         const hit=defender.receiveHit({
           ...ATTACKS.special,damage:move.damage,stun:.56,push:380,
-        },attacker.face,true);
+        },attacker.face,true,{
+          rear:isBackStrike(attacker.x,defender.x,defender.face),
+        });
         damage=hit.damage;
         this.cameras.main.shake(200,.009);
       }else{
@@ -626,6 +659,7 @@ export class ArenaScene extends Phaser.Scene {
         : getCharacter(attacker.id).name+' виконує '+move.name+
           ' і завдає '+damage+' HP!'+(defender.knockedOut?' НОКАУТ!':''));
       this.splash=null;
+      this.splashFx?.clear();
       // Holding the cinematic chord must not queue a regular hit afterwards.
       this.prev1=this.controls.read(0);
       this.prev2=this.mode==='cpu'?emptyInput():this.controls.read(1);
