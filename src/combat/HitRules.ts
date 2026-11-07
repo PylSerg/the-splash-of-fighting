@@ -1,3 +1,5 @@
+import type { FighterId } from './Fighter';
+
 /** Arcade attack lanes: high passes over crouching fighters, low reaches feet. */
 export type HitLevel = 'high' | 'mid' | 'low';
 
@@ -69,7 +71,6 @@ export function stopsHit(guard: GuardStance, attack: HitLevel): boolean {
  *
  * The debug green rectangles and real strike/duel checks read the SAME data.
  */
-import type { FighterId } from './Fighter';
 
 export interface HurtboxProfile {
   readonly halfWidth:number;
