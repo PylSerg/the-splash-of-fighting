@@ -73,6 +73,18 @@ export function chooseDuelInput(
   return null;
 }
 
+/** Keep the most recent freshly pressed duel move until the two-second
+ *  selection window closes. Releasing a key or pressing an invalid key
+ *  never erases the last valid choice. The attacker cannot choose A.
+ */
+export function reviseDuelChoice(
+  previous: DuelChoice,
+  pressed: {light:boolean;heavy:boolean;kick:boolean;block:boolean},
+  defender: boolean,
+): DuelChoice {
+  return chooseDuelInput(pressed,defender) ?? previous;
+}
+
 export function duelDamage(fighterIsRuna: boolean): number {
   return fighterIsRuna ? DUEL_RUNA_DAMAGE : DUEL_DAMAGE;
 }
