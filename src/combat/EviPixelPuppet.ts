@@ -237,7 +237,7 @@ export class EviPixelPuppet {
   private pose:EviPose=neutralEviPose();
   private lastName:EviMotionInput['name']='idle';
 
-  constructor(private readonly scene:Phaser.Scene){
+  constructor(scene:Phaser.Scene){
     ensurePixelTextures(scene);
     const image=(key:string,x:number,y:number,ox=.5,oy=.5)=>{
       const sprite=scene.add.image(x,y,PREFIX+key)
@@ -270,7 +270,8 @@ export class EviPixelPuppet {
     this.torso=joint(0,0);
     this.hip.add(this.torso);
     this.torso.add(image('torso',0,1,.5,.99));
-    this.torso.add(image('skirtFront',0,-9,.5,0));
+    this.skirt=image('skirtFront',0,-9,.5,0);
+    this.torso.add(this.skirt);
     this.upperL=joint(-19,-53);
     this.upperR=joint(19,-53);
     this.torso.add(this.upperL);
@@ -296,7 +297,6 @@ export class EviPixelPuppet {
     this.head.add(image('head',0,1,.5,.50));
     this.frontHair=image('hairFront',-1,-12,.5,.42);
     this.head.add(this.frontHair);
-    this.skirt=this.torso.list[1] as Phaser.GameObjects.Image;
     this.applyPose(this.pose);
   }
 
@@ -314,7 +314,7 @@ export class EviPixelPuppet {
     this.pose=blendEviPose(this.pose,next,dt);
     this.applyPose(this.pose);
     // Tint the whole puppet on contact; no additional GPU textures.
-    this.root.setAlpha(hitFlash?.81:1);
+    this.root.setAlpha(hitFlash ? 0.81 : 1);
   }
 
   private applyPose(p:EviPose):void {
