@@ -55,8 +55,8 @@ assert.match(layer,/new THREE\.ExtrudeGeometry\(/,
 assert.match(layer,/new THREE\.HemisphereLight\(/);
 assert.match(layer,/new THREE\.DirectionalLight\(/);
 assert.match(layer,/this\.fan\.position\.set\(/);
-assert.match(layer,/this\.rightElbow\.add\(this\.fan\)/,
-  'fan follows skeletal right wrist');
+assert.match(layer,/this\.rightWrist\.add\(this\.fan\)/,
+  'fan is always attached to anatomical RIGHT wrist');
 assert.match(layer,/this\.root\.scale\.set\(frame\.face,1,1\)/,
   '3D fighter faces the original gameplay direction');
 assert.match(layer,/eviPoseFor\(input\)/,

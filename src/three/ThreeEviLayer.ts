@@ -4,6 +4,10 @@ import {eviSlashGlow} from '../combat/EviFanSlash.ts';
 import {threeGroundedRoll,screenToThree,threeViewDimensions,THREE_ROLL_PIVOT} from './ThreeFighterRules.ts';
 import {threeEviStance} from './ThreeEviStance.ts';
 import {
+  eviHandTargets,blendEviHands,solveEviArm,
+  type HandTargets,
+} from './EviArmMotion.ts';
+import {
   eviGroundedFootTargets,shouldPlantEviFeet,solveTwoBoneLeg,
   type Vec3,
 } from './EviAnatomy.ts';
@@ -78,6 +82,8 @@ class EviThreeCharacter{
   private readonly rightShoulder=new THREE.Group();
   private readonly leftElbow=new THREE.Group();
   private readonly rightElbow=new THREE.Group();
+  private readonly leftWrist=new THREE.Group();
+  private readonly rightWrist=new THREE.Group();
   private readonly leftHip=new THREE.Group();
   private readonly rightHip=new THREE.Group();
   private readonly leftKnee=new THREE.Group();
@@ -93,6 +99,8 @@ class EviThreeCharacter{
   private pose:EviPose=neutralEviPose();
   private lastAction='idle';
   private lastElapsed=0;
+  private handTargets:HandTargets=eviHandTargets(
+    {name:'idle',time:0},neutralEviPose());
 
   constructor(private readonly scene:THREE.Scene){
     this.pivot.position.y=THREE_ROLL_PIVOT;
@@ -236,17 +244,22 @@ class EviThreeCharacter{
       // Pale glove and lacy bell cuff, independent of arm rotation.
       taper(elbow,white,0,-.27,.009,.064,.065,.17,12,satin);
       ring(elbow,goldLight,0,-.22,.015,.071,.009);
-      ellipsoid(elbow,skin,0,-.38,.015,.065,.089,.064);
+      const wrist=side<0?this.leftWrist:this.rightWrist;
+      wrist.position.set(0,-.38,.015);
+      elbow.add(wrist);
+      // The fingers and fan share a genuine wrist joint. The right
+      // glove cannot switch to the left hand during a mirror or roll.
+      ellipsoid(wrist,skin,0,0,0,.065,.089,.064);
       const cuff=new THREE.Mesh(new THREE.ConeGeometry(.13,.24,12,1,true),
         new THREE.MeshStandardMaterial({color:lace,transparent:true,
           opacity:.68,roughness:.8,side:THREE.DoubleSide}));
       cuff.rotation.z=Math.PI;
       obj(cuff,elbow,0,-.31,-.04);
     }
-    // The white bladed fan has real thickness and gold ribs, attached
-    // to the RIGHT wrist, not floating beside the character.
-    this.fan.position.set(.06,-.40,.085);
-    this.rightElbow.add(this.fan);
+    // Only the ANATOMICAL RIGHT wrist owns the fan. The parent hierarchy
+    // is never swapped during left-facing, rolls, grabs or 3D rotation.
+    this.fan.position.set(.06,-.02,.07);
+    this.rightWrist.add(this.fan);
     const shape=new THREE.Shape();
     shape.moveTo(0,0);
     const radius=.45;
@@ -355,6 +368,57 @@ class EviThreeCharacter{
     foot.quaternion.copy(jointRotation.invert().multiply(bootRotation));
   }
 
+  /** Independent 3D shoulder -> elbow -> wrist IK, with a wrist that
+   * cancels accumulated arm rotation so the fan always points forward.
+   */
+  private plantArm(
+    shoulder:THREE.Group,elbow:THREE.Group,wrist:THREE.Group,
+    goal:Vec3,right:boolean,
+  ):void{
+    const solved=solveEviArm(right,goal);
+    const down=new THREE.Vector3(0,-1,0);
+    const upper=new THREE.Vector3(
+      solved.upper.x,solved.upper.y,solved.upper.z);
+    const lower=new THREE.Vector3(
+      solved.lower.x,solved.lower.y,solved.lower.z);
+    shoulder.quaternion.setFromUnitVectors(down,upper);
+    const elbowLocal=lower.applyQuaternion(shoulder.quaternion.clone().invert());
+    elbow.quaternion.setFromUnitVectors(down,elbowLocal);
+    // Keep wrist orientation steady while shoulder and elbow bend.
+    wrist.quaternion.copy(
+      shoulder.quaternion.clone().multiply(elbow.quaternion).invert());
+  }
+
+  private currentRollContacts():readonly (readonly [number,number])[]{
+    // These are sampled from the REAL animated 3D skeleton, rather than
+    // a rectangle pretending to be the fighter's body.
+    this.sculpture.updateMatrixWorld(true);
+    const inverse=this.sculpture.matrixWorld.clone().invert();
+    const marks:readonly [THREE.Object3D,THREE.Vector3][]=[
+      [this.head,new THREE.Vector3(0,.29,0)],
+      [this.head,new THREE.Vector3(-.23,.05,0)],
+      [this.head,new THREE.Vector3(.23,.05,0)],
+      [this.leftShoulder,new THREE.Vector3()],
+      [this.rightShoulder,new THREE.Vector3()],
+      [this.leftElbow,new THREE.Vector3()],
+      [this.rightElbow,new THREE.Vector3()],
+      [this.leftWrist,new THREE.Vector3()],
+      [this.rightWrist,new THREE.Vector3()],
+      [this.pelvis,new THREE.Vector3(0,1.1,0)],
+      [this.leftHip,new THREE.Vector3()],
+      [this.rightHip,new THREE.Vector3()],
+      [this.leftKnee,new THREE.Vector3()],
+      [this.rightKnee,new THREE.Vector3()],
+      [this.leftFoot,new THREE.Vector3(0,-.09,0)],
+      [this.rightFoot,new THREE.Vector3(0,-.09,0)],
+      [this.fan,new THREE.Vector3(.42,0,.06)],
+    ];
+    return marks.map(([node,offset])=>{
+      const p=node.localToWorld(offset.clone()).applyMatrix4(inverse);
+      return [p.x,p.y] as const;
+    });
+  }
+
   update(frame:ThreeFighterFrame,dt:number):void{
     const input=frame.motion;
     const newPose=eviPoseFor(input);
@@ -376,16 +440,14 @@ class EviThreeCharacter{
     this.head.rotation.y=stance.headYaw;
     this.head.rotation.z=-p.headTilt*.55;
 
-    // Fan hand is the leading guard, the left hand protects the torso.
-    // Arm depth, elbow pitch and nonparallel shoulders add real 3D shape.
-    this.leftShoulder.rotation.z=-p.armL;
-    this.rightShoulder.rotation.z=-p.armR;
-    this.leftShoulder.rotation.x=stance.rearArmPitch;
-    this.rightShoulder.rotation.x=stance.leadArmPitch;
-    this.leftElbow.rotation.z=-p.elbowL*.78;
-    this.rightElbow.rotation.z=-p.elbowR*.78;
-    this.leftElbow.rotation.x=stance.rearElbowPitch;
-    this.rightElbow.rotation.x=stance.leadElbowPitch;
+    // Real two-bone IK replaces independent cardboard shoulder/elbow
+    // rotations. The target wrist stays attached to the correct arm.
+    this.handTargets=blendEviHands(this.handTargets,
+      eviHandTargets(input,p),dt);
+    this.plantArm(this.leftShoulder,this.leftElbow,this.leftWrist,
+      this.handTargets.left,false);
+    this.plantArm(this.rightShoulder,this.rightElbow,this.rightWrist,
+      this.handTargets.right,true);
 
     // The front foot is closer to the enemy in 3D depth; the rear leg
     // carries the weight. Mirror the entire formation when face flips.
@@ -410,12 +472,9 @@ class EviThreeCharacter{
       this.rightFoot.rotation.set(0,stance.leadFootYaw,0);
     }
 
-    // Point the opened blade toward the fighter across the arena,
-    // cancelling torso and camera-facing yaw at the fan joint.
-    this.fan.rotation.z=-(this.rightShoulder.rotation.z+
-      this.rightElbow.rotation.z+this.chest.rotation.z)+.08;
-    this.fan.rotation.y=stance.fanYaw;
-    this.fan.rotation.x=.21;
+    // The right wrist is counter-rotated by IK; aim the opened fan toward
+    // the rival, not back into Evi or into her other hand.
+    this.fan.rotation.set(.16,stance.fanYaw,.06,'XYZ');
     this.fan.scale.setScalar(.94+.1*p.fanScale);
     for(let i=0;i<this.hem.length;i++){
       const mesh=this.hem[i];
@@ -425,7 +484,10 @@ class EviThreeCharacter{
     const roll=input.name==='roll';
     const knocked=input.name==='fall'||input.name==='prone'||input.name==='rise';
     if(roll){
-      const r=threeGroundedRoll(input.progress??0,input.backwards);
+      // Recompute the floor contact from this frame's tucked 3D joints.
+      // The fan stays parented to the right wrist throughout the turn.
+      const r=threeGroundedRoll(input.progress??0,input.backwards,
+        this.currentRollContacts());
       this.pivot.rotation.z=-r.angle;
       this.pivot.position.y=THREE_ROLL_PIVOT+r.lift;
     }else if(knocked){

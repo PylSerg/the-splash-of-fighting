@@ -27,11 +27,19 @@ const outline:[number,number][]=[
   [-.55,1.13],[.55,1.13],
 ];
 export const THREE_ROLL_PIVOT=.91;
-export function threeGroundedRoll(progress:number,backwards=false):ThreeRollTransform{
+/** Optional current-frame silhouette measurements allow the 3D rig
+ * to keep its head, arms, fan, knees and feet above the arena even
+ * as the joints tuck into a somersault. Old callers retain the fallback.
+ */
+export function threeGroundedRoll(
+  progress:number,backwards=false,
+  contacts:readonly (readonly [number,number])[]=outline,
+):ThreeRollTransform{
   const p=bound(progress);
   const angle=(backwards?-1:1)*Math.PI*2*smooth(p);
   const c=Math.cos(angle),s=Math.sin(angle);
-  const bottom=Math.min(...outline.map(([x,y])=>
+  const usable=contacts.length?contacts:outline;
+  const bottom=Math.min(...usable.map(([x,y])=>
     THREE_ROLL_PIVOT+(y-THREE_ROLL_PIVOT)*c+x*s));
   return {angle,lift:.01-bottom};
 }
