@@ -22,7 +22,7 @@ import {
 } from '../combat/DuelRules';
 import { getStage, type StageId } from '../stages/Stages';
 import { SPLASH_WINDUP, SPLASH_MOVES, SPLASH_DUEL_WIN_GAIN,
-  comboSplashBonus, canSplashGuard, guidedSplashPosition } from '../combat/SplashRules';
+  comboSplashBonus, canSplashGuard, guidedSplashPosition, splashWindupActive } from '../combat/SplashRules';
 import { awardRound, winnerByRemainingHealth, MATCH_MAX_ROUNDS, ROUND_INTRO_TOTAL, roundIntroText } from '../combat/MatchRules';
 
 type GameMode = 'cpu' | 'versus';
@@ -564,7 +564,7 @@ export class ArenaScene extends Phaser.Scene {
     session.elapsed=Math.min(move.duration,session.elapsed+dt);
     const justEntered=oldElapsed<SPLASH_WINDUP && session.elapsed>=SPLASH_WINDUP;
 
-    if(oldElapsed<SPLASH_WINDUP){
+    if(splashWindupActive(oldElapsed)){
       // Until the attack begins, defender input (including walking and guard)
       // stays live. The splash attacker is committed and cannot be controlled.
       const defensiveInput=defender===this.player1 ? this.controls.read(0) :
@@ -739,11 +739,20 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  /** CPU has a human-like reaction delay and does not always find ↓+A. */
+  /** CPU may guard, attempt a fast nearby counter, or counter-splash.
+   * Unlike a scripted immunity, every attempt follows the human input rules.
+   */
   private cpuSplashDefense(session:SplashSession):InputState {
     const input=emptyInput();
     if(session.elapsed>=.20 && this.aiCount%3===0){
       input.down=true;input.block=true;
+    } else if(session.elapsed>=.11 && this.aiCount%5===1 &&
+       Math.abs(this.player1.x-this.player2.x)<95){
+      // X starts early enough that its normal startup can complete in 0.5s.
+      input.light=true;
+    } else if(session.elapsed>=.21 && this.aiCount%7===2 &&
+       session.defender.splashEnergy>=100) {
+      input.up=true;input.splash=true;
     }
     return input;
   }
