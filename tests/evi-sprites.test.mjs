@@ -3,13 +3,39 @@ import {
   EVI_COMBAT_COLUMNS,EVI_COMBAT_ROWS,
   EVI_CINEMATIC_COLUMNS,EVI_CINEMATIC_ROWS,
   EVI_CINEMATIC_SECONDS,
-  frameForEvi,atlasRects,EVI_MISSING_ANIMATIONS,
+  frameForEvi,atlasRects,eviFrameTextureKey,
+  EVI_RENDER_WIDTH,EVI_RENDER_HEIGHT,EVI_FEET_ORIGIN_Y,
+  EVI_MISSING_ANIMATIONS,
 } from '../src/combat/EviSpriteStates.ts';
 import { readFileSync } from 'node:fs';
 
 assert.equal(EVI_COMBAT_COLUMNS*EVI_COMBAT_ROWS,21);
 assert.equal(EVI_CINEMATIC_COLUMNS*EVI_CINEMATIC_ROWS,10);
 assert.equal(EVI_CINEMATIC_SECONDS,2);
+assert.equal(EVI_RENDER_WIDTH,125);
+assert.equal(EVI_RENDER_HEIGHT,195);
+assert.equal(EVI_FEET_ORIGIN_Y,.95,
+  'sprite feet must remain near the floor through all state changes');
+assert.equal(eviFrameTextureKey('combat',0),'evi-combat-pose-0');
+assert.equal(eviFrameTextureKey('cinematic',9),'evi-cinematic-pose-9');
+assert.notEqual(eviFrameTextureKey('combat',0),eviFrameTextureKey('combat',1),
+  'each pose must be an isolated GPU texture');
+assert.throws(()=>eviFrameTextureKey('combat',21));
+assert.throws(()=>eviFrameTextureKey('cinematic',10));
+const textureKeys=[
+  ...Array.from({length:21},(_,i)=>eviFrameTextureKey('combat',i)),
+  ...Array.from({length:10},(_,i)=>eviFrameTextureKey('cinematic',i)),
+];
+assert.equal(new Set(textureKeys).size,31,
+  'all 31 pose textures must be independent');
+const arenaSource=readFileSync(new URL('../src/scenes/ArenaScene.ts',import.meta.url),'utf8');
+assert.match(arenaSource,/textures\.addCanvas\(key,canvas\)/,
+  'importer must build an independent transparent texture per pose');
+assert.doesNotMatch(arenaSource,/texture\.add\(part\.name,0/,
+  'old shared-atlas UV slicing can cause neighboring silhouettes to leak');
+const fighterSource=readFileSync(new URL('../src/combat/Fighter.ts',import.meta.url),'utf8');
+assert.match(fighterSource,/setOrigin\(\.5,EVI_FEET_ORIGIN_Y\)/,
+  'Evi feet baseline must be explicitly reapplied after setTexture');
 const grid=atlasRects(1448,1086,7,3);
 assert.equal(grid.length,21);
 assert.equal(grid[0].x,0);
