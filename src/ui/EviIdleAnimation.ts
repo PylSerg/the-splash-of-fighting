@@ -65,6 +65,15 @@ export async function parseEviIdleFiles(files:FileList|File[]):Promise<Blob[]>{
   return images;
 }
 
+/** Store separately edited PNGs as the same canonical ZIP as imported packs. */
+export async function packEviIdleFrames(frames:Blob[]):Promise<Blob>{
+  if(frames.length!==EVI_IDLE_FRAMES)throw new Error('Потрібно шість кадрів.');
+  const zip=new JSZip();
+  for(let i=0;i<frames.length;i++)zip.file(key(i),frames[i]);
+  return zip.generateAsync({type:'blob',compression:'DEFLATE',
+    compressionOptions:{level:6}});
+}
+
 /** Warm browser image decoders before enabling the visible animation. */
 export async function preloadEviIdle(frames:Blob[]):Promise<string[]>{
   if(frames.length!==EVI_IDLE_FRAMES)
