@@ -8,6 +8,7 @@ import {
   isSimultaneousClash, type ClashAttempt, type ClashRect,
 } from '../combat/StrikeClashRules';
 import { getCharacter } from '../characters/Roster';
+import { STAGE_FLOOR_BACK_EDGE_Y } from '../combat/FighterStageLayout.ts';
 import {
   EVI_COMBAT_IDLE_COUNT,eviCombatIdleKey,eviCombatIdleAssetUrl,
 } from '../combat/EviCombatIdle.ts';
@@ -260,15 +261,17 @@ export class ArenaScene extends Phaser.Scene {
       g.fillStyle(0x283f5c,.7).fillRoundedRect(x,352,24,75,8);
       g.fillStyle(0xee90bb,.6).fillRect(x+9,345,6,8);
     }
+    // The back edge is painted at y=443, while characters now stand 27 px
+    // forward on the floor plane. Keeping these separate gives visible depth.
     // Fighting platform
-    g.fillStyle(0x20263a).fillRect(leftEdge,GROUND_Y,sceneWidth,97);
-    g.fillStyle(0x434966).fillRect(leftEdge,GROUND_Y,sceneWidth,5);
-    g.fillStyle(0xc28cb6,.8).fillRect(leftEdge,GROUND_Y+5,sceneWidth,2);
+    g.fillStyle(0x20263a).fillRect(leftEdge,STAGE_FLOOR_BACK_EDGE_Y,sceneWidth,97);
+    g.fillStyle(0x434966).fillRect(leftEdge,STAGE_FLOOR_BACK_EDGE_Y,sceneWidth,5);
+    g.fillStyle(0xc28cb6,.8).fillRect(leftEdge,STAGE_FLOOR_BACK_EDGE_Y+5,sceneWidth,2);
     g.lineStyle(2,0x66789e,.37);
     for(let i=-32;i<64;i++){
-      g.lineBetween(i*70-155,540,i*50+80,GROUND_Y+8);
+      g.lineBetween(i*70-155,540,i*50+80,STAGE_FLOOR_BACK_EDGE_Y+8);
     }
-    for(let y=GROUND_Y+25;y<540;y+=24)g.lineBetween(leftEdge,y,leftEdge+sceneWidth,y);
+    for(let y=STAGE_FLOOR_BACK_EDGE_Y+25;y<540;y+=24)g.lineBetween(leftEdge,y,leftEdge+sceneWidth,y);
     // Arcades: poles, lamps, animated-looking neon rings
     for(const x of [80,880]){
       g.fillStyle(0x1b2440).fillRoundedRect(x-15,210,30,234,8);
@@ -437,15 +440,15 @@ export class ArenaScene extends Phaser.Scene {
       g.fillStyle(0xf0efd3,.18-j*.015).fillRoundedRect(489-w/2,y,w,3,1);
     }
     // Shoreline ground and subtle wet sand.
-    g.fillStyle(0x26394d).fillRect(left,GROUND_Y,wide,97);
-    g.fillStyle(0xbcae91,.75).fillRect(left,GROUND_Y,wide,5);
-    g.lineStyle(3,0xa1dbd7,.55).lineBetween(left,GROUND_Y,left+wide,GROUND_Y);
-    for(let y=GROUND_Y+16;y<540;y+=19){
+    g.fillStyle(0x26394d).fillRect(left,STAGE_FLOOR_BACK_EDGE_Y,wide,97);
+    g.fillStyle(0xbcae91,.75).fillRect(left,STAGE_FLOOR_BACK_EDGE_Y,wide,5);
+    g.lineStyle(3,0xa1dbd7,.55).lineBetween(left,STAGE_FLOOR_BACK_EDGE_Y,left+wide,STAGE_FLOOR_BACK_EDGE_Y);
+    for(let y=STAGE_FLOOR_BACK_EDGE_Y+16;y<540;y+=19){
       g.lineStyle(1,y%3===0?0x718c99:0x617b90,.28).lineBetween(left,y,left+wide,y);
     }
     for(let i=-37;i<66;i++){
       g.lineStyle(1,0x85948e,.16)
-        .lineBetween(i*71-110,540,i*46+92,GROUND_Y+7);
+        .lineBetween(i*71-110,540,i*46+92,STAGE_FLOOR_BACK_EDGE_Y+7);
     }
 
     // Glow mushrooms and coastal lanterns framing the fighting area.
@@ -464,8 +467,8 @@ export class ArenaScene extends Phaser.Scene {
     }
     // Colorful shells near the combat floor.
     for(const x of [215,774,-220,1170]){
-      g.fillStyle(0xe7bea7,.47).fillEllipse(x,GROUND_Y-3,22,8);
-      g.fillStyle(0x7db7ba,.46).fillTriangle(x-7,GROUND_Y-3,x,GROUND_Y-15,x+7,GROUND_Y-3);
+      g.fillStyle(0xe7bea7,.47).fillEllipse(x,STAGE_FLOOR_BACK_EDGE_Y-3,22,8);
+      g.fillStyle(0x7db7ba,.46).fillTriangle(x-7,STAGE_FLOOR_BACK_EDGE_Y-3,x,STAGE_FLOOR_BACK_EDGE_Y-15,x+7,STAGE_FLOOR_BACK_EDGE_Y-3);
     }
     this.stageSign=this.add.text(480,313,'MOONLIGHT  ☾  LAGOON',{
       fontFamily:'Rajdhani, sans-serif',fontSize:'28px',fontStyle:'bold',

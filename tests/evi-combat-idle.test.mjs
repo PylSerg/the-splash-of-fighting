@@ -78,7 +78,7 @@ assert.match(fighter,/this\.combatIdleElapsed=showIdle/,
   'idle sequence restarts from its first frame after other moves');
 assert.match(fighter,/\.setOrigin\(\.5,EVI_COMBAT_IDLE_FOOT_ORIGIN_Y\)/,
   'feet share one stable floor origin');
-assert.match(fighter,/this\.rig\.setScale\(this\.face,/,
+assert.match(fighter,/this\.rig\.setScale\(this\.face\*FIGHTER_VISUAL_SCALE,/,
   'frame is mirrored to face the real opponent without duplicating PNGs');
 assert.match(selector,/advanceEviIdleFrame\(/,
   'character selection animation remains unchanged');
