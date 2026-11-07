@@ -38,7 +38,7 @@ export async function parseEviIdleFiles(files:FileList|File[]):Promise<Blob[]>{
     if(file.size>MAX_ZIP_BYTES)
       throw new Error('ZIP завеликий. Максимум 12 МБ.');
     let zip:JSZip;
-    try {zip=await JSZip.loadAsync(file);}catch{
+    try {zip=await JSZip.loadAsync(await file.arrayBuffer());}catch{
       throw new Error('Не вдалося прочитати ZIP з кадрами Еві.');
     }
     const images:Blob[]=[];
