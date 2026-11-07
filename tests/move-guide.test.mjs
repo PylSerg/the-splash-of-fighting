@@ -21,8 +21,8 @@ for(const fighter of ['evi','runa','lyra','kai']){
     COMBO_ROUTES.map(route=>route.map(x=>labels[x]).join(' → ')));
   assert.ok(commands.moves.some(m=>m.buttons.includes('A + B')));
   assert.ok(commands.moves.some(m=>m.buttons.includes('B + Y')));
-  assert.ok(commands.moves.some(m=>m.buttons.includes('SPLASH') &&
-    m.description.includes('сенсорна')));
+  assert.ok(commands.moves.some(m=>m.buttons.includes('↑ + X + Y') &&
+    m.description.includes('X↔Y')),'guide explains physical hold and swipe');
   assert.ok(commands.moves.some(m=>m.description.includes(SPLASH_MOVES[fighter].name)));
   assert.ok(commands.moves.some(m=>m.buttons.includes('X + A')));
 }
