@@ -1,5 +1,5 @@
 import { deriveCommandChords, visualChords } from './CommandRules';
-import { splashRequested } from '../combat/SplashRules';
+import { splashChord } from '../combat/SplashRules';
 
 export type Action = 'left' | 'right' | 'up' | 'down' | 'jump' | 'light' | 'heavy' | 'kick' | 'block' | 'grab' | 'special' | 'duel' | 'roll' | 'splash';
 export type InputState = Record<Action, boolean>;
@@ -63,14 +63,15 @@ export class Controls {
   private keys = new Set<string>();
   private touches = new Map<number, Action>();
   private buttons = new Map<Action, HTMLButtonElement>();
-  /** One-tap splash works reliably on phones, with no three-finger chord. */
-  private splashButton: HTMLButtonElement | null = null;
-  private splashReady=false;
   // One-finger duel swipe: drag a held B (kick) onto Y (heavy), or the reverse.
   // The gesture remains active for the pointer lifetime, like a two-button chord.
   private comboSwipePointers = new Set<number>();
   // Preserve fast swipes long enough for the next 60Hz simulation sample.
   private comboSwipePulseUntil = 0;
+  // X↔Y is the original SPLASH chord: support two held fingers OR one
+  // continuous swipe while the other thumb holds Up on the joystick.
+  private splashSwipePointers = new Set<number>();
+  private splashSwipePulseUntil = 0;
   // A<->B is a one-finger special chord; B<->Y is the duel chord.
   private specialSwipePointers = new Set<number>();
   private specialSwipePulseUntil = 0;
@@ -110,8 +111,6 @@ export class Controls {
 
     this.bindJoystick();
     this.bindAttackButtons();
-    this.splashButton=document.querySelector<HTMLButtonElement>('#btn-splash');
-    this.setSplashReady(false);
   }
 
   private bindJoystick(): void {
@@ -213,17 +212,21 @@ export class Controls {
       // This does not interfere with a second finger or with the joystick.
       button.addEventListener('pointermove', event => {
         if (this.touches.get(event.pointerId) !== action) return;
-        // One-finger chord swipes: B↔Y duel, A↔B special, X↔A grab.
-        const partners: {other:Action;pointers:Set<number>;pulse:'duel'|'special'|'grab'}[] = [];
+        // One-finger chord swipes: X↔Y SPLASH, B↔Y duel,
+        // A↔B special, X↔A grab. Every swipe retains its own pointer.
+        const partners: {other:Action;pointers:Set<number>;
+          pulse:'duel'|'special'|'grab'|'splash'}[] = [];
         if(action==='kick') {
           partners.push({other:'heavy',pointers:this.comboSwipePointers,pulse:'duel'});
           partners.push({other:'block',pointers:this.specialSwipePointers,pulse:'special'});
         } else if(action==='heavy') {
+          partners.push({other:'light',pointers:this.splashSwipePointers,pulse:'splash'});
           partners.push({other:'kick',pointers:this.comboSwipePointers,pulse:'duel'});
         } else if(action==='block') {
           partners.push({other:'light',pointers:this.grabSwipePointers,pulse:'grab'});
           partners.push({other:'kick',pointers:this.specialSwipePointers,pulse:'special'});
         } else if(action==='light') {
+          partners.push({other:'heavy',pointers:this.splashSwipePointers,pulse:'splash'});
           partners.push({other:'block',pointers:this.grabSwipePointers,pulse:'grab'});
         }
         for(const {other,pointers,pulse} of partners) {
@@ -236,6 +239,7 @@ export class Controls {
             pointers.add(event.pointerId);
             if(pulse==='duel') this.comboSwipePulseUntil=performance.now()+220;
             else if(pulse==='special') this.specialSwipePulseUntil=performance.now()+220;
+            else if(pulse==='splash') this.splashSwipePulseUntil=performance.now()+220;
             else this.grabSwipePulseUntil=performance.now()+220;
             this.updateVisuals();
             break;
@@ -245,6 +249,7 @@ export class Controls {
       const release = (event: PointerEvent) => {
         this.touches.delete(event.pointerId);
         this.comboSwipePointers.delete(event.pointerId);
+        this.splashSwipePointers.delete(event.pointerId);
         this.specialSwipePointers.delete(event.pointerId);
         this.grabSwipePointers.delete(event.pointerId);
         this.updateVisuals();
@@ -258,6 +263,8 @@ export class Controls {
 
   private updateVisuals(): void {
     const pressed=new Set(this.touches.values());
+    const splashSwiped=this.splashSwipePointers.size>0 ||
+      performance.now()<this.splashSwipePulseUntil;
     const diamond=document.querySelector('.touch-attacks');
     const chord=visualChords({
       light:pressed.has('light'),heavy:pressed.has('heavy'),
@@ -269,25 +276,17 @@ export class Controls {
       grabSwipe:this.grabSwipePointers.size>0,
     });
     for(const [action,button] of this.buttons){
-      button.classList.toggle('pressed',pressed.has(action) &&
-        !(action==='heavy' && chord.special));
+      button.classList.toggle('pressed',(
+        pressed.has(action) || (splashSwiped && (action==='light'||action==='heavy'))
+      ) && !(action==='heavy' && chord.special));
     }
     // A+B MUST highlight A and B, never Y. The old shared combo-active
     // class incorrectly made Y appear pressed on the special chord.
     diamond?.classList.toggle('duel-active',chord.duel);
+    diamond?.classList.toggle('splash-xy-active',splashSwiped ||
+      (pressed.has('light')&&pressed.has('heavy')));
     diamond?.classList.toggle('special-active',chord.special);
     diamond?.classList.toggle('grab-active',chord.grab);
-  }
-
-  setSplashReady(ready:boolean):void {
-    if(!this.splashButton)return;
-    if(ready===this.splashReady && this.splashButton.disabled===!ready)return;
-    this.splashReady=ready;
-    this.splashButton.disabled=!ready;
-    this.splashButton.classList.toggle('is-ready',ready);
-    this.splashButton.setAttribute('aria-label',ready
-      ? 'SPLASH готовий: натисни для здібності на всю арену'
-      : 'SPLASH: накопич 100 енергії для запуску');
   }
 
   clear(): void {
@@ -295,6 +294,8 @@ export class Controls {
     this.touches.clear();
     this.comboSwipePointers.clear();
     this.comboSwipePulseUntil=0;
+    this.splashSwipePointers.clear();
+    this.splashSwipePulseUntil=0;
     this.specialSwipePointers.clear();
     this.specialSwipePulseUntil=0;
     this.r1Started=[0,0];this.r1Held=[false,false];
@@ -329,6 +330,14 @@ export class Controls {
     for (const action of ACTIONS) {
       state[action] ||= pad[action];
     }
+    // Two physical X/Y touches are independent pointer IDs. A continuous
+    // X↔Y swipe also logically holds both, so SPLASH only needs two
+    // fingers on a phone: one Up and one across X/Y.
+    if(player===0 && (this.splashSwipePointers.size>0 ||
+        performance.now()<this.splashSwipePulseUntil)){
+      state.light=true;
+      state.heavy=true;
+    }
     const l1Down=Boolean(pads[player]?.buttons[4]?.pressed);
     const r1Down=Boolean(pads[player]?.buttons[5]?.pressed);
     const r2Down=Boolean(pads[player]?.buttons[7]?.pressed) ||
@@ -350,11 +359,11 @@ export class Controls {
     });
     state.duel=commands.duel;
     state.special=commands.special;
-    state.splash=splashRequested(Boolean(touched?.has('splash')),{
+    state.splash=splashChord({
       up:state.up,light:state.light,heavy:state.heavy,l1:l1Down,r1:r1Down,
     });
     if(state.splash){
-      // The dedicated button and Up+X+Y / Up+L1+R1 take priority.
+      // Real Up+X+Y (or X↔Y swipe) and Up+L1+R1 take priority.
       state.duel=false;state.special=false;
     } else if(state.special){
       // A+B is never also a Y attack. Shield accidental overlaps with
