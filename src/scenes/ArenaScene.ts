@@ -100,6 +100,8 @@ export class ArenaScene extends Phaser.Scene {
   private centerLabel!: Phaser.GameObjects.Text;
   private timeLabel!: Phaser.GameObjects.Text;
   private roundLabel!: Phaser.GameObjects.Text;
+  private splashLabel1!: Phaser.GameObjects.Text;
+  private splashLabel2!: Phaser.GameObjects.Text;
   private leftName!: Phaser.GameObjects.Text;
   private rightName!: Phaser.GameObjects.Text;
   private extraHalf = 0;
@@ -145,6 +147,13 @@ export class ArenaScene extends Phaser.Scene {
       fontFamily:'Rajdhani, Arial, sans-serif',fontSize:'18px',
       color:'#fff0bd',fontStyle:'bold',stroke:'#19192f',strokeThickness:3,
     }).setOrigin(.5,0).setDepth(21);
+    const splashLabelStyle={
+      fontFamily:'Rajdhani, Arial, sans-serif',fontSize:'16px',
+      color:'#a8eefa',fontStyle:'bold',stroke:'#14172b',strokeThickness:3,
+    };
+    this.splashLabel1=this.add.text(112,466,'SPLASH',splashLabelStyle).setDepth(21);
+    this.splashLabel2=this.add.text(848,466,'SPLASH',splashLabelStyle)
+      .setOrigin(1,0).setDepth(21);
     this.centerLabel = this.add.text(480,210,'READY?',{
       fontFamily:'Rajdhani, Impact, sans-serif',fontSize:'77px',color:'#fff1ca',fontStyle:'bold',
       stroke:'#792f65',strokeThickness:10,
@@ -167,6 +176,8 @@ export class ArenaScene extends Phaser.Scene {
     this.cameras.main.setScroll(-this.extraHalf,0);
     if (this.leftName) this.leftName.x = 112 - this.extraHalf;
     if (this.rightName) this.rightName.x = 848 + this.extraHalf;
+    if (this.splashLabel1) this.splashLabel1.x=112-this.extraHalf;
+    if (this.splashLabel2) this.splashLabel2.x=848+this.extraHalf;
     this.paintHud();
     this.paintDebug();
   }
@@ -1019,7 +1030,11 @@ export class ArenaScene extends Phaser.Scene {
     if(this.aiCooldown<=0){
       this.aiCount++;
       this.aiCooldown=.52+((this.aiCount*17)%9)*.09;
-      if(distance<115 && this.aiCount%6===3) input.grab=true;
+      if(distance<220 && this.player2.splashEnergy>=100 && this.aiCount%4===0){
+        // CPU spends its slow, combo/duel-only splash gauge sparingly.
+        input.block=false;input.down=false;input[forward]=false;
+        input.up=true;input.splash=true;
+      } else if(distance<115 && this.aiCount%6===3) input.grab=true;
       else if(distance<130 && this.aiCount%8===2) {
         input.block=false;input.down=false;input[forward]=true;
         input.duel=true; // CPU may challenge an opponent as well.
@@ -1201,20 +1216,34 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private finishRound(): void {
-    if (this.roundOver) return;
+    if(this.roundOver)return;
     this.roundOver=true;
-    const winner=this.player1.hp===this.player2.hp?'DRAW!'
-      :this.player1.hp>this.player2.hp?getCharacter(this.player1.id).name+' WINS!'
-        :getCharacter(this.player2.id).name+' WINS!';
-    if (winner !== 'DRAW!') {
-      const loser=this.player1.hp<this.player2.hp?this.player1:this.player2;
-      const victor=loser===this.player1?this.player2:this.player1;
-      // On time-out, the loser can still have HP and be standing. The
-      // victory screen must also leave this fighter lying on the ground.
-      if (!loser.knockedDown) loser.startDefeatFall(victor.face);
+    const winnerIndex:0|1|null=this.player1.hp===this.player2.hp?null:
+      this.player1.hp>this.player2.hp?0:1;
+    const result=awardRound({wins:this.matchWins,roundsPlayed:this.roundsPlayed},winnerIndex);
+    this.matchWins=result.wins;
+    this.roundsPlayed=result.roundsPlayed;
+    this.matchWinner=result.matchWinner;
+    this.roundTransition=2.8;
+
+    if(winnerIndex!==null){
+      const victor=winnerIndex===0?this.player1:this.player2;
+      const loser=winnerIndex===0?this.player2:this.player1;
+      // On timeout, a standing loser must visibly fall before the next round.
+      if(!loser.knockedDown)loser.startDefeatFall(victor.face);
     }
-    this.centerLabel.setText(winner).setColor('#ffe5a4').setVisible(true);
-    this.onStatus(winner+' Натисни «Новий раунд» у меню або R для повтору.');
+    const label=winnerIndex===null?'DRAW!':this.matchWinner!==null
+      ?getCharacter((this.matchWinner===0?this.player1:this.player2).id).name+' CHAMPION!'
+      :getCharacter((winnerIndex===0?this.player1:this.player2).id).name+' WINS!';
+    this.centerLabel.setText(label).setColor('#ffe5a4').setVisible(true);
+    this.onStatus(this.matchWinner!==null
+      ?label+' Матч завершено: '+this.matchWins.join(':')+
+        '. У меню можна почати новий матч.'
+      :winnerIndex===null
+        ?'Нічия! Раунд буде переграно. Заряд сплешу збережено.'
+        :'Раунд '+this.roundsPlayed+' завершено! Рахунок '+
+          this.matchWins.join(':')+'. Далі раунд '+result.roundNumber+
+          '. SPLASH залишається.');
   }
 
   private paintHud(): void {
@@ -1230,6 +1259,19 @@ export class ArenaScene extends Phaser.Scene {
       Number.parseInt(getCharacter(this.player2.id).color.slice(1),16),true);
     this.drawEnergy(left,82,this.player1.energy,0xa18afa);
     this.drawEnergy(right,82,this.player2.energy,0xa18afa);
+    const p1Color=Number.parseInt(getCharacter(this.player1.id).color.slice(1),16);
+    const p2Color=Number.parseInt(getCharacter(this.player2.id).color.slice(1),16);
+    this.drawSplashMeter(left,492,this.player1.splashEnergy,p1Color);
+    this.drawSplashMeter(right+100,492,this.player2.splashEnergy,p2Color);
+    this.splashLabel1.setText(this.player1.splashEnergy>=100?'SPLASH READY!':'SPLASH');
+    this.splashLabel2.setText(this.player2.splashEnergy>=100?'SPLASH READY!':'SPLASH');
+    // Two victory pips at each side; no round is awarded for a draw.
+    for(let i=0;i<2;i++){
+      const x1=left+284-i*22,x2=right+16+i*22;
+      this.hud.fillStyle(i<this.matchWins[0]?p1Color:0x171a2e,.96).fillCircle(x1,36,8);
+      this.hud.fillStyle(i<this.matchWins[1]?p2Color:0x171a2e,.96).fillCircle(x2,36,8);
+      this.hud.lineStyle(2,0xf5e8d9,.75).strokeCircle(x1,36,8).strokeCircle(x2,36,8);
+    }
     if(this.duel) {
       // Full viewport width under both HUD bars; fills from both edges
       // toward the center as the two-second decision window closes.
@@ -1264,6 +1306,16 @@ export class ArenaScene extends Phaser.Scene {
     this.hud.fillStyle(color).fillRect(x,y,w*Math.min(100,power)/100,8);
     this.hud.fillStyle(0xd6cbff).fillRect(x+w*SPECIAL_METER_COST/100-1,y,2,8);
     this.hud.lineStyle(1,0x827caa).strokeRect(x,y,w,8);
+  }
+
+  private drawSplashMeter(x:number,y:number,power:number,color:number):void {
+    const w=200,h=8;
+    this.hud.fillStyle(0x11152b,.93).fillRoundedRect(x-3,y-3,w+6,h+6,4);
+    this.hud.fillStyle(0x243547,.92).fillRect(x,y,w,h);
+    this.hud.fillStyle(color,power>=100?1:.92)
+      .fillRect(x,y,w*Math.max(0,Math.min(100,power))/100,h);
+    this.hud.lineStyle(1,power>=100?0xffffff:0x658d9c,.85)
+      .strokeRoundedRect(x-3,y-3,w+6,h+6,4);
   }
 
   private paintDebug(): void {
