@@ -10,7 +10,7 @@ import { getMoveGuide } from './ui/MoveGuide';
 import {
   type EviSheetKind, readEviSheet,storeEviSheet,clearEviSheets,loadImageFromBlob,
 } from './ui/SpriteImport';
-import {parseEviIdleFiles,packEviIdleFrames} from './ui/EviIdleAnimation';
+import {parseEviIdleFiles,packEviIdleFrames,loadBundledEviIdleFrames} from './ui/EviIdleAnimation';
 import { CHARACTERS, getCharacter, portraitSvg } from './characters/Roster';
 import gamePackage from '../package.json';
 import { getStage, type StageId } from './stages/Stages';
@@ -133,10 +133,17 @@ for(const kind of ['combat','cinematic'] as const){
 get<HTMLButtonElement>('#btn-evi-reset-art').addEventListener('click',()=>{
   arena.removeEviSheets();importedSheets.clear();selectEviMode('puppet');
   characterSelector.clearEviIdle();
-  get<HTMLElement>('#evi-idle-status').textContent='Завантажити 6 кадрів';
-  void clearEviSheets().catch(()=>{
-    spriteStatus.textContent+=' Збережені файли не вдалося очистити.';
-  });
+  get<HTMLElement>('#evi-idle-status').textContent='Повертаю вбудовані кадри…';
+  const version=++idleLoadVersion;
+  void (async()=>{
+    try {await clearEviSheets();}
+    catch {spriteStatus.textContent+=' Збережені файли не вдалося очистити.';}
+    try {await installBundledIdle(version);}
+    catch {
+      if(version===idleLoadVersion)
+        idleStatus.textContent='Не вдалося відновити вбудовані кадри.';
+    }
+  })();
 });
 void (async()=>{
   for(const kind of ['combat','cinematic'] as const){
@@ -199,42 +206,67 @@ const confirmationCopy: Record<DisruptiveAction,{
 const characterSelector=new CharacterSelector(onCharacterChosen, backFromCharacter);
 const stageSelector=new StageSelector(onStageChosen, backFromStage);
 
-// The first native-frame animation is only used on the select screen.
-// Store the ZIP locally, as with the existing two 2D combat sprite atlases.
+// The six transparent PNGs ship in public/assets/evi/idle/.
+// Local ZIP/PNG imports remain available for future hand-edited frames.
 const idleInput=get<HTMLInputElement>('#input-evi-idle');
 const idleStatus=get<HTMLElement>('#evi-idle-status');
+let idleLoadVersion=0;
+
+/** Prefer saved user-edited frames, otherwise use the originals in GitHub. */
+async function installBundledIdle(version:number):Promise<void>{
+  const frames=await loadBundledEviIdleFrames(import.meta.env.BASE_URL);
+  if(version!==idleLoadVersion)return;
+  await characterSelector.installEviIdle(frames);
+  if(version===idleLoadVersion)
+    idleStatus.textContent='6 вбудованих кадрів · анімація ✓';
+}
 idleInput.addEventListener('change',()=>{
   const selected=Array.from(idleInput.files??[]);
   if(selected.length===0)return;
+  const version=++idleLoadVersion;
   idleStatus.textContent='Читаю кадри…';
   void (async()=>{
     const frames=await parseEviIdleFiles(selected);
+    if(version!==idleLoadVersion)return;
     await characterSelector.installEviIdle(frames);
-    idleStatus.textContent='6 кадрів · анімація ✓';
+    if(version!==idleLoadVersion)return;
+    idleStatus.textContent='6 власних кадрів · анімація ✓';
     try {
       const zip=selected.length===1 && /\.zip$/i.test(selected[0].name)
         ? selected[0]:await packEviIdleFrames(frames);
+      if(version!==idleLoadVersion)return;
       await storeEviSheet('idle-selection',zip);
     }catch{
-      idleStatus.textContent='Анімація ✓ · зберегти не вдалося';
+      if(version===idleLoadVersion)
+        idleStatus.textContent='Анімація ✓ · зберегти не вдалося';
     }
   })().catch(error=>{
+    if(version!==idleLoadVersion)return;
     const message=error instanceof Error?error.message:'Не вдалося імпортувати Idle.';
     idleStatus.textContent=message;
     status.textContent=message;
   }).finally(()=>{idleInput.value='';});
 });
 void (async()=>{
-  try {
-    const saved=await readEviSheet('idle-selection');
-    if(!saved)return;
-    const frames=await parseEviIdleFiles([
-      new File([saved],'evi_idle_frames.zip',{type:'application/zip'}),
-    ]);
-    await characterSelector.installEviIdle(frames);
-    idleStatus.textContent='6 кадрів · анімація ✓';
-  }catch{
-    idleStatus.textContent='Завантажити 6 кадрів';
+  const version=++idleLoadVersion;
+  // IndexedDB is optional; a fresh install needs no manual user action.
+  const saved=await readEviSheet('idle-selection').catch(()=>null);
+  if(version!==idleLoadVersion)return;
+  if(saved){
+    try{
+      const frames=await parseEviIdleFiles([
+        new File([saved],'evi_idle_frames.zip',{type:'application/zip'}),
+      ]);
+      if(version!==idleLoadVersion)return;
+      await characterSelector.installEviIdle(frames);
+      if(version===idleLoadVersion)idleStatus.textContent='6 власних кадрів · анімація ✓';
+      return;
+    }catch{/* Corrupted old files should not hide the bundled game art. */}
+  }
+  try{await installBundledIdle(version);}
+  catch(error){
+    if(version===idleLoadVersion)
+      idleStatus.textContent=error instanceof Error?error.message:'Не вдалося завантажити Idle.';
   }
 })();
 
