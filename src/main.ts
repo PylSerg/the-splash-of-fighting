@@ -534,7 +534,11 @@ window.addEventListener('keydown',event=>{
     return;
   }
   if(screen==='stages'){
-    if(event.code==='ArrowLeft'||event.code==='ArrowRight'){
+    // A story panel is modal: navigation cannot change the stage behind it.
+    if(stageSelector.isLoreOpen)return;
+    if(event.code==='KeyI'){
+      event.preventDefault();stageSelector.inspect();
+    }else if(event.code==='ArrowLeft'||event.code==='ArrowRight'){
       event.preventDefault();
       stageSelector.navigate(event.code==='ArrowLeft'?-1:1);
     }else if(event.code==='Enter'||event.code==='Space'){
@@ -619,6 +623,20 @@ function pollGamepadMenu(): void {
     selectionDirectionHeld=0;
     selectionAHeld=false;
   } else if(screen==='stages'){
+    if(stageSelector.isLoreOpen){
+      // Same as the fighter biography: B closes the story, A/Start and
+      // D-pad cannot accidentally confirm or change the underlying stage.
+      const back=connected.some(p=>Boolean(p.buttons[1]?.pressed));
+      if(back&&!selectionBHeld)stageSelector.closeLore();
+      selectionBHeld=back;
+      selectionAHeld=connected.some(p=>Boolean(p.buttons[0]?.pressed));
+      selectionDirectionHeld=0;
+      playerDirectionHeld[0]=0;playerDirectionHeld[1]=0;
+      playerAHeld[0]=false;playerAHeld[1]=false;
+      selectionStartHeld=start;
+      requestAnimationFrame(pollGamepadMenu);
+      return;
+    }
     const dir=connected.reduce((value,pad)=>value||direction(pad),0);
     if(dir&&(dir!==selectionDirectionHeld||now-selectionDirectionTime>280)){
       stageSelector.navigate(dir as -1|1);

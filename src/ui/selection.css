@@ -678,3 +678,60 @@
   .fighter-bio-facts p{padding:6px}
   .fighter-bio-footer{margin-top:8px}
 }
+
+/* Alpha 1.19: Arena lore opens with the same fullscreen overlay and
+   keyboard focus behavior as character biography, with a landscape preview. */
+.cinematic-stage-lore{
+  padding:9px 15px;
+  min-height:clamp(39px,9dvh,58px);
+  border:1px solid #9fd6d5b9;border-radius:13px;
+  background:linear-gradient(115deg,#1d4659de,#403558df);
+  color:#e1fff5;
+  font:800 clamp(14px,2.55dvh,19px)/1 Rajdhani,system-ui,sans-serif;
+  white-space:nowrap;touch-action:manipulation;
+  box-shadow:0 5px 18px #050d24a0;
+}
+.cinematic-stage-lore:hover,
+.cinematic-stage-lore:focus-visible{
+  border-color:#ddffef;
+  background:linear-gradient(115deg,#276976,#574273);
+}
+.cinematic-stage-lore:disabled{opacity:.55;cursor:default}
+.stage-lore-overlay{--bio-accent:#efa4db}
+.stage-lore-panel{width:min(970px,99%)}
+.stage-lore-main{
+  grid-template-columns:minmax(160px,35%) minmax(0,1fr);
+  align-items:start;
+}
+.stage-lore-art{
+  position:relative;isolation:isolate;
+  width:100%;aspect-ratio:4/3;
+  border:2px solid var(--bio-accent,#eba6dd);
+  border-radius:15px;
+  overflow:hidden;
+  background:#14203b;
+  box-shadow:0 0 23px color-mix(in srgb,var(--bio-accent,#eba6dd) 24%,transparent);
+}
+.stage-lore-art .stage-art{position:absolute;inset:0;border:0;border-radius:0}
+.stage-lore-art .stage-art-title{
+  font-size:clamp(13px,2.7vmin,23px);
+  letter-spacing:clamp(1px,.28vw,3px);
+}
+.stage-lore-panel .fighter-bio-story{white-space:normal}
+@media(max-width:640px){
+  .cinematic-stage-lore{padding:7px 9px;font-size:13px}
+  .stage-lore-main{grid-template-columns:minmax(105px,34%) minmax(0,1fr);gap:10px}
+  .stage-lore-art{aspect-ratio:3/4}
+}
+@media(orientation:landscape) and (max-height:420px){
+  .cinematic-stage-lore{min-height:37px;padding:5px 9px;font-size:14px}
+  .stage-lore-art{aspect-ratio:5/4}
+  .stage-lore-panel{padding:10px 14px}
+  .stage-lore-panel .fighter-bio-story{line-height:1.36}
+  .stage-lore-panel .fighter-bio-facts{margin-top:8px}
+  .stage-lore-panel .fighter-bio-footer{margin-top:8px}
+}
+@media(max-width:520px){
+  .stage-bottom .cinematic-actions{gap:5px}
+  .stage-bottom .cinematic-confirm{padding:7px 9px}
+}
