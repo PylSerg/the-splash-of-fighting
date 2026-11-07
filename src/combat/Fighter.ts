@@ -4,7 +4,7 @@ import { stopsHit, strikeBand, strikeDamage, canAutoTurn, STANDING_ATTACK_LANES,
 import { crouchMoveForPress } from './CrouchRules';
 import { blockedGrabRecoil } from './GrabRules';
 import { earnSpecialMeter, SPECIAL_METER_COST, MAX_HEALTH } from './CombatFeedback';
-import { earnSplashEnergy, SPLASH_METER_MAX, splashFacing } from './SplashRules';
+import { earnSplashEnergy, SPLASH_METER_MAX, SPLASH_INPUT_GRACE, splashFacing } from './SplashRules';
 import {
   FIGHTER_STYLES, ATTACK_ACTIVE, WAKEUP_PROTECTION,
   attackRecovery, phaseOfAttack, styledAttack, blockstunSeconds,
@@ -821,9 +821,9 @@ export class Fighter {
       } else {
         if (!input.special && !this.queuedSolo) {
           if(just.light && awaitingSplash)
-            this.queuedSolo={name:'light',remaining:.24};
+            this.queuedSolo={name:'light',remaining:SPLASH_INPUT_GRACE};
           else if(just.heavy)
-            this.queuedSolo={name:'heavy',remaining:awaitingSplash?.24:.075};
+            this.queuedSolo={name:'heavy',remaining:awaitingSplash?SPLASH_INPUT_GRACE:.075};
           else if(just.kick)
             this.queuedSolo={name:'kick',remaining:.075};
         }
