@@ -1,4 +1,5 @@
 /** Shared rules for slow special-meter gain and lagging health feedback. */
+export const MAX_HEALTH = 200;
 export const SPECIAL_METER_MAX = 100;
 export const SPECIAL_METER_COST = 40;
 /** Roughly 67 HP of successful damage is needed to earn one special. */
@@ -30,7 +31,7 @@ export const makeHealthTrail = (hp: number): HealthTrail =>
  * A second hit restarts the trail from its current visible location.
  */
 export function advanceHealthTrail(old: HealthTrail, hp: number, dt: number): HealthTrail {
-  const health = Math.max(0, Math.min(100, hp));
+  const health = Math.max(0, Math.min(MAX_HEALTH, hp));
   if (health > old.target) return makeHealthTrail(health); // heal/reset
   const changed = health < old.target;
   const from = changed ? Math.max(old.displayed,health) : old.from;

@@ -1,7 +1,20 @@
 import assert from 'node:assert/strict';
-import {awardRound,MATCH_MAX_ROUNDS,MATCH_WINS_REQUIRED} from '../src/combat/MatchRules.ts';
+import {awardRound,MATCH_MAX_ROUNDS,MATCH_WINS_REQUIRED,
+  ROUND_ANNOUNCE_SECONDS,FIGHT_ANNOUNCE_SECONDS,ROUND_INTRO_TOTAL,roundIntroText,
+} from '../src/combat/MatchRules.ts';
 assert.equal(MATCH_MAX_ROUNDS,3);
 assert.equal(MATCH_WINS_REQUIRED,2);
+assert.equal(ROUND_ANNOUNCE_SECONDS,1);
+assert.equal(FIGHT_ANNOUNCE_SECONDS,1);
+assert.equal(ROUND_INTRO_TOTAL,2);
+for(const round of [1,2,3]){
+  assert.equal(roundIntroText(2,round),'ROUND '+round);
+  assert.equal(roundIntroText(1.01,round),'ROUND '+round);
+  assert.equal(roundIntroText(1,round),'FIGHT!');
+  assert.equal(roundIntroText(.01,round),'FIGHT!');
+  assert.equal(roundIntroText(0,round),null);
+}
+
 let s={wins:[0,0],roundsPlayed:0};
 s=awardRound(s,null);
 assert.deepEqual(s.wins,[0,0]);

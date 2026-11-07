@@ -12,7 +12,7 @@ import { HIT_LEVEL_NAMES } from '../combat/HitRules';
 import { sweepTrips } from '../combat/CrouchRules';
 import {
   advanceHealthTrail, healthFillRect, makeHealthTrail,
-  type HealthTrail, SPECIAL_METER_COST,
+  type HealthTrail, SPECIAL_METER_COST, MAX_HEALTH,
 } from '../combat/CombatFeedback';
 import { canBeGrabbed } from '../combat/GrabRules';
 import {
@@ -23,7 +23,7 @@ import {
 import { getStage, type StageId } from '../stages/Stages';
 import { SPLASH_WINDUP, SPLASH_MOVES, SPLASH_DUEL_WIN_GAIN,
   comboSplashBonus, canSplashGuard } from '../combat/SplashRules';
-import { awardRound, MATCH_MAX_ROUNDS } from '../combat/MatchRules';
+import { awardRound, MATCH_MAX_ROUNDS, ROUND_INTRO_TOTAL, roundIntroText } from '../combat/MatchRules';
 
 type GameMode = 'cpu' | 'versus';
 interface DuelPending {
@@ -105,7 +105,7 @@ export class ArenaScene extends Phaser.Scene {
   private leftName!: Phaser.GameObjects.Text;
   private rightName!: Phaser.GameObjects.Text;
   private extraHalf = 0;
-  private readyTime = 1.5;
+  private readyTime = ROUND_INTRO_TOTAL;
   private roundTime = 99;
   private roundOver = false;
   private accumulator = 0;
@@ -121,8 +121,8 @@ export class ArenaScene extends Phaser.Scene {
   private roundsPlayed=0;
   private matchWinner:0|1|null=null;
   private roundTransition=0;
-  private healthTrail1: HealthTrail = makeHealthTrail(100);
-  private healthTrail2: HealthTrail = makeHealthTrail(100);
+  private healthTrail1: HealthTrail = makeHealthTrail(MAX_HEALTH);
+  private healthTrail2: HealthTrail = makeHealthTrail(MAX_HEALTH);
 
   constructor(controls: Controls, onStatus: (message: string) => void) {
     super({ key: 'Arena' });
@@ -389,7 +389,7 @@ export class ArenaScene extends Phaser.Scene {
     this.healthTrail1=makeHealthTrail(this.player1.hp);
     this.healthTrail2=makeHealthTrail(this.player2.hp);
     this.prev1=ZERO();this.prev2=ZERO();
-    this.readyTime=1.5;this.roundTime=99;this.roundOver=false;
+    this.readyTime=ROUND_INTRO_TOTAL;this.roundTime=99;this.roundOver=false;
     this.grapple=null;
     this.duel=null;
     this.duelPending=null;
@@ -397,7 +397,8 @@ export class ArenaScene extends Phaser.Scene {
     this.splash=null;
     this.roundTransition=0;
     this.aiCooldown=.85;this.aiCount=0;this.frameCount=0;this.accumulator=0;
-    this.centerLabel.setText('READY?').setColor('#fff0c0').setVisible(true);
+    this.centerLabel.setText(roundIntroText(this.readyTime,this.roundsPlayed+1) ?? '')
+      .setColor('#fff0c0').setVisible(true);
     this.roundLabel.setText('ROUND '+(this.roundsPlayed+1)+' / '+MATCH_MAX_ROUNDS);
     this.paintHud();
   }
@@ -426,8 +427,9 @@ export class ArenaScene extends Phaser.Scene {
     this.frameCount++;
     if(this.readyTime>0){
       this.readyTime=Math.max(0,this.readyTime-dt);
-      this.centerLabel.setText(this.readyTime>.52?'READY?':'FIGHT!');
-      if(this.readyTime===0)this.centerLabel.setVisible(false);
+      const label=roundIntroText(this.readyTime,this.roundsPlayed+1);
+      if(label)this.centerLabel.setText(label);
+      else this.centerLabel.setVisible(false);
       return;
     }
     if(this.splash){
@@ -1293,9 +1295,9 @@ export class ArenaScene extends Phaser.Scene {
     // Two physical layers: red = health BEFORE the latest hit; the live
     // fighter-colored bar covers its surviving portion. Both use the same
     // anchor, so P1 shows lost health on its right, P2 on its left.
-    const trail=healthFillRect(x,w,trailHp,right);
+    const trail=healthFillRect(x,w,trailHp/MAX_HEALTH*100,right);
     this.hud.fillStyle(0xf34b55,.95).fillRect(trail.x,y,trail.width,h);
-    const live=healthFillRect(x,w,hp,right);
+    const live=healthFillRect(x,w,hp/MAX_HEALTH*100,right);
     this.hud.fillStyle(color).fillRect(live.x,y,live.width,h);
     this.hud.fillStyle(0xffffff,.2).fillRect(live.x,y,live.width,4);
     this.hud.lineStyle(2,0xc7abc1,.7).strokeRoundedRect(x-4,y-4,w+8,h+8,6);
