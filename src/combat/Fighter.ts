@@ -4,7 +4,7 @@ import { stopsHit, strikeBand, strikeDamage, canAutoTurn, type HitLevel, type Gu
 import { crouchMoveForPress } from './CrouchRules';
 import { blockedGrabRecoil } from './GrabRules';
 import { earnSpecialMeter, SPECIAL_METER_COST, MAX_HEALTH } from './CombatFeedback';
-import { earnSplashEnergy, SPLASH_METER_MAX } from './SplashRules';
+import { earnSplashEnergy, SPLASH_METER_MAX, splashFacing } from './SplashRules';
 import {
   DUEL_WHIFF_RECOVERY, DUEL_RESULT_ANIMATION, forwardHeld,
   canDuelCatchTarget, type DuelStrike,
@@ -368,12 +368,22 @@ export class Fighter {
   gainSplash(amount:number):void {
     this.splashEnergy=earnSplashEnergy(this.splashEnergy,amount);
   }
+  /** SPLASH explicitly overrides the normal guard-facing lock, including
+   * during its reactable windup. Do not alter ordinary block behavior.
+   */
+  faceOpponentDuringSplash(opponentX:number):void {
+    const next=splashFacing(this.x,opponentX,this.face);
+    if(next!==this.face){
+      this.face=next;
+      this.draw(0);
+    }
+  }
   /** A cutscene pose is animated independently of ordinary attack hitboxes. */
   stepSplashPose(dt:number,phase:'startup'|'attack'|'victim'|'guard',progress:number,opponentX:number):void {
     this.time+=dt;
-    // A crouch guard retains the fighter's facing; only an unguarded
-    // fighter tracks the rival during a cinematic ability.
-    if(phase==='startup' || phase==='attack')this.face=opponentX>=this.x?1:-1;
+    // SPLASH is the only exception to guard-facing lock: both the caster
+    // and defender turn toward the opponent, including protected ↓+A.
+    this.face=splashFacing(this.x,opponentX,this.face);
     this.splashPose=phase;
     this.splashProgress=Phaser.Math.Clamp(progress,0,1);
     this.attack=null;
