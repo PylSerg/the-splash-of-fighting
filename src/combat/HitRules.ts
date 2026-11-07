@@ -57,15 +57,36 @@ export function stopsHit(guard: GuardStance, attack: HitLevel): boolean {
   return false;
 }
 
-/** Relative to the character's feet (negative means above ground).
- * High fan/weapon cuts include the head silhouette, not just the upper
- * torso. Their lower edge remains at -81, so a crouching fighter (-73
- * to -1) can still duck cleanly beneath the swing.
+/** Body collision relative to the fighter's feet (all Y values negative
+ * above ground). The larger 1.12× sprites have heads about 220px above
+ * their foot pivot. Previously the 145px tall box began at the SHOULDERS,
+ * leaving both characters' heads outside the green debug rectangle.
+ *
+ * Use one shared source for actual collision and debug overlays. The small
+ * crouching/rolling profile remains low enough to duck under high attacks.
+ */
+export const FIGHTER_HURTBOX = {
+  standing: { halfWidth: 32, top: -222, bottom: -2 },
+  low:      { halfWidth: 29, top: -84,  bottom: -1 },
+} as const;
+
+export function fighterHurtboxBand(low:boolean):{
+  halfWidth:number;top:number;height:number;
+}{
+  const hit=low?FIGHTER_HURTBOX.low:FIGHTER_HURTBOX.standing;
+  return {halfWidth:hit.halfWidth,top:hit.top,height:hit.bottom-hit.top};
+}
+
+/** Attack lanes now reach the increased head/shoulder silhouette, while
+ * preserving the explicit high-attack duck gap:
+ * high ends at -92 and crouch begins at -84 (8 px clearance).
+ * Mid and low bands also grow moderately with the enlarged artwork.
+ * Never let high attacks overlap the low-profile body hitbox!
  */
 export function strikeBand(level: HitLevel): { top: number; height: number } {
   switch (level) {
-    case 'high': return { top: -190, height: 109 }; // bottom -81, covers head
-    case 'mid':  return { top: -113, height: 87 }; // bottom -26
-    case 'low':  return { top: -60, height: 58 };  // bottom -2
+    case 'high': return { top: -232, height: 140 }; // bottom -92, covers head
+    case 'mid':  return { top: -127, height: 100 }; // bottom -27
+    case 'low':  return { top: -67, height: 65 };   // bottom -2
   }
 }
