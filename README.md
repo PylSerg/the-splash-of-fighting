@@ -21,6 +21,14 @@ npm run build
 npm run preview
 ```
 
+## Alpha 1.22.12 · True sprite-based fighting stance
+
+- Split the six poses from the user-approved **1536 × 1024** RGBA collage into individual, lossless **512 × 768 RGBA PNGs** at `public/assets/evi/combat-idle/fight_idle_001.png` … `fight_idle_006.png`. Each frame has its torso horizontally aligned, visible feet at the same source pixel row (741), real alpha transparency and its own SHA-256 regression check.
+- Phaser preloads the six separate combat PNGs (respecting the GitHub Pages base path). When Evi stands **still in the default pixel-puppet mode** during a fight, the six-frame **185 ms/frame** ping-pong animation replaces the temporary modular puppet: **1 → 2 → 3 → 4 → 5 → 6 → 5 → 4 → 3 → 2 → 1**.
+- Upon movement, guard, crouch, attack, hit, jump, throw, roll or cinematics, the original 2D battle puppet returns immediately. Selecting imported sprite-sheet or legacy art still works; the Character Select animation retains its own existing six PNGs.
+- The sprite uses a consistent ground origin, visually scaled to the existing ~190 px tall combat fighter, and mirrors with the arena facing. No hitbox, movement, damage, duel, SPLASH or other gameplay rules are changed.
+- New regression tests validate original PNG RGBA, asset URLs/hashes, seamless playback, baseline and state switching.
+
 ## Alpha 1.22.11 · Seamless bidirectional idle playback
 
 - Evi's six transparent idle PNGs on **Character Select** now run in a ping-pong loop **1 → 2 → 3 → 4 → 5 → 6 → 5 → 4 → 3 → 2 → 1** and repeat, rather than jumping directly **6 → 1**.
