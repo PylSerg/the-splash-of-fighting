@@ -110,11 +110,10 @@ export function fighterHurtboxBand(
   return {halfWidth:hit.halfWidth,top:hit.top,height:hit.bottom-hit.top};
 }
 
-/** Attack lanes now reach the increased head/shoulder silhouette, while
- * preserving the explicit high-attack duck gap:
- * high ends at -92 and crouch begins at -84 (8 px clearance).
- * Mid and low bands also grow moderately with the enlarged artwork.
- * Never let high attacks overlap the low-profile body hitbox!
+/** Attack lanes keep their current reach and timings while hurtboxes
+ * become fighter-specific. High Y ends at -92, above the highest crouching
+ * profile (-81), so it misses every crouched/rolling opponent.
+ * Mid and low bands continue to intersect all standing/low profiles.
  */
 export function strikeBand(level: HitLevel): { top: number; height: number } {
   switch (level) {
