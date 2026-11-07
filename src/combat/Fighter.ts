@@ -12,6 +12,11 @@ import {
 } from './EviSpriteStates.ts';
 import { type EviMotionInput } from './EviRigMotion.ts';
 import { EviPixelPuppet } from './EviPixelPuppet.ts';
+import {
+  EVI_COMBAT_IDLE_COUNT,EVI_COMBAT_IDLE_FOOT_ORIGIN_Y,
+  EVI_COMBAT_IDLE_DISPLAY_HEIGHT,EVI_COMBAT_IDLE_DISPLAY_WIDTH,
+  eviCombatIdleKey,eviCombatIdleFrame,
+} from './EviCombatIdle.ts';
 import { groundedRollVisual } from './GroundedRollVisual.ts';
 import { legacyFallVisual } from './EviGroundedTumble.ts';
 import { earnSplashEnergy, SPLASH_METER_MAX, SPLASH_INPUT_GRACE, splashFacing } from './SplashRules';
@@ -114,6 +119,9 @@ export class Fighter {
   private cinematic: {kind:'intro'|'victory';elapsed:number}|null=null;
   private pixelSprite?: Phaser.GameObjects.Image;
   private pixelPuppet?:EviPixelPuppet;
+  /** Independent standing animation; only shown during true neutral idle. */
+  private combatIdleSprite?:Phaser.GameObjects.Image;
+  private combatIdleElapsed=0;
   private eviVisualMode:'puppet'|'sheet'|'legacy'='puppet';
   attack: ActiveAttack | null = null;
   // Two-stage throw animations are controlled by the arena's grapple state.
@@ -313,6 +321,20 @@ export class Fighter {
     if(this.id==='evi'){
       this.pixelPuppet=new EviPixelPuppet(scene);
       this.rig.add(this.pixelPuppet.root);
+      // These bundled PNGs are purely visual and never enter physics or
+      // collision calculations. A missing texture preserves the old puppet.
+      const allIdleLoaded=Array.from({length:EVI_COMBAT_IDLE_COUNT},(_,i)=>
+        scene.textures.exists(eviCombatIdleKey(i))).every(Boolean);
+      if(allIdleLoaded){
+        for(let i=0;i<EVI_COMBAT_IDLE_COUNT;i++)
+          scene.textures.get(eviCombatIdleKey(i))
+            .setFilter(Phaser.Textures.FilterMode.NEAREST);
+        this.combatIdleSprite=scene.add.image(0,0,eviCombatIdleKey(0))
+          .setOrigin(.5,EVI_COMBAT_IDLE_FOOT_ORIGIN_Y)
+          .setDisplaySize(EVI_COMBAT_IDLE_DISPLAY_WIDTH,EVI_COMBAT_IDLE_DISPLAY_HEIGHT)
+          .setVisible(false);
+        this.rig.add(this.combatIdleSprite);
+      }
     }
     this.refreshSpriteArt();
     this.draw(0);
@@ -1288,7 +1310,29 @@ export class Fighter {
 
   private draw(_dt: number): void {
     // Art has no influence on collisions, startup, active frames or recovery.
-    this.pixelPuppet?.update(this.eviMotionInput(),_dt,this.hitFlash>0);
+    const motion=this.eviMotionInput();
+    this.pixelPuppet?.update(motion,_dt,this.hitFlash>0);
+    if(this.combatIdleSprite){
+      // Only replace the DEFAULT pixel puppet at rest. Imported full combat
+      // sheets, classic art, attacks, guard, rolls, walking etc. remain intact.
+      const showIdle=this.eviVisualMode==='puppet' && motion.name==='idle';
+      this.combatIdleElapsed=showIdle
+        ?this.combatIdleElapsed+Math.max(0,_dt):0;
+      this.combatIdleSprite.setVisible(showIdle);
+      if(showIdle){
+        const key=eviCombatIdleKey(eviCombatIdleFrame(this.combatIdleElapsed));
+        if(this.combatIdleSprite.texture.key!==key)
+          this.combatIdleSprite.setTexture(key);
+        // setTexture can reset the origin: feet must not drift between PNGs.
+        this.combatIdleSprite
+          .setOrigin(.5,EVI_COMBAT_IDLE_FOOT_ORIGIN_Y)
+          .setDisplaySize(EVI_COMBAT_IDLE_DISPLAY_WIDTH,EVI_COMBAT_IDLE_DISPLAY_HEIGHT)
+          .setPosition(0,0);
+      }
+      const puppetMode=this.eviVisualMode==='puppet' ||
+        (this.eviVisualMode==='sheet'&&!this.pixelSprite);
+      this.pixelPuppet?.setVisible(puppetMode&&!showIdle);
+    }
     if(this.pixelSprite){
       const chosen=frameForEvi({
         cinematic:this.cinematic,
