@@ -21,6 +21,14 @@ npm run build
 npm run preview
 ```
 
+## Alpha 1.22.14 · Hitboxes follow the enlarged fighter silhouettes
+
+- The green debug rectangles previously started **below the characters' heads**, since both 2D fighters still used the old upright hurtbox of 50 × 142 px and a top of -145 from the feet. The larger Evi and Runa now share a **64 × 220 px** upright hurtbox, reaching from -222 to -2 relative to their foot pivot. Its center stays aligned with the character's feet.
+- The crouching / grounded-roll hurtbox is only **58 × 83 px**, from -84 to -1, so ducking and rolling still have a meaningful low profile.
+- The high Y strike now spans -232 to -92, reaching the enlarged character's head while ending **8 px ABOVE the crouching hurtbox**; crouching still avoids high Y. Mid X and low B bands are adjusted to the enlarged art without changing their intended attack lanes.
+- Debug outlines and live hit detection both call the same `Fighter.bodyBox()` and shared `fighterHurtboxBand()`. Airborne hitboxes still follow the fighter's y-offset; the stage floor, scale, damage, movement, attack startup/active timing and existing art remain unchanged.
+- Updated geometry regression tests for high-versus-crouch whiffs, head contact, low/mid body overlap, horizontal widths and the shared ground anchor.
+
 ## Alpha 1.22.13 · Fighter scale and floor perspective
 
 - Placed both fighters **27 world pixels forward on the existing foreground platform**: feet and shadows now rest at y=470, rather than straddling the decorative back edge at y=443. City floor tiles and lagoon sand/water retain their original back-edge art position.
