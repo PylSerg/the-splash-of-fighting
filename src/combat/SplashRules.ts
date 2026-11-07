@@ -1,4 +1,5 @@
 import { fullSpecialDamage } from './SpecialRules.ts';
+import { damagePercent } from './CombatScale.ts';
 
 /** Cinematic splash: deliberately independent of normal (damage-based) special energy. */
 export const SPLASH_METER_MAX = 100;
@@ -61,6 +62,16 @@ export function earnSplashEnergy(current:number, bonus:number): number {
   if (!Number.isFinite(bonus) || bonus<=0) return current;
   return Math.min(SPLASH_METER_MAX,Math.max(0,current)+bonus);
 }
+/** Unlike an ordinary attack, a normal special rewards ONLY SPLASH meter.
+ * Reward 1 SPLASH point per 1% of real max HP removed: misses get zero,
+ * a guard-break gets roughly half, and rear hits earn the actual damage.
+ * This stays balanced even if the global maximum HP changes again.
+ */
+export function specialSplashBonus(actualHpRemoved:number):number {
+  if(!Number.isFinite(actualHpRemoved)||actualHpRemoved<=0)return 0;
+  return damagePercent(actualHpRemoved);
+}
+
 /** Only a FULL, clean three-hit combo earns splash energy. */
 export function comboSplashBonus(cleanHits:number): number {
   return cleanHits===3 ? SPLASH_COMBO_COMPLETE_GAIN : 0;
