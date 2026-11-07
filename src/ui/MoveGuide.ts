@@ -2,6 +2,7 @@ import type { FighterId } from '../combat/Fighter';
 import { FIGHTER_STYLES } from '../combat/CombatRhythm.ts';
 import { COMBO_ROUTES } from '../combat/ComboRules.ts';
 import { SPLASH_MOVES } from '../combat/SplashRules.ts';
+import { specialDamageAt } from '../combat/SpecialRules.ts';
 import { getCharacter } from '../characters/Roster.ts';
 
 export type GuideMove = { buttons:string; description:string };
@@ -22,7 +23,6 @@ export function getMoveGuide(fighter:FighterId):MoveGuide {
   const runa=fighter==='runa';
   const short=(number:number)=>String(number).replace('.',',');
   const heavyDamage=runa?14:11;
-  const specialDamage=runa?23:20;
   const throwDamage=runa?21:16;
   const cleanComboBonus=24;
   return {
@@ -41,13 +41,26 @@ export function getMoveGuide(fighter:FighterId):MoveGuide {
         {buttons:'↓ + B',description:'Нижня підсічка · '+(runa?6:5)+' HP. Збиває з ніг, якщо не заблокована.'},
       ]},
       {title:'Спеціальні дії та захист',moves:[
-        {buttons:'Вперед + A + B',description:'Спецприйом · '+specialDamage+' HP, потребує 40 звичайної енергії. Пробиває блок за 50% шкоди.'},
+        {buttons:'Вперед + A + B',description:'Заряджений спецприйом від 15% до 100%: '+
+          specialDamageAt(fighter,15)+'–'+specialDamageAt(fighter,100)+
+          ' HP. Витрачає весь заряд, зростає сила. Фронтальний блок пропускає 50% шкоди.'},
         {buttons:'Вперед + B + Y',description:'Виклик на таємну дуель · вибір X/Y/B протягом 2 с. Захисник може обрати A.'},
         {buttons:'↑ + X + Y',description:'SPLASH: «'+SPLASH_MOVES[fighter].name+'» · '+SPLASH_MOVES[fighter].damage+' HP. Потрібно 100 заряду.'},
         {buttons:'↑ + X + Y / ↑ + L1 + R1',description:'Утримуй ↑ й затисни X та Y двома пальцями або одним проведи X↔Y. На геймпаді ↑+L1+R1. Здібність діє по всій арені.'},
         {buttons:'X + A / L1',description:'Захват стоячого противника. Потім потягни джойстик назад для кидка · '+throwDamage+' HP.'},
         {buttons:'Напрямок + ↓ + X + A',description:'Перекат із короткою невразливістю. На геймпаді: напрямок + L2.'},
         {buttons:'A / ↓ + A',description:'Стоячий блок / блок навприсядки. Під час блоку напрямок не змінюється.'},
+      ]},
+      {title:'Чотири секції заряду спецприйому',moves:[
+        {buttons:'0–15%',description:'Накопичення до 14%; від 15% можна виконати спецприйом із '+
+          specialDamageAt(fighter,15)+' HP (трохи сильніше за Y).'},
+        {buttons:'16–35%',description:'Наростаюча сила: від '+
+          specialDamageAt(fighter,16)+' до '+specialDamageAt(fighter,35)+' HP.'},
+        {buttons:'36–60%',description:'Посилений прийом: від '+
+          specialDamageAt(fighter,36)+' до '+specialDamageAt(fighter,60)+' HP.'},
+        {buttons:'61–100%',description:'Максимальна сила: від '+
+          specialDamageAt(fighter,61)+' до '+specialDamageAt(fighter,100)+' HP. SPLASH завдає '+
+          SPLASH_MOVES[fighter].damage+' HP, рівно ×2 від 100% спецприйому.'},
       ]},
       {title:'Шість триударних комбінацій',moves:
         COMBO_ROUTES.map((route,index)=>({
