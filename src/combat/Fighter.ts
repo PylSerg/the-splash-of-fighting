@@ -14,7 +14,7 @@ import {
   canDuelCatchTarget, type DuelStrike,
 } from './DuelRules';
 import {
-  COMBO_LINK_WINDOW, COMBO_FINISH_RECOVERY, comboAllows,
+  COMBO_FINISH_RECOVERY, comboAllows,
   comboFinisherUnblockable, comboIsCleanHit, type ComboMove,
 } from './ComboRules';
 
@@ -563,7 +563,7 @@ export class Fighter {
     // orientation: a roll behind the fighter exposes their back.
     // Include the current held input so defense cannot auto-turn in
     // the same frame that the player first presses A.
-    if (!preserveFacing &&
+    if (!preserveFacing && this.blockstun<=0 &&
         canAutoTurn(this.face,input,this.airborne,this.stunned,this.knockedDown))
       this.face = opponentX >= this.x ? 1 : -1;
     this.hitFlash = Math.max(0, this.hitFlash-dt);
@@ -943,6 +943,7 @@ export class Fighter {
     this.walking=false;
     this.rollElapsed=-1;
     this.stunned=0;
+    this.blockstun=0;this.wakeupGrace=0;
     this.impactVelocity=attackerFace*170;
     this.vy=-160;
     this.yOffset=-1;
@@ -966,7 +967,7 @@ export class Fighter {
     // Send the victim BEHIND the thrower, with much greater travel.
     // Facing is frozen throughout the tumble and restored on recovery.
     this.face=attackerFace;
-    this.stunned=0;
+    this.stunned=0;this.blockstun=0;this.wakeupGrace=0;
     this.impactVelocity=-attackerFace*1120;
     this.vy=-540;
     this.yOffset=-1;
@@ -1090,7 +1091,7 @@ export class Fighter {
     this.comboRecovery=0;
     this.blocking=false;
     this.crouching=false;
-    this.stunned=0;
+    this.stunned=0;this.blockstun=0;this.wakeupGrace=0;
     this.impactVelocity=impulseFace*430;
     this.vy=-310;
     this.yOffset=-1;
