@@ -666,6 +666,78 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
+  /** Ranged ability preview, independent of ordinary fist/weapon hitboxes.
+   * Guided effects always reach the victim, even on a widened arena;
+   * only the preparation counter or a correctly facing ↓+A can stop damage.
+   * Later these four effects can be replaced by character-specific sprites.
+   */
+  private drawSplashAbility(session: SplashSession, progress:number):void {
+    const g=this.splashFx;
+    if(!g)return;
+    g.clear();
+    const {attacker,defender}=session;
+    const start={x:attacker.x+attacker.face*42,y:GROUND_Y-130};
+    const end={x:defender.x,y:GROUND_Y+defender.yOffset-102};
+    const p=guidedSplashPosition(start,end,progress);
+    const spin=progress*Math.PI*16;
+    switch(attacker.id) {
+      case 'evi': {
+        // A crystalline folding FAN leaves Evi's hand and curves exactly
+        // toward the opponent, rotating through a shower of pink shards.
+        g.fillStyle(0xffa8dd,.22).fillCircle(p.x,p.y,48);
+        for(let i=-4;i<=4;i++){
+          const a=spin-1.1+i*.27;
+          const radius=31+(i%2===0?9:0);
+          g.lineStyle(4,i%2===0?0xfff6ff:0xff8acb,.96);
+          g.lineBetween(p.x,p.y,
+            p.x+Math.cos(a)*radius,p.y+Math.sin(a)*radius);
+        }
+        g.fillStyle(0xfff9fc,.95).fillCircle(p.x,p.y,7);
+        g.lineStyle(2,0xf59cdd,.88).strokeCircle(p.x,p.y,43);
+        break;
+      }
+      case 'runa': {
+        // Bronze bastion shockwave: a heavy magical ring, not another punch.
+        const radius=27+24*Math.sin(Math.PI*progress)+progress*45;
+        g.fillStyle(0xffbb78,.22).fillEllipse(p.x,p.y,145,75);
+        g.lineStyle(10,0xefac76,.86).strokeCircle(p.x,p.y,radius);
+        g.lineStyle(3,0xffecc3,.96).strokeCircle(p.x,p.y,radius+14);
+        g.fillStyle(0xffe2a0,.8).fillCircle(p.x,p.y,11);
+        break;
+      }
+      case 'lyra': {
+        // Whirling columns of fire converge from every side on the target.
+        g.fillStyle(0xff663c,.14).fillCircle(p.x,p.y,66);
+        for(let i=0;i<11;i++){
+          const a=spin*.67+i*2*Math.PI/11;
+          const r=25+30*Math.sin(Math.PI*progress)+i%4*5;
+          const fx=p.x+Math.cos(a)*r,fy=p.y+Math.sin(a)*r;
+          g.lineStyle(6,i%2===0?0xffc36d:0xff6348,.88)
+            .lineBetween(p.x,p.y,fx,fy);
+          g.fillStyle(0xffe9a5,.88).fillCircle(fx,fy,4+i%3);
+        }
+        break;
+      }
+      case 'kai': {
+        // A zig-zag lightning bolt seeks the opponent across the arena.
+        let bx=start.x,by=start.y;
+        const segments=9;
+        for(let i=1;i<=segments;i++){
+          const t=i/segments;
+          const nx=start.x+(p.x-start.x)*t;
+          const ny=start.y+(p.y-start.y)*t+
+            (i===segments?0:Math.sin(i*17+spin)*21);
+          g.lineStyle(i%2===0?5:3,i%2===0?0x6ce5f7:0xf2ffff,.98)
+            .lineBetween(bx,by,nx,ny);
+          bx=nx;by=ny;
+        }
+        g.fillStyle(0xc8ffff,.75).fillCircle(p.x,p.y,15);
+        g.lineStyle(2,0x67e7ff,.9).strokeCircle(p.x,p.y,29);
+        break;
+      }
+    }
+  }
+
   /** CPU has a human-like reaction delay and does not always find ↓+A. */
   private cpuSplashDefense(session:SplashSession):InputState {
     const input=emptyInput();
