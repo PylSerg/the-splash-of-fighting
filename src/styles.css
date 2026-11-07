@@ -16,6 +16,15 @@ button:focus-visible,summary:focus-visible{outline:3px solid #7bd3f9;outline-off
 .game-shell{border:1px solid #56688d;padding:7px;border-radius:18px;background:linear-gradient(140deg,#3a497a,#131a31);box-shadow:0 20px 65px #030614b0}
 #game-frame{position:relative;aspect-ratio:16/9;width:100%;overflow:hidden;border-radius:11px;background:#10152e;isolation:isolate}
 #game-canvas{position:absolute;inset:0}
+/* The Three.js WebGL canvas is a transparent world-space overlay. It
+   ignores touches and never becomes a UI hit-target; controls stay above. */
+.three-evi-layer{
+  position:absolute;inset:0;width:100%;height:100%;
+  pointer-events:none!important;touch-action:none;
+  z-index:2;image-rendering:auto;
+}
+#game-canvas{z-index:0}
+#game-frame.front-screen>.three-evi-layer{visibility:hidden!important}
 #game-canvas canvas{display:block;image-rendering:pixelated}
 .touch-controls{display:none;position:absolute;inset:0;z-index:5;pointer-events:none;touch-action:none;user-select:none;-webkit-user-select:none}
 /* Alpha 0.2: 8-way joystick and four-button diamond; both accept independent pointers. */
@@ -858,7 +867,7 @@ body { min-height:0; }
 /* Alpha 1.21.0: interactive style comparison while iterating on the
    articulated pixel 2D fighter. The new puppet is the default. */
 .evi-render-modes{
-  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
   gap:8px;margin:11px 0;
 }
 .evi-render-modes .pill{
