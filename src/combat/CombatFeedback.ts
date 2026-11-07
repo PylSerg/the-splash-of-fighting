@@ -1,17 +1,19 @@
 /** Shared rules for slow special-meter gain and lagging health feedback. */
-export const MAX_HEALTH = 200;
+import { MAX_HEALTH, BALANCE_REFERENCE_HP, earnedMeterFromDamage } from './CombatScale.ts';
+export { MAX_HEALTH };
 import { SPECIAL_MIN_CHARGE, SPECIAL_METER_MAX } from './SpecialRules.ts';
 export { SPECIAL_MIN_CHARGE, SPECIAL_METER_MAX };
-/** Roughly 25 actual HP damage earns the minimum 15% special charge;
- * 167 damage fills 100% of the normal special bar. */
-export const METER_PER_DAMAGE = 0.6;
+/** 15% special is earned from 12.5% max-HP damage, regardless of max HP.
+ * Originally 0.6 meter per HP at 200 max HP, now scaled to match 500 HP.
+ */
+export const METER_PER_DAMAGE = .6 * BALANCE_REFERENCE_HP/MAX_HEALTH;
 
 /** Only actual HP removed from the rival counts. Blocks, misses,
  * avoided strikes and attempted overkill contribute zero.
  */
 export function earnSpecialMeter(current: number, damageDealt: number): number {
   if (!Number.isFinite(damageDealt) || damageDealt <= 0) return current;
-  return Math.min(SPECIAL_METER_MAX, current + damageDealt * METER_PER_DAMAGE);
+  return Math.min(SPECIAL_METER_MAX, current + earnedMeterFromDamage(damageDealt));
 }
 
 export interface HealthTrail {
