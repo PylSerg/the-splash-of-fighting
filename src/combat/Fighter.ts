@@ -350,10 +350,13 @@ export class Fighter {
       (this.attack.name==='light' || this.attack.name==='heavy') &&
       this.attack.comboStage===1 && !this.attack.connected && this.attack.elapsed<.16);
     if(this.splashEnergy<SPLASH_METER_MAX || this.knockedOut || this.knockedDown ||
-       this.airborne || this.crouching || this.isRolling || this.grabPose ||
+       this.crouching || this.isRolling || this.grabPose ||
        this.stunned>0 || this.grabRecovery>0 || this.comboRecovery>0 ||
        this.duelWhiffRecovery>0 || (this.attack && !earlyComponent)) return false;
     this.splashEnergy=0;
+    // Stick-up is also jump: the chord must still work when Up preceded X/Y.
+    // Anchor the cinematic to the floor instead of leaving a floating rig.
+    this.yOffset=0;this.vy=0;
     this.attack=null;
     this.queuedSolo=null;
     this.queuedSpecial=0;
