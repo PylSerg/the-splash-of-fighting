@@ -12,6 +12,10 @@ export function splashFacing(
   if(role==='defender' || opponentX===ownX)return current;
   return opponentX>ownX ? 1 : -1;
 }
+/** Allow touch fingers a short delay to form ↑+X+Y before a solo attack.
+ * Charged SPLASH only: normal light/strong attacks retain their timing.
+ */
+export const SPLASH_INPUT_GRACE = 0.24;
 export const SPLASH_WINDUP = 0.5;
 /** A damaging counterstrike or another SPLASH can stop the ability only
  * before the half-second preparation has finished.
