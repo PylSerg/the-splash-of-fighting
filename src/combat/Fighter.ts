@@ -57,9 +57,9 @@ const ROLL_COOLDOWN = .88;
 const ROLL_IFRAME_START = .095;
 const ROLL_IFRAME_END = .31;
 export const ATTACKS: Record<AttackName, AttackSpec> = {
-  light: { duration: .27, reach: 92, damage: 5, level: 'low', stun: .18, push: 110, gain: 7 },
+  light: { duration: .27, reach: 92, damage: 5, level: 'mid', stun: .18, push: 110, gain: 7 },
   heavy: { duration: .48, reach: 116, damage: 11, level: 'high', stun: .32, push: 185, gain: 12 },
-  kick: { duration: .40, reach: 135, damage: 9, level: 'mid', stun: .27, push: 150, gain: 10 },
+  kick: { duration: .40, reach: 135, damage: 9, level: 'low', stun: .27, push: 150, gain: 10 },
   // Supers keep their own damage but behave as a mid-level strike defensively.
   special: { duration: .82, reach: 205, damage: 20, level: 'mid', stun: .40, push: 290, gain: 0 },
   // Crouching B: low trip. Knockdown triggers ONLY on an unblocked hit.
