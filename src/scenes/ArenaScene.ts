@@ -21,6 +21,9 @@ import {
   resolveDuel, duelDamage, type DuelChoice, type DuelStrike,
 } from '../combat/DuelRules';
 import { getStage, type StageId } from '../stages/Stages';
+import { SPLASH_WINDUP, SPLASH_MOVES, SPLASH_DUEL_WIN_GAIN,
+  comboSplashBonus, canSplashGuard } from '../combat/SplashRules';
+import { awardRound, MATCH_MAX_ROUNDS } from '../combat/MatchRules';
 
 type GameMode = 'cpu' | 'versus';
 interface DuelPending {
@@ -43,6 +46,13 @@ interface DuelSession {
   /** Index 0=P1, 1=P2; never revealed until resolution. */
   choices: [DuelChoice,DuelChoice];
   previous: [InputState,InputState];
+}
+interface SplashSession {
+  attacker:Fighter;
+  defender:Fighter;
+  elapsed:number;
+  guarded:boolean;
+  pulses:number;
 }
 interface Grapple {
   attacker: Fighter;
@@ -89,6 +99,9 @@ export class ArenaScene extends Phaser.Scene {
   private debugDraw!: Phaser.GameObjects.Graphics;
   private centerLabel!: Phaser.GameObjects.Text;
   private timeLabel!: Phaser.GameObjects.Text;
+  private roundLabel!: Phaser.GameObjects.Text;
+  private splashLabel1!: Phaser.GameObjects.Text;
+  private splashLabel2!: Phaser.GameObjects.Text;
   private leftName!: Phaser.GameObjects.Text;
   private rightName!: Phaser.GameObjects.Text;
   private extraHalf = 0;
@@ -103,6 +116,11 @@ export class ArenaScene extends Phaser.Scene {
   private duel: DuelSession | null = null;
   private duelPending: DuelPending | null = null;
   private duelAftermath: DuelAftermath | null = null;
+  private splash: SplashSession | null = null;
+  private matchWins:[number,number]=[0,0];
+  private roundsPlayed=0;
+  private matchWinner:0|1|null=null;
+  private roundTransition=0;
   private healthTrail1: HealthTrail = makeHealthTrail(100);
   private healthTrail2: HealthTrail = makeHealthTrail(100);
 
@@ -125,6 +143,17 @@ export class ArenaScene extends Phaser.Scene {
       fontFamily:'Rajdhani, Arial, sans-serif',fontSize:'42px',color:'#ffe7a6',fontStyle:'bold',
       stroke:'#251e3a',strokeThickness:5,
     }).setOrigin(.5,0).setDepth(21);
+    this.roundLabel=this.add.text(480,81,'ROUND 1 / 3',{
+      fontFamily:'Rajdhani, Arial, sans-serif',fontSize:'18px',
+      color:'#fff0bd',fontStyle:'bold',stroke:'#19192f',strokeThickness:3,
+    }).setOrigin(.5,0).setDepth(21);
+    const splashLabelStyle={
+      fontFamily:'Rajdhani, Arial, sans-serif',fontSize:'16px',
+      color:'#a8eefa',fontStyle:'bold',stroke:'#14172b',strokeThickness:3,
+    };
+    this.splashLabel1=this.add.text(112,466,'SPLASH',splashLabelStyle).setDepth(21);
+    this.splashLabel2=this.add.text(848,466,'SPLASH',splashLabelStyle)
+      .setOrigin(1,0).setDepth(21);
     this.centerLabel = this.add.text(480,210,'READY?',{
       fontFamily:'Rajdhani, Impact, sans-serif',fontSize:'77px',color:'#fff1ca',fontStyle:'bold',
       stroke:'#792f65',strokeThickness:10,
@@ -147,6 +176,8 @@ export class ArenaScene extends Phaser.Scene {
     this.cameras.main.setScroll(-this.extraHalf,0);
     if (this.leftName) this.leftName.x = 112 - this.extraHalf;
     if (this.rightName) this.rightName.x = 848 + this.extraHalf;
+    if (this.splashLabel1) this.splashLabel1.x=112-this.extraHalf;
+    if (this.splashLabel2) this.splashLabel2.x=848+this.extraHalf;
     this.paintHud();
     this.paintDebug();
   }
@@ -237,7 +268,7 @@ export class ArenaScene extends Phaser.Scene {
     this.hasMatch=true;
     this.leftName.setText(getCharacter(first).name);
     this.rightName.setText(getCharacter(second).name);
-    this.resetRound();
+    this.restartMatch();
     this.onStatus(mode==='cpu'
       ? getCharacter(first).name+' проти '+getCharacter(second).name+' (CPU)!'
       : getCharacter(first).name+' проти '+getCharacter(second).name+' (PvP)!');
@@ -329,7 +360,7 @@ export class ArenaScene extends Phaser.Scene {
 
   setMode(mode: GameMode): void {
     this.mode=mode;
-    if (this.hasMatch) this.resetRound();
+    if (this.hasMatch) this.restartMatch();
   }
   getMode(): GameMode { return this.mode; }
 
@@ -341,11 +372,20 @@ export class ArenaScene extends Phaser.Scene {
 
   getDebug(): boolean { return this.debug; }
 
-  resetRound(): void {
+  /** Starting a fresh match clears wins and both energy bars. */
+  restartMatch():void {
+    this.matchWins=[0,0];
+    this.roundsPlayed=0;
+    this.matchWinner=null;
+    this.resetRound(false);
+  }
+
+  /** Between rounds preserve only splash energy; reset regular special energy. */
+  resetRound(preserveSplash=false): void {
     if(!this.player1||!this.player2)return;
     this.controls.clear();
-    this.player1.reset(250,1);
-    this.player2.reset(710,-1);
+    this.player1.reset(250,1,preserveSplash);
+    this.player2.reset(710,-1,preserveSplash);
     this.healthTrail1=makeHealthTrail(this.player1.hp);
     this.healthTrail2=makeHealthTrail(this.player2.hp);
     this.prev1=ZERO();this.prev2=ZERO();
@@ -354,8 +394,11 @@ export class ArenaScene extends Phaser.Scene {
     this.duel=null;
     this.duelPending=null;
     this.duelAftermath=null;
+    this.splash=null;
+    this.roundTransition=0;
     this.aiCooldown=.85;this.aiCount=0;this.frameCount=0;this.accumulator=0;
     this.centerLabel.setText('READY?').setColor('#fff0c0').setVisible(true);
+    this.roundLabel.setText('ROUND '+(this.roundsPlayed+1)+' / '+MATCH_MAX_ROUNDS);
     this.paintHud();
   }
 
@@ -371,7 +414,7 @@ export class ArenaScene extends Phaser.Scene {
       frames++;
     }
     // HUD animations advance even after a KO or while fighters are recovering.
-    const visualDt=(this.duel || this.duelAftermath)?0:
+    const visualDt=(this.duel || this.duelAftermath || this.splash)?0:
       Math.min(Math.max(0,delta/1000),.10);
     this.healthTrail1=advanceHealthTrail(this.healthTrail1,this.player1.hp,visualDt);
     this.healthTrail2=advanceHealthTrail(this.healthTrail2,this.player2.hp,visualDt);
@@ -387,6 +430,10 @@ export class ArenaScene extends Phaser.Scene {
       if(this.readyTime===0)this.centerLabel.setVisible(false);
       return;
     }
+    if(this.splash){
+      this.stepSplash(dt);
+      return;
+    }
     // During a duel, movement, AI attacks, countdown and hit detection freeze.
     // Only the private button-selection timer is allowed to advance.
     if(this.duel) {
@@ -398,9 +445,15 @@ export class ArenaScene extends Phaser.Scene {
       return;
     }
     if(this.roundOver) {
-      // Let the defeated fighter finish falling AFTER the winner is announced
-      // (time-out loss); everybody else remains frozen.
       this.advanceFallenFighters(dt);
+      if(this.matchWinner===null){
+        this.roundTransition=Math.max(0,this.roundTransition-dt);
+        if(this.roundTransition===0 && this.player1.knockdownPhase!=='flying' &&
+           this.player2.knockdownPhase!=='flying'){
+          this.resetRound(true);
+          this.onStatus('Раунд '+(this.roundsPlayed+1)+' із 3. Заряд SPLASH збережено!');
+        }
+      }
       return;
     }
     // Once someone has 0 HP, freeze the remaining fight and let the KO fall
@@ -417,6 +470,31 @@ export class ArenaScene extends Phaser.Scene {
     const just1=justPressed(input1,this.prev1);
     const just2=justPressed(input2,this.prev2);
     this.prev1=input1;this.prev2=input2;
+
+    // Cinematic splash has priority over all component X/Y/L1/R1 inputs.
+    if(!this.grapple && !this.duelPending){
+      const splash1=just1.splash && this.player1.tryStartSplash();
+      const splash2=just2.splash && this.player2.tryStartSplash();
+      if(splash1&&splash2){
+        this.player1.endSplashPose();this.player2.endSplashPose();
+        this.player1.stunned=.5;this.player2.stunned=.5;
+        this.combatNotice('SPLASH CLASH!',480,GROUND_Y-215,0x9af4f4);
+        this.onStatus('Одночасні сплеші! Взаємне блокування: 0 шкоди.');
+        return;
+      }
+      if(splash1||splash2){
+        const attacker=splash1?this.player1:this.player2;
+        const defender=splash1?this.player2:this.player1;
+        this.splash={attacker,defender,elapsed:0,guarded:false,pulses:0};
+        this.combatNotice('SPLASH!',attacker.x,GROUND_Y-222,
+          SPLASH_MOVES[attacker.id].color);
+        this.onStatus(getCharacter(attacker.id).name+': '+
+          SPLASH_MOVES[attacker.id].name+
+          '! У суперника 0,5 с на ↓+A, звичайний блок не діє!');
+        this.stepSplash(dt);
+        return;
+      }
+    }
 
     if (!this.grapple && !this.duelPending) {
       // A duel opener has priority over its component B/Y attacks, and
@@ -464,6 +542,97 @@ export class ArenaScene extends Phaser.Scene {
     if(this.roundTime<=0 && !this.duel && !this.duelPending && !this.duelAftermath) {
       this.finishRound();
     }
+  }
+
+
+  /** Phase 1 is reactable. After 0.5 s the opponent is locked until the end.
+   * Only an actual crouching A guard during the wind-up survives the cinematic.
+   * One final damage application prevents early KO animations from escaping it.
+   */
+  private stepSplash(dt:number):void {
+    const session=this.splash;
+    if(!session)return;
+    const {attacker,defender}=session;
+    const move=SPLASH_MOVES[attacker.id];
+    const oldElapsed=session.elapsed;
+    session.elapsed=Math.min(move.duration,session.elapsed+dt);
+    const justEntered=oldElapsed<SPLASH_WINDUP && session.elapsed>=SPLASH_WINDUP;
+
+    if(oldElapsed<SPLASH_WINDUP){
+      // Until the attack begins, defender input (including walking and guard)
+      // stays live. The splash attacker is committed and cannot be controlled.
+      const defensiveInput=defender===this.player1 ? this.controls.read(0) :
+        this.mode==='cpu' ? this.cpuSplashDefense(session) : this.controls.read(1);
+      const oldInput=defender===this.player1?this.prev1:this.prev2;
+      const just=justPressed(defensiveInput,oldInput);
+      if(defender===this.player1)this.prev1=defensiveInput;
+      else this.prev2=defensiveInput;
+      defender.step(dt,defensiveInput,just,attacker.x);
+      session.guarded ||= canSplashGuard({
+        down:defensiveInput.down,block:defensiveInput.block,
+        airborne:defender.airborne,knockedDown:defender.knockedDown,
+        knockedOut:defender.knockedOut,stunned:defender.stunned,
+        guarding:defender.blocking && defender.crouching,
+      });
+      attacker.stepSplashPose(dt,'startup',
+        Math.min(1,session.elapsed/SPLASH_WINDUP),defender.x);
+    }
+    if(session.elapsed>=SPLASH_WINDUP){
+      const progress=Math.min(1,(session.elapsed-SPLASH_WINDUP)/
+        (move.duration-SPLASH_WINDUP));
+      if(justEntered){
+        this.combatNotice(session.guarded?'SPLASH GUARD!':'SPLASH HIT!',
+          defender.x,GROUND_Y-218,session.guarded?0x78e5ed:move.color);
+      }
+      attacker.stepSplashPose(oldElapsed<SPLASH_WINDUP?0:dt,'attack',
+        progress,defender.x);
+      // Even a jumping, attacking or rolling defender is frozen from here.
+      defender.stepSplashPose(0,session.guarded?'guard':'victim',
+        progress,attacker.x);
+      const pulse=Math.min(move.pulses,Math.floor(progress*move.pulses));
+      while(session.pulses<pulse){
+        session.pulses++;
+        this.spawnSparks(defender.x,GROUND_Y+defender.yOffset-104,
+          session.guarded);
+        if(session.pulses===Math.ceil(move.pulses/2))
+          this.combatNotice(session.guarded?'BLOCKED!':'COMBO SPLASH!',
+            defender.x,GROUND_Y-202,session.guarded?0x87f1ec:move.color);
+      }
+    }
+    if(session.elapsed>=move.duration){
+      attacker.endSplashPose();
+      defender.endSplashPose();
+      let damage=0;
+      if(!session.guarded){
+        const hit=defender.receiveHit({
+          ...ATTACKS.special,damage:move.damage,stun:.56,push:380,
+        },attacker.face,true);
+        damage=hit.damage;
+        this.cameras.main.shake(200,.009);
+      }else{
+        defender.deflectSimultaneousStrike(ATTACKS.special,attacker.face);
+      }
+      this.combatNotice(session.guarded?'PERFECT GUARD!':'SPLASH FINISH!',
+        defender.x,GROUND_Y-238,session.guarded?0x82edee:move.color);
+      this.onStatus(session.guarded
+        ? getCharacter(defender.id).name+
+          ' вчасно натискає ↓+A! Увесь сплеш заблоковано, 0 HP.'
+        : getCharacter(attacker.id).name+' виконує '+move.name+
+          ' і завдає '+damage+' HP!'+(defender.knockedOut?' НОКАУТ!':''));
+      this.splash=null;
+      // Holding the cinematic chord must not queue a regular hit afterwards.
+      this.prev1=this.controls.read(0);
+      this.prev2=this.mode==='cpu'?emptyInput():this.controls.read(1);
+    }
+  }
+
+  /** CPU has a human-like reaction delay and does not always find ↓+A. */
+  private cpuSplashDefense(session:SplashSession):InputState {
+    const input=emptyInput();
+    if(session.elapsed>=.20 && this.aiCount%3===0){
+      input.down=true;input.block=true;
+    }
+    return input;
   }
 
   private advanceFallenFighters(dt: number): void {
@@ -785,6 +954,7 @@ export class ArenaScene extends Phaser.Scene {
       ...base,damage:duelDamage(winner.id==='runa'),stun:.5,push:430,
     },winner.face,true);
     winner.rewardDamage(hit.damage);
+    winner.gainSplash(SPLASH_DUEL_WIN_GAIN);
     this.cameras.main.shake(165,.008);
     this.spawnSparks(loser.x,GROUND_Y-103,false);
     this.combatNotice('DUEL WIN!',loser.x,GROUND_Y-240,0xffd18c);
@@ -860,7 +1030,11 @@ export class ArenaScene extends Phaser.Scene {
     if(this.aiCooldown<=0){
       this.aiCount++;
       this.aiCooldown=.52+((this.aiCount*17)%9)*.09;
-      if(distance<115 && this.aiCount%6===3) input.grab=true;
+      if(distance<220 && this.player2.splashEnergy>=100 && this.aiCount%4===0){
+        // CPU spends its slow, combo/duel-only splash gauge sparingly.
+        input.block=false;input.down=false;input[forward]=false;
+        input.up=true;input.splash=true;
+      } else if(distance<115 && this.aiCount%6===3) input.grab=true;
       else if(distance<130 && this.aiCount%8===2) {
         input.block=false;input.down=false;input[forward]=true;
         input.duel=true; // CPU may challenge an opponent as well.
@@ -998,6 +1172,7 @@ export class ArenaScene extends Phaser.Scene {
       this.combatNotice('SWEEP!',target.x,GROUND_Y-143,0xffd596);
     }
     attacker.rewardDamage(hit.damage);
+    attacker.gainSplash(comboSplashBonus(comboHits));
     if(comboHits===2) {
       this.combatNotice('2 HIT!',target.x,GROUND_Y-206,0x8ce9fa);
     } else if(comboHits===3) {
@@ -1041,20 +1216,34 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private finishRound(): void {
-    if (this.roundOver) return;
+    if(this.roundOver)return;
     this.roundOver=true;
-    const winner=this.player1.hp===this.player2.hp?'DRAW!'
-      :this.player1.hp>this.player2.hp?getCharacter(this.player1.id).name+' WINS!'
-        :getCharacter(this.player2.id).name+' WINS!';
-    if (winner !== 'DRAW!') {
-      const loser=this.player1.hp<this.player2.hp?this.player1:this.player2;
-      const victor=loser===this.player1?this.player2:this.player1;
-      // On time-out, the loser can still have HP and be standing. The
-      // victory screen must also leave this fighter lying on the ground.
-      if (!loser.knockedDown) loser.startDefeatFall(victor.face);
+    const winnerIndex:0|1|null=this.player1.hp===this.player2.hp?null:
+      this.player1.hp>this.player2.hp?0:1;
+    const result=awardRound({wins:this.matchWins,roundsPlayed:this.roundsPlayed},winnerIndex);
+    this.matchWins=result.wins;
+    this.roundsPlayed=result.roundsPlayed;
+    this.matchWinner=result.matchWinner;
+    this.roundTransition=2.8;
+
+    if(winnerIndex!==null){
+      const victor=winnerIndex===0?this.player1:this.player2;
+      const loser=winnerIndex===0?this.player2:this.player1;
+      // On timeout, a standing loser must visibly fall before the next round.
+      if(!loser.knockedDown)loser.startDefeatFall(victor.face);
     }
-    this.centerLabel.setText(winner).setColor('#ffe5a4').setVisible(true);
-    this.onStatus(winner+' Натисни «Новий раунд» у меню або R для повтору.');
+    const label=winnerIndex===null?'DRAW!':this.matchWinner!==null
+      ?getCharacter((this.matchWinner===0?this.player1:this.player2).id).name+' CHAMPION!'
+      :getCharacter((winnerIndex===0?this.player1:this.player2).id).name+' WINS!';
+    this.centerLabel.setText(label).setColor('#ffe5a4').setVisible(true);
+    this.onStatus(this.matchWinner!==null
+      ?label+' Матч завершено: '+this.matchWins.join(':')+
+        '. У меню можна почати новий матч.'
+      :winnerIndex===null
+        ?'Нічия! Раунд буде переграно. Заряд сплешу збережено.'
+        :'Раунд '+this.roundsPlayed+' завершено! Рахунок '+
+          this.matchWins.join(':')+'. Далі раунд '+result.roundNumber+
+          '. SPLASH залишається.');
   }
 
   private paintHud(): void {
@@ -1070,6 +1259,19 @@ export class ArenaScene extends Phaser.Scene {
       Number.parseInt(getCharacter(this.player2.id).color.slice(1),16),true);
     this.drawEnergy(left,82,this.player1.energy,0xa18afa);
     this.drawEnergy(right,82,this.player2.energy,0xa18afa);
+    const p1Color=Number.parseInt(getCharacter(this.player1.id).color.slice(1),16);
+    const p2Color=Number.parseInt(getCharacter(this.player2.id).color.slice(1),16);
+    this.drawSplashMeter(left,492,this.player1.splashEnergy,p1Color);
+    this.drawSplashMeter(right+100,492,this.player2.splashEnergy,p2Color);
+    this.splashLabel1.setText(this.player1.splashEnergy>=100?'SPLASH READY!':'SPLASH');
+    this.splashLabel2.setText(this.player2.splashEnergy>=100?'SPLASH READY!':'SPLASH');
+    // Two victory pips at each side; no round is awarded for a draw.
+    for(let i=0;i<2;i++){
+      const x1=left+284-i*22,x2=right+16+i*22;
+      this.hud.fillStyle(i<this.matchWins[0]?p1Color:0x171a2e,.96).fillCircle(x1,36,8);
+      this.hud.fillStyle(i<this.matchWins[1]?p2Color:0x171a2e,.96).fillCircle(x2,36,8);
+      this.hud.lineStyle(2,0xf5e8d9,.75).strokeCircle(x1,36,8).strokeCircle(x2,36,8);
+    }
     if(this.duel) {
       // Full viewport width under both HUD bars; fills from both edges
       // toward the center as the two-second decision window closes.
@@ -1104,6 +1306,16 @@ export class ArenaScene extends Phaser.Scene {
     this.hud.fillStyle(color).fillRect(x,y,w*Math.min(100,power)/100,8);
     this.hud.fillStyle(0xd6cbff).fillRect(x+w*SPECIAL_METER_COST/100-1,y,2,8);
     this.hud.lineStyle(1,0x827caa).strokeRect(x,y,w,8);
+  }
+
+  private drawSplashMeter(x:number,y:number,power:number,color:number):void {
+    const w=200,h=8;
+    this.hud.fillStyle(0x11152b,.93).fillRoundedRect(x-3,y-3,w+6,h+6,4);
+    this.hud.fillStyle(0x243547,.92).fillRect(x,y,w,h);
+    this.hud.fillStyle(color,power>=100?1:.92)
+      .fillRect(x,y,w*Math.max(0,Math.min(100,power))/100,h);
+    this.hud.lineStyle(1,power>=100?0xffffff:0x658d9c,.85)
+      .strokeRoundedRect(x-3,y-3,w+6,h+6,4);
   }
 
   private paintDebug(): void {

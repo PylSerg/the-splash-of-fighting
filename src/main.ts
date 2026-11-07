@@ -90,18 +90,18 @@ const confirmationCopy: Record<DisruptiveAction,{
   title:string; description:string; accept:string;
 }> = {
   restart: {
-    title:'Почати раунд заново?',
-    description:'Поточний бій, здоров’я, енергія та час раунду будуть скинуті. Персонажі й арена залишаться без змін.',
+    title:'Почати матч заново?',
+    description:'Усі перемоги, заряд SPLASH, звичайна енергія, здоров’я та час будуть скинуті. Персонажі й арена залишаться.',
     accept:'↻ Так, рестарт',
   },
   characters: {
     title:'Перейти до вибору бійців?',
-    description:'Якщо обереш інших персонажів, поточний раунд почнеться заново на цій самій арені. Повернення без змін збереже бій.',
+    description:'Зміна персонажів почне новий матч на цій арені. Повернення без змін збереже поточний матч.',
     accept:'🧑‍🤝‍🧑 Обрати бійців',
   },
   stage: {
     title:'Змінити арену?',
-    description:'Якщо обереш іншу арену, поточний раунд почнеться заново, але бійці залишаться ті самі. Повернення без змін збереже бій.',
+    description:'Зміна арени почне новий матч із цими бійцями. Повернення без змін збереже поточний матч.',
     accept:'🌄 Обрати арену',
   },
   exit: {
@@ -255,7 +255,7 @@ function onStageChosen(id:StageId): void {
     }
     activeStage=id;
     arena.setArena(id);
-    arena.resetRound(); // Same characters, fresh round on the new stage.
+    arena.restartMatch(); // Same characters, fresh best-of-three on the new stage.
     resumeBattle();
   } else if(pendingPair){
     startBattle(pendingPair,id);
@@ -277,7 +277,7 @@ function startBattle(pair:Pair,id:StageId): void {
 }
 function restart(): void {
   if(!activePair || screen==='home') return;
-  arena.resetRound(); // Keeps the current characters and arena.
+  arena.restartMatch(); // Keeps the current characters and arena.
   resumeBattle();
 }
 function editLayout(): void {
