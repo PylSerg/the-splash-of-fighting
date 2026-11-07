@@ -17,7 +17,7 @@ import {
 import { canBeGrabbed } from '../combat/GrabRules';
 import {
   DUEL_DURATION, DUEL_RESULT_ANIMATION, DUEL_GUARD_STUN,
-  DUEL_TIE_PUSH, DUEL_GUARD_PUSH, chooseDuelInput,
+  DUEL_TIE_PUSH, DUEL_GUARD_PUSH,
   resolveDuel, duelDamage, reviseDuelChoice, type DuelChoice, type DuelStrike,
 } from '../combat/DuelRules';
 import { getStage, type StageId } from '../stages/Stages';
