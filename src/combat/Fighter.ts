@@ -12,6 +12,7 @@ import {
 } from './EviSpriteStates.ts';
 import { type EviMotionInput } from './EviRigMotion.ts';
 import { EviPixelPuppet } from './EviPixelPuppet.ts';
+import { groundedRollVisual } from './GroundedRollVisual.ts';
 import { earnSplashEnergy, SPLASH_METER_MAX, SPLASH_INPUT_GRACE, splashFacing } from './SplashRules';
 import {
   FIGHTER_STYLES, ATTACK_ACTIVE, WAKEUP_PROTECTION,
@@ -1267,6 +1268,7 @@ export class Fighter {
     }
     if(this.isRolling)return {
       name:'roll',time,progress:this.rollElapsed/ROLL_DURATION,
+      backwards:this.rollDirection!==this.face,
     };
     if(this.attack){
       const a=this.attack;
@@ -1457,24 +1459,19 @@ export class Fighter {
       this.frontArm.rotation=-2.60;this.backArm.rotation=-2.10;
       this.body.y=-9;
     }
-    if (this.isRolling) {
-      // Temporary rolling pose: rotate the sprite sheet's sweep frame
-      // until dedicated roll animation keyframes are drawn.
-      // rotate the rig around the torso, not its feet. The adjusted pivot
-      // keeps the fighter visually on the ground during a full turn.
-      const progress = this.rollElapsed / ROLL_DURATION;
-      const angle = this.rollDirection * Math.PI * 2 * progress;
-      const squash = 1 - .36 * Math.sin(Math.PI * progress);
-      const pivot = 80 * squash;
-      const centerY = GROUND_Y - 80 + 20 * Math.sin(Math.PI * progress);
-      this.rig.setPosition(
-        this.x - pivot * Math.sin(angle),
-        centerY + pivot * Math.cos(angle)
-      );
-      this.rig.setScale(this.face,squash);
-      this.rig.setRotation(angle);
+    if(this.isRolling) {
+      // No full-body 360° rotation! That old pivot launched the character
+      // 100+ pixels upward during a supposedly ground-level dodge.
+      // The Evi puppet now tucks and unfolds its OWN joints. A legacy
+      // drawing uses only a slight squat and rock, anchored at the feet.
+      const visual=groundedRollVisual(
+        this.rollElapsed/ROLL_DURATION,this.rollDirection!==this.face);
+      const puppetVisible=this.pixelPuppet?.root.visible===true;
+      this.rig.setPosition(this.x,GROUND_Y+this.yOffset+visual.lift);
+      this.rig.setScale(this.face,puppetVisible?1:visual.fallbackScaleY);
+      this.rig.setRotation(puppetVisible?0:this.face*visual.fallbackLean);
       this.shadow.setPosition(this.x,GROUND_Y+5);
-      this.shadow.setScale(.76,1);
+      this.shadow.setScale(visual.shadowScale,1);
       this.rig.alpha=1;
       this.guardAura.setVisible(false);
       this.body.setAlpha(this.hitFlash>0?.45:1);
