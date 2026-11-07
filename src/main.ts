@@ -212,7 +212,7 @@ idleInput.addEventListener('change',()=>{
     await characterSelector.installEviIdle(frames);
     idleStatus.textContent='6 кадрів · анімація ✓';
     try {
-      const zip=selected.length===1 && /\\.zip$/i.test(selected[0].name)
+      const zip=selected.length===1 && /\.zip$/i.test(selected[0].name)
         ? selected[0]:await packEviIdleFrames(frames);
       await storeEviSheet('idle-selection',zip);
     }catch{
