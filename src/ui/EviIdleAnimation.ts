@@ -13,6 +13,25 @@ const MAX_FRAME_BYTES=5*1024*1024;
 
 const key=(i:number)=>'idle_'+String(i+1).padStart(3,'0')+'.png';
 
+/** Vite BASE_URL works in development AND on GitHub Pages' subdirectory.
+ * These six original RGBA PNGs ship with the game, so no manual ZIP import
+ * is necessary. Importing edited frames is still supported as an override.
+ */
+export function bundledEviIdleUrls(baseUrl:string):string[]{
+  const prefix=baseUrl.endsWith('/')?baseUrl:baseUrl+'/';
+  return Array.from({length:EVI_IDLE_FRAMES},(_,i)=>
+    prefix+'assets/evi/idle/'+key(i));
+}
+
+export async function loadBundledEviIdleFrames(baseUrl:string):Promise<Blob[]>{
+  const urls=bundledEviIdleUrls(baseUrl);
+  return Promise.all(urls.map(async (url,i)=>{
+    const response=await fetch(url);
+    if(!response.ok)throw new Error('Не вдалося завантажити '+key(i)+'.');
+    return pngFrame(await response.blob(),key(i));
+  }));
+}
+
 async function pngFrame(blob:Blob,name:string):Promise<Blob>{
   if(blob.size<33||blob.size>MAX_FRAME_BYTES)
     throw new Error(name+': некоректний розмір PNG.');
