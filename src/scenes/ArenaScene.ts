@@ -8,7 +8,7 @@ import {
   isSimultaneousClash, type ClashAttempt, type ClashRect,
 } from '../combat/StrikeClashRules';
 import { getCharacter } from '../characters/Roster';
-import { HIT_LEVEL_NAMES } from '../combat/HitRules';
+import { HIT_LEVEL_NAMES, isBackStrike } from '../combat/HitRules';
 import { sweepTrips } from '../combat/CrouchRules';
 import {
   advanceHealthTrail, healthFillRect, makeHealthTrail,
@@ -117,6 +117,8 @@ export class ArenaScene extends Phaser.Scene {
   private duelPending: DuelPending | null = null;
   private duelAftermath: DuelAftermath | null = null;
   private splash: SplashSession | null = null;
+  /** Procedural long-range ability preview; sprite effects can replace it later. */
+  private splashFx?: Phaser.GameObjects.Graphics;
   private matchWins:[number,number]=[0,0];
   private roundsPlayed=0;
   private matchWinner:0|1|null=null;
@@ -135,6 +137,7 @@ export class ArenaScene extends Phaser.Scene {
     this.player1 = new Fighter(this,'evi',250,1);
     this.player2 = new Fighter(this,'runa',710,-1);
     this.debugDraw = this.add.graphics().setDepth(12);
+    this.splashFx = this.add.graphics().setDepth(17);
     this.hud = this.add.graphics().setDepth(20);
     const labelStyle = {fontFamily:'Rajdhani, Arial, sans-serif',fontSize:'27px',color:'#f7f4ff',fontStyle:'bold',stroke:'#12132d',strokeThickness:4};
     this.leftName = this.add.text(112,11,'ЕВІ',labelStyle).setDepth(21);
@@ -395,6 +398,7 @@ export class ArenaScene extends Phaser.Scene {
     this.duelPending=null;
     this.duelAftermath=null;
     this.splash=null;
+    this.splashFx?.clear();
     this.roundTransition=0;
     this.aiCooldown=.85;this.aiCount=0;this.frameCount=0;this.accumulator=0;
     this.centerLabel.setText(roundIntroText(this.readyTime,this.roundsPlayed+1) ?? '')
@@ -492,7 +496,7 @@ export class ArenaScene extends Phaser.Scene {
           SPLASH_MOVES[attacker.id].color);
         this.onStatus(getCharacter(attacker.id).name+': '+
           SPLASH_MOVES[attacker.id].name+
-          '! У суперника 0,5 с на ↓+A, звичайний блок не діє!');
+          '! Здібність влучає на будь-якій відстані. 0,5 с на ↓+A або удар, що перерве підготовку!');
         this.stepSplash(dt);
         return;
       }
@@ -1164,8 +1168,11 @@ export class ArenaScene extends Phaser.Scene {
     // Only a third strike PREPARED by two successful unblocked hits
     // ignores guard. It must still genuinely overlap the target's hurtbox.
     const unblockable=attacker.isUnblockableFinisher(strike);
+    const rear=isBackStrike(attacker.x,target.x,target.face);
     const failedHighGuard=target.guardStance==='standing' && strike.spec.level==='low';
-    const hit=target.receiveHit(strike.spec,attacker.face,unblockable);
+    const hit=target.receiveHit(strike.spec,attacker.face,unblockable,{
+      rear,guardBreaker:strike.name==='special',
+    });
     const comboHits=attacker.recordComboImpact(strike,true,hit.blocked,hit.damage);
     const sweepLanded=sweepTrips(strike.name,hit.blocked,target.airborne,target.knockedOut);
     if(sweepLanded) {
@@ -1184,6 +1191,11 @@ export class ArenaScene extends Phaser.Scene {
     if(unblockable && hit.damage>0) {
       this.combatNotice('UNBLOCKABLE!',target.x,GROUND_Y-252,0xff9fab);
     }
+    if(hit.guardBroken) {
+      this.combatNotice('GUARD BREAK!',target.x,GROUND_Y-240,0xffce7d);
+    } else if(rear && hit.damage>0) {
+      this.combatNotice('BACK HIT ×1.5!',target.x,GROUND_Y-240,0xffca75);
+    }
     this.spawnSparks(target.x,GROUND_Y+target.yOffset-(strike.spec.level==='low'?37:85),hit.blocked);
     if(hit.interrupted) {
       this.combatNotice('INTERRUPT!',target.x,GROUND_Y+target.yOffset-173,0xffd898);
@@ -1193,15 +1205,21 @@ export class ArenaScene extends Phaser.Scene {
     }
     if(!hit.blocked)this.cameras.main.shake(sweepLanded?105:75,sweepLanded?.004:.003);
     const level=HIT_LEVEL_NAMES[strike.spec.level];
-    this.onStatus(comboHits===3
-      ? getCharacter(attacker.id).name+' завершує 3-ударне комбо! Третій удар неможливо заблокувати. -'+hit.damage+' HP.'
-      :hit.blocked
-        ? getCharacter(target.id).name+' блокує '+level+' атаку! Шкоди немає.'
-      :sweepLanded
-        ? getCharacter(attacker.id).name+' виконує підсічку! -'+hit.damage+
-          ' HP, '+getCharacter(target.id).name+' падає на землю.'
-        :getCharacter(attacker.id).name+' влучає ('+level+' атака)! -'+hit.damage+
-          ' HP '+getCharacter(target.id).name+'.');
+    this.onStatus(hit.guardBroken
+      ? getCharacter(attacker.id).name+' розбиває блок спецприйомом! -'+hit.damage+
+        ' HP (половина від звичайної шкоди), захист зірвано.'
+      :rear && hit.damage>0
+        ? getCharacter(attacker.id).name+' атакує в спину! -'+hit.damage+
+          ' HP (бонус ×1,5), блок не діє.'
+        :comboHits===3
+          ? getCharacter(attacker.id).name+' завершує 3-ударне комбо! Третій удар неможливо заблокувати. -'+hit.damage+' HP.'
+          :hit.blocked
+            ? getCharacter(target.id).name+' блокує '+level+' атаку! Шкоди немає.'
+          :sweepLanded
+            ? getCharacter(attacker.id).name+' виконує підсічку! -'+hit.damage+
+              ' HP, '+getCharacter(target.id).name+' падає на землю.'
+            :getCharacter(attacker.id).name+' влучає ('+level+' атака)! -'+hit.damage+
+              ' HP '+getCharacter(target.id).name+'.');
   }
 
   private spawnSparks(x:number,y:number,blocked:boolean): void {
