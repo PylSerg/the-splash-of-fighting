@@ -107,6 +107,7 @@ export class ArenaScene extends Phaser.Scene {
   private mode: GameMode = 'cpu';
   private training=false;
   private trainingBehavior:TrainingBehavior='passive';
+  private eviVisualMode:'puppet'|'sheet'|'legacy'='puppet';
   private debug = false;
   private hud!: Phaser.GameObjects.Graphics;
   private debugDraw!: Phaser.GameObjects.Graphics;
@@ -344,6 +345,16 @@ export class ArenaScene extends Phaser.Scene {
     this.player1?.refreshSpriteArt();this.player2?.refreshSpriteArt();
   }
 
+  /** Switch artwork only. This never resets the current match or hitboxes. */
+  setEviVisualMode(mode:'puppet'|'sheet'|'legacy'):void {
+    this.eviVisualMode=mode;
+    this.player1?.setEviVisualMode(mode);
+    this.player2?.setEviVisualMode(mode);
+  }
+  getEviVisualMode(): 'puppet'|'sheet'|'legacy'{
+    return this.eviVisualMode;
+  }
+
   setMatchup(first: FighterId, second: FighterId, mode: GameMode, training=false): void {
     if(training && mode!=='cpu')throw new Error('Training requires a CPU dummy.');
     if (first === second) throw new Error('A mirror match is not allowed.');
@@ -351,6 +362,8 @@ export class ArenaScene extends Phaser.Scene {
     this.player2?.destroy();
     this.player1=new Fighter(this,first,250,1);
     this.player2=new Fighter(this,second,710,-1);
+    this.player1.setEviVisualMode(this.eviVisualMode);
+    this.player2.setEviVisualMode(this.eviVisualMode);
     this.mode=mode;
     this.training=training;
     this.trainingBehavior='passive';
