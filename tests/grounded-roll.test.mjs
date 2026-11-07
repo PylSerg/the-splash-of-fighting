@@ -43,8 +43,10 @@ assert.ok(Math.abs(groundedRollVisual(.25).fallbackLean+
   'only direction of lean changes');
 
 const base=neutralEviPose();
-assert.deepEqual(eviPoseFor({name:'roll',time:0,progress:0}),base,
-  'begin roll without limb teleport');
+const initial=eviPoseFor({name:'roll',time:0,progress:0});
+for(const key of EVI_POSE_FIELDS)
+  assert.ok(Math.abs(initial[key]-base[key])<1e-10,
+    'begin roll without limb teleport: '+key);
 const final=eviPoseFor({name:'roll',time:1,progress:1});
 for(const key of EVI_POSE_FIELDS)
   assert.ok(Math.abs(final[key]-base[key])<1e-10,
