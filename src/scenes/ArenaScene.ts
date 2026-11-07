@@ -17,9 +17,10 @@ import { HIT_LEVEL_NAMES, isBackStrike } from '../combat/HitRules';
 import { sweepTrips } from '../combat/CrouchRules';
 import {
   advanceHealthTrail, healthFillRect, makeHealthTrail,
-  type HealthTrail, SPECIAL_METER_COST, MAX_HEALTH,
+  type HealthTrail, MAX_HEALTH,
 } from '../combat/CombatFeedback';
 import { canBeGrabbed } from '../combat/GrabRules';
+import { SPECIAL_MIN_CHARGE, SPECIAL_CHARGE_MARKS } from '../combat/SpecialRules.ts';
 import {
   DUEL_DURATION, DUEL_RESULT_ANIMATION, DUEL_GUARD_STUN,
   DUEL_TIE_PUSH, DUEL_GUARD_PUSH,
@@ -1067,6 +1068,16 @@ export class ArenaScene extends Phaser.Scene {
     this.duel=null;
     this.centerLabel.setVisible(false);
     const aIndex=duel.attacker===this.player1?0:1;
+    const passive=passiveTrainingDefender(
+      this.training,this.trainingBehavior,duel.defender===this.player2);
+    // A passive dummy cannot secretly counter or block, even if the
+    // player did not press a second key after starting the challenge.
+    // This automatic training-only attacker choice helps practise the full
+    // duel animation against an entirely non-responsive opponent.
+    if(passive){
+      duel.choices[1-aIndex]=null;
+      if(!duel.choices[aIndex])duel.choices[aIndex]='heavy';
+    }
     const attackerChoice=duel.choices[aIndex];
     const defenderChoice=duel.choices[1-aIndex];
     this.duelAftermath={
@@ -1258,7 +1269,7 @@ export class ArenaScene extends Phaser.Scene {
         input.down=true; // duck beneath a high attack.
       } else {
         input.block=true;
-        input.down=incoming==='low'; // standing A loses against low X.
+        input.down=incoming==='low'; // standing A loses against low B.
       }
     }
     // The CPU cannot advance while guarding/crouching. Backward motion
@@ -1281,7 +1292,10 @@ export class ArenaScene extends Phaser.Scene {
         input.block=false;input.down=false;input[forward]=true;
         input.duel=true; // CPU may challenge an opponent as well.
       }
-      else if(distance<210 && this.player2.energy>=40 && this.aiCount%5===0) {
+      else if(distance<210 &&
+        this.player2.energy>=[
+          SPECIAL_MIN_CHARGE,35,60,100,
+        ][this.aiCount%4] && this.aiCount%5===0) {
         input.block=false;input.down=false;input[forward]=true;
         input.special=true;
       }
@@ -1555,11 +1569,32 @@ export class ArenaScene extends Phaser.Scene {
     this.hud.lineStyle(2,0xc7abc1,.7).strokeRoundedRect(x-4,y-4,w+8,h+8,6);
   }
   private drawEnergy(x:number,y:number,power:number,color:number): void {
-    const w=300;
-    this.hud.fillStyle(0x14162a).fillRect(x,y,w,8);
-    this.hud.fillStyle(color).fillRect(x,y,w*Math.min(100,power)/100,8);
-    this.hud.fillStyle(0xd6cbff).fillRect(x+w*SPECIAL_METER_COST/100-1,y,2,8);
-    this.hud.lineStyle(1,0x827caa).strokeRect(x,y,w,8);
+    const w=300,h=10,charge=Math.max(0,Math.min(100,power));
+    const fills=[0x60699f,0x7b79b6,0x9c8ecc,color];
+    this.hud.fillStyle(0x14162a,.97).fillRect(x,y,w,h);
+    // Four physical bands 0–15%, 16–35%, 36–60% and 61–100%.
+    // Every section fills smoothly as energy is gained.
+    for(let i=0;i<4;i++){
+      const start=SPECIAL_CHARGE_MARKS[i];
+      const end=SPECIAL_CHARGE_MARKS[i+1];
+      const bx=x+w*start/100,bw=w*(end-start)/100;
+      this.hud.fillStyle(fills[i],.14).fillRect(bx,y,bw,h);
+      const drawn=Math.max(0,Math.min(end-start,charge-start));
+      if(drawn>0){
+        this.hud.fillStyle(fills[i],1)
+          .fillRect(bx,y,w*drawn/100,h);
+        this.hud.fillStyle(0xffffff,.20)
+          .fillRect(bx,y,w*drawn/100,2);
+      }
+    }
+    // Visible separators at 15%, 35% and 60% stay above the fill.
+    for(const mark of SPECIAL_CHARGE_MARKS.slice(1,-1)){
+      const tickX=x+w*mark/100;
+      this.hud.lineStyle(2,0xe1d9ff,.92).lineBetween(tickX,y-2,tickX,y+h+2);
+    }
+    // An uncharged move is unavailable before the first 15% threshold.
+    this.hud.lineStyle(1,charge>=SPECIAL_MIN_CHARGE?0xe0cffb:0x827caa)
+      .strokeRect(x,y,w,h);
   }
 
   private drawSplashMeter(x:number,y:number,power:number,color:number):void {
