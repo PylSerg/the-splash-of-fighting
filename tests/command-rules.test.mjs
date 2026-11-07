@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { deriveCommandChords, visualChords, resolveXYTouch } from '../src/input/CommandRules.ts';
+import { splashChord } from '../src/combat/SplashRules.ts';
 const b={block:false,kick:false,heavy:false,r1Solo:false,
   r1AndR2:false,duelSwipe:false,specialSwipe:false};
 const d=change=>deriveCommandChords({...b,...change});
@@ -55,4 +56,12 @@ assert.deepEqual(resolveXYTouch(new Map([[202,'heavy']]),true),
   {light:true,heavy:true},'Y→X swipe holds both virtual buttons');
 assert.deepEqual(resolveXYTouch(new Map([[101,'block'],[202,'kick']]),false),
   {light:false,heavy:false},'A+B never impersonates X+Y');
+const swipeXY=resolveXYTouch(new Map([[101,'light']]),true);
+assert.equal(splashChord({up:true,...swipeXY,l1:false,r1:false}),true,
+  'joystick ↑ + X→Y one-finger swipe really activates SPLASH');
+assert.equal(splashChord({up:false,...swipeXY,l1:false,r1:false}),false,
+  'X/Y swipe alone never launches a SPLASH without ↑');
+const holdXY=resolveXYTouch(new Map([[101,'light'],[202,'heavy']]),false);
+assert.equal(splashChord({up:true,...holdXY,l1:false,r1:false}),true,
+  'two simultaneous X/Y fingers plus ↑ really activate SPLASH');
 console.log('✓ Independent X+Y multi-touch, two swipe directions, A+B and duel precedence: passed.');
