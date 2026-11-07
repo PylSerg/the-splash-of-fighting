@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {eviPoseFor,blendEviPose,neutralEviPose,type EviPose,type EviMotionInput} from '../combat/EviRigMotion.ts';
-import {eviSlashGlow} from '../combat/EviFanSlash.ts';
+import {eviSlashGlow,isEviFanSlash} from '../combat/EviFanSlash.ts';
 import {threeGroundedRoll,screenToThree,threeViewDimensions,THREE_ROLL_PIVOT} from './ThreeFighterRules.ts';
 import {threeEviStance} from './ThreeEviStance.ts';
 import {
@@ -224,15 +224,18 @@ class EviThreeCharacter{
         ellipsoid(knee,goldLight,.098,py,.028,.008,.019,.012,trim);
       }
     }
-    // Both shoulder/elbow chains are genuinely parented 3D joints.
+    // Anatomical RIGHT is -X for a character whose face points +Z.
+    // Previously side>0 was called "right", which was actually the
+    // character's LEFT arm in the camera-facing coordinate system.
     for(const side of [-1,1]){
-      const shoulder=side<0?this.leftShoulder:this.rightShoulder;
-      const elbow=side<0?this.leftElbow:this.rightElbow;
-      shoulder.position.set(side*.252,.55,side>0?.075:-.075);
+      const anatomicalRight=side<0;
+      const shoulder=anatomicalRight?this.rightShoulder:this.leftShoulder;
+      const elbow=anatomicalRight?this.rightElbow:this.leftElbow;
+      shoulder.position.set(side*.252,.55,anatomicalRight?.075:-.075);
       this.chest.add(shoulder);
       // Shoulder sockets overlap the upper chest, so the moving upper
       // arms have an anatomical join rather than a detached ball joint.
-      ellipsoid(this.chest,skin,side*.226,.53,side>0?.060:-.055,
+      ellipsoid(this.chest,skin,side*.226,.53,anatomicalRight?.060:-.055,
         .114,.111,.104);
       ellipsoid(shoulder,skin,0,-.045,0,.115,.113,.106);
       taper(shoulder,skin,0,-.205,0,.09,.066,.34);
@@ -244,7 +247,7 @@ class EviThreeCharacter{
       // Pale glove and lacy bell cuff, independent of arm rotation.
       taper(elbow,white,0,-.27,.009,.064,.065,.17,12,satin);
       ring(elbow,goldLight,0,-.22,.015,.071,.009);
-      const wrist=side<0?this.leftWrist:this.rightWrist;
+      const wrist=anatomicalRight?this.rightWrist:this.leftWrist;
       wrist.position.set(0,-.38,.015);
       elbow.add(wrist);
       // The fingers and fan share a genuine wrist joint. The right
@@ -443,8 +446,13 @@ class EviThreeCharacter{
 
     // Real two-bone IK replaces independent cardboard shoulder/elbow
     // rotations. The target wrist stays attached to the correct arm.
-    this.handTargets=blendEviHands(this.handTargets,
-      eviHandTargets(input,p),dt);
+    const nextHands=eviHandTargets(input,p);
+    // Do NOT low-pass the 3D attack wrist on the active frames.
+    // The old 24 Hz smoothing delayed the almost-straight arm until AFTER
+    // the Phaser hit had already happened, visually hiding the entire cut.
+    // A windup has its own easing; normal guards retain joint smoothing.
+    this.handTargets=isEviFanSlash(input.name)&&dt>0
+      ?nextHands:blendEviHands(this.handTargets,nextHands,dt);
     this.plantArm(this.leftShoulder,this.leftElbow,this.leftWrist,
       this.handTargets.left,false);
     this.plantArm(this.rightShoulder,this.rightElbow,this.rightWrist,
