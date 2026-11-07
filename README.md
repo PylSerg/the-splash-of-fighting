@@ -21,6 +21,14 @@ npm run build
 npm run preview
 ```
 
+## Alpha 1.22.9 · Six-frame Evi idle animation in Character Select
+
+- The **character selection carousel** can now display six individually authored, transparent **512 × 768 PNG** frames of Evi (not a rigid atlas). Her idle animation loops every **185 ms** without changing gameplay, HUD portraits or other fighters.
+- In **Choose Fighters**, tap **🪭 Idle Еві** and import either the supplied `evi_idle_frames_512x768_RGBA.zip` or all six `idle_001.png` to `idle_006.png` simultaneously. Each frame is checked for PNG RGBA encoding and identical dimensions; invalid or missing frames produce an actionable error.
+- The six frames are stored locally in **IndexedDB** and restored on subsequent visits. Resetting art in **Settings → Graphics** also clears these selection sprites.
+- Both player's Evi slide renders the same loop; timers stop when the screen closes and honor `prefers-reduced-motion`. If no frames are installed, the original SVG fighter remains as a fallback.
+- **No binary assets are bundled yet:** the generated image files are available as downloadable chat attachments and must be imported once in the browser. Neither battle sprite rendering nor hitboxes, timing, CPU, duels or other characters are modified.
+
 ## Alpha 1.22.8 · Back to 2D sprite artwork
 
 - Removed the experimental Three.js renderer, the entire 3D fighter rig and animation system, the separate WebGL canvas and all 3D-only test suites and documentation.
