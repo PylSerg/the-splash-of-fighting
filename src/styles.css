@@ -854,3 +854,36 @@ body { min-height:0; }
   .sprite-import-button{min-height:32px;padding:5px 9px}
   .sprite-import-panel p{margin:4px 0}
 }
+
+/* Alpha 1.21.0: interactive style comparison while iterating on the
+   articulated pixel 2D fighter. The new puppet is the default. */
+.evi-render-modes{
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;margin:11px 0;
+}
+.evi-render-modes .pill{
+  min-width:0;min-height:40px;padding:7px 9px;
+  border:1px solid #c7b3e078;border-radius:10px;
+  background:#201f3d9c;color:#e4def4;
+  font:800 clamp(12px,2.1vmin,16px)/1.2 Rajdhani,system-ui,sans-serif;
+}
+.evi-render-modes .pill.selected{
+  color:#132633;background:linear-gradient(115deg,#b7f4e9,#ecc7ff);
+  border-color:#f6fbff;box-shadow:0 0 13px #c9a7ff5f;
+}
+.evi-import-details{
+  border-top:1px solid #c3bcdb45;padding:8px 0 0;margin-top:4px;
+}
+.evi-import-details summary{
+  cursor:pointer;color:#c6f0ef;touch-action:manipulation;
+  font:800 clamp(13px,2.25vmin,16px) Rajdhani,system-ui,sans-serif;
+}
+.evi-import-details:focus-within{outline-offset:2px}
+@media(orientation:landscape) and (max-height:390px){
+  .evi-render-modes{gap:5px;margin:6px 0}
+  .evi-render-modes .pill{min-height:30px;padding:4px 6px}
+}
+@media(max-width:460px){
+  .evi-render-modes{grid-template-columns:1fr}
+  .evi-render-modes .pill{min-height:34px}
+}
