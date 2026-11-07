@@ -476,7 +476,7 @@ export class ArenaScene extends Phaser.Scene {
     this.roundTransition=0;
     this.aiCooldown=.85;this.aiCount=0;this.frameCount=0;this.accumulator=0;
     this.centerLabel.setText(roundIntroText(this.readyTime,this.roundsPlayed+1) ?? '')
-      .setColor('#fff0c0').setVisible(!this.training);
+      .setColor('#fff0c0').setVisible(!this.training && this.preMatchTime===0);
     this.roundLabel.setText(this.training?'TRAINING ∞':
       'ROUND '+(this.roundsPlayed+1)+' / '+MATCH_MAX_ROUNDS);
     this.paintHud();
@@ -511,6 +511,7 @@ export class ArenaScene extends Phaser.Scene {
       this.player2.advanceCinematic(dt);
       if(this.preMatchTime===0){
         this.player1.endCinematic();this.player2.endCinematic();
+        this.centerLabel.setVisible(true); // Only now announce ROUND / FIGHT.
       }
       return; // No movement, hitboxes, AI or timer during introductions.
     }
