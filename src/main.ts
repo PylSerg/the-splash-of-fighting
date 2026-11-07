@@ -7,6 +7,9 @@ import { TouchLayoutEditor } from './ui/TouchLayoutEditor';
 import { CharacterSelector, type MatchMode } from './ui/CharacterSelector';
 import { StageSelector } from './ui/StageSelector';
 import { getMoveGuide } from './ui/MoveGuide';
+import {
+  type EviSheetKind, readEviSheet,storeEviSheet,clearEviSheets,loadImageFromBlob,
+} from './ui/SpriteImport';
 import { CHARACTERS, getCharacter, portraitSvg } from './characters/Roster';
 import gamePackage from '../package.json';
 import { getStage, type StageId } from './stages/Stages';
@@ -65,6 +68,59 @@ const avatar1=get<HTMLElement>('#hud-avatar-p1');
 const avatar2=get<HTMLElement>('#hud-avatar-p2');
 const layoutEditButton=get<HTMLButtonElement>('#btn-layout-edit');
 const touchLayout=new TouchLayoutEditor();
+
+const spriteStatus=get<HTMLElement>('#evi-sprite-status');
+const importedSheets=new Set<EviSheetKind>();
+function describeSpriteState():void {
+  if(!importedSheets.size){
+    spriteStatus.textContent='Тимчасові моделі активні. Завантаж спрайти для Еві.';
+    return;
+  }
+  spriteStatus.textContent='На цьому пристрої встановлено: '+
+    (importedSheets.has('combat')?'🥊 бойові пози':'🥊 бойові пози відсутні')+
+    ', '+(importedSheets.has('cinematic')?'🎬 вступ/перемога':'🎬 вступ/перемога відсутні')+
+    '. Продовж бій або почни матч, щоб переглянути.';
+}
+async function waitForArenaBoot():Promise<void>{
+  if(arena.textures)return;
+  await new Promise<void>(resolve=>game.events.once(Phaser.Core.Events.READY,()=>resolve()));
+}
+async function applyEviSheet(kind:EviSheetKind,blob:Blob,remember:boolean):Promise<void>{
+  const image=await loadImageFromBlob(blob);
+  await waitForArenaBoot();
+  arena.installEviSheet(kind,image);
+  importedSheets.add(kind);
+  describeSpriteState();
+  if(remember){
+    try{await storeEviSheet(kind,blob);}
+    catch{spriteStatus.textContent+=' Не вдалося зберегти на пристрої, але у цій сесії спрайти працюють.';}
+  }
+}
+for(const kind of ['combat','cinematic'] as const){
+  const id=kind==='combat'?'#input-evi-combat':'#input-evi-cinematic';
+  get<HTMLInputElement>(id).addEventListener('change',event=>{
+    const input=event.currentTarget as HTMLInputElement;
+    const file=input.files?.[0];
+    if(!file)return;
+    void applyEviSheet(kind,file,true)
+      .catch(error=>{spriteStatus.textContent=error instanceof Error?error.message:'Помилка імпорту.';})
+      .finally(()=>{input.value='';});
+  });
+}
+get<HTMLButtonElement>('#btn-evi-reset-art').addEventListener('click',()=>{
+  arena.removeEviSheets();importedSheets.clear();describeSpriteState();
+  void clearEviSheets().catch(()=>{
+    spriteStatus.textContent+=' Збережені файли не вдалося очистити.';
+  });
+});
+void (async()=>{
+  for(const kind of ['combat','cinematic'] as const){
+    try{
+      const saved=await readEviSheet(kind);
+      if(saved)await applyEviSheet(kind,saved,false);
+    }catch{/* Storage is optional; the player can always import again. */}
+  }
+})();
 
 let screen: Screen='home';
 let menuOrigin: 'home' | 'battle'='battle';
