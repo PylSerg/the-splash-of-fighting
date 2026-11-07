@@ -3,6 +3,10 @@ import {eviPoseFor,blendEviPose,neutralEviPose,type EviPose,type EviMotionInput}
 import {eviSlashGlow} from '../combat/EviFanSlash.ts';
 import {threeGroundedRoll,screenToThree,threeViewDimensions,THREE_ROLL_PIVOT} from './ThreeFighterRules.ts';
 import {threeEviStance} from './ThreeEviStance.ts';
+import {
+  eviGroundedFootTargets,shouldPlantEviFeet,solveTwoBoneLeg,
+  type Vec3,
+} from './EviAnatomy.ts';
 import type {FighterId} from '../combat/Fighter.ts';
 
 export interface ThreeFighterFrame {
@@ -119,6 +123,9 @@ class EviThreeCharacter{
     const dress=material(cream,.07,.5);
     const satin=material(white,.1,.47);
     const trim=material(gold,.56,.33);
+    // A continuous anatomical waist overlaps the upper pelvis and lower
+    // corset. No gap opens when the hips turn separately from the chest.
+    ellipsoid(this.pelvis,cream,0,1.13,0,.183,.195,.137,dress);
     this.chest.position.set(0,1.12,0);
     this.pelvis.add(this.chest);
     ellipsoid(this.chest,cream,0,.28,0,.245,.32,.162,dress);
@@ -197,7 +204,9 @@ class EviThreeCharacter{
       // The boots are individual toe/heel joints. Both feet can turn
       // along the fighting line instead of being glued to the camera plane.
       const foot=side<0?this.leftFoot:this.rightFoot;
-      foot.position.set(side*.01,-.57,.05);
+      // The ankle pivot sits exactly at the end of the .57 lower leg.
+      // This is essential for a mathematically planted two-bone IK solve.
+      foot.position.set(0,-.57,0);
       knee.add(foot);
       ellipsoid(foot,white,side*.01,0,.045,.133,.07,.219,satin);
       ellipsoid(foot,cream,0,-.02,-.10,.105,.055,.17,satin);
@@ -211,9 +220,13 @@ class EviThreeCharacter{
     for(const side of [-1,1]){
       const shoulder=side<0?this.leftShoulder:this.rightShoulder;
       const elbow=side<0?this.leftElbow:this.rightElbow;
-      shoulder.position.set(side*.275,.55,.008);
+      shoulder.position.set(side*.252,.55,side>0?.075:-.075);
       this.chest.add(shoulder);
-      ellipsoid(shoulder,skin,0,-.045,0,.105,.113,.095);
+      // Shoulder sockets overlap the upper chest, so the moving upper
+      // arms have an anatomical join rather than a detached ball joint.
+      ellipsoid(this.chest,skin,side*.226,.53,side>0?.060:-.055,
+        .114,.111,.104);
+      ellipsoid(shoulder,skin,0,-.045,0,.115,.113,.106);
       taper(shoulder,skin,0,-.205,0,.09,.066,.34);
       ring(shoulder,gold,0,-.06,.0,.095,.008);
       elbow.position.set(0,-.37,0);
@@ -315,6 +328,33 @@ class EviThreeCharacter{
     ellipsoid(this.head,blonde,0,.265,-.04,.15,.060,.136);
   }
 
+  /** Solves hip -> knee -> ankle in actual 3D and keeps boot soles upright.
+   * Quaternions rotate the original tapered meshes, never the hitboxes.
+   */
+  private plantLeg(
+    hip:THREE.Group,knee:THREE.Group,foot:THREE.Group,
+    ankle:Vec3,footYaw:number,
+  ):void {
+    const solved=solveTwoBoneLeg({
+      x:hip.position.x,y:hip.position.y,z:hip.position.z,
+    },ankle);
+    const down=new THREE.Vector3(0,-1,0);
+    const upper=new THREE.Vector3(
+      solved.upper.x,solved.upper.y,solved.upper.z);
+    const lower=new THREE.Vector3(
+      solved.lower.x,solved.lower.y,solved.lower.z);
+    hip.quaternion.setFromUnitVectors(down,upper);
+    const hipInverse=hip.quaternion.clone().invert();
+    const kneeLocalDirection=lower.applyQuaternion(hipInverse);
+    knee.quaternion.setFromUnitVectors(down,kneeLocalDirection);
+    // The ankles inherit both bent bones. Undo those rotations before
+    // applying the desired local toe orientation, so boots stay level.
+    const jointRotation=hip.quaternion.clone().multiply(knee.quaternion);
+    const bootRotation=new THREE.Quaternion().setFromAxisAngle(
+      new THREE.Vector3(0,1,0),footYaw);
+    foot.quaternion.copy(jointRotation.invert().multiply(bootRotation));
+  }
+
   update(frame:ThreeFighterFrame,dt:number):void{
     const input=frame.motion;
     const newPose=eviPoseFor(input);
@@ -351,16 +391,24 @@ class EviThreeCharacter{
     // carries the weight. Mirror the entire formation when face flips.
     this.leftHip.position.z=stance.rearHipDepth;
     this.rightHip.position.z=stance.leadHipDepth;
-    this.leftHip.rotation.z=-p.legL*.8-.09;
-    this.rightHip.rotation.z=-p.legR*.8+.12;
-    this.leftHip.rotation.x=stance.rearLegPitch;
-    this.rightHip.rotation.x=stance.leadLegPitch;
-    this.leftKnee.rotation.z=-p.kneeL*.66;
-    this.rightKnee.rotation.z=-p.kneeR*.66;
-    this.leftKnee.rotation.x=stance.rearKneePitch;
-    this.rightKnee.rotation.x=stance.leadKneePitch;
-    this.leftFoot.rotation.y=stance.rearFootYaw;
-    this.rightFoot.rotation.y=stance.leadFootYaw;
+    if(shouldPlantEviFeet(input.name)){
+      // Analytic 3D hip/knee/ankle positions. Crouching lowers the pelvis
+      // but not the feet; the knees bend automatically to absorb it.
+      const feet=eviGroundedFootTargets(p,input,stance);
+      this.plantLeg(this.leftHip,this.leftKnee,this.leftFoot,
+        feet.rear,stance.rearFootYaw);
+      this.plantLeg(this.rightHip,this.rightKnee,this.rightFoot,
+        feet.lead,stance.leadFootYaw);
+    }else{
+      // Airborne, tumbling and knockdown moves retain their existing
+      // free leg animation. No artificial floor glue in midair.
+      this.leftHip.rotation.set(stance.rearLegPitch,0,-p.legL*.8-.09);
+      this.rightHip.rotation.set(stance.leadLegPitch,0,-p.legR*.8+.12);
+      this.leftKnee.rotation.set(stance.rearKneePitch,0,-p.kneeL*.66);
+      this.rightKnee.rotation.set(stance.leadKneePitch,0,-p.kneeR*.66);
+      this.leftFoot.rotation.set(0,stance.rearFootYaw,0);
+      this.rightFoot.rotation.set(0,stance.leadFootYaw,0);
+    }
 
     // Point the opened blade toward the fighter across the arena,
     // cancelling torso and camera-facing yaw at the fan joint.

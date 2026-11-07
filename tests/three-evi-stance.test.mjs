@@ -75,8 +75,10 @@ for(const fragment of [
   'this.leftShoulder.rotation.x=stance.rearArmPitch',
   'this.rightHip.position.z=stance.leadHipDepth',
   'this.leftHip.position.z=stance.rearHipDepth',
-  'this.rightFoot.rotation.y=stance.leadFootYaw',
-  'this.leftFoot.rotation.y=stance.rearFootYaw',
+  'this.plantLeg(this.leftHip,this.leftKnee,this.leftFoot,',
+  'this.plantLeg(this.rightHip,this.rightKnee,this.rightFoot,',
+  'this.leftFoot.rotation.set(0,stance.rearFootYaw,0)',
+  'this.rightFoot.rotation.set(0,stance.leadFootYaw,0)',
   'this.fan.rotation.y=stance.fanYaw',
 ]){
   assert.ok(renderer.includes(fragment),
