@@ -21,6 +21,13 @@ npm run build
 npm run preview
 ```
 
+## Alpha 1.22.11 · Seamless bidirectional idle playback
+
+- Evi's six transparent idle PNGs on **Character Select** now run in a ping-pong loop **1 → 2 → 3 → 4 → 5 → 6 → 5 → 4 → 3 → 2 → 1** and repeat, rather than jumping directly **6 → 1**.
+- Frame duration stays **185 ms** and both screen-side instances use the same animation. The first and last frames are not accidentally duplicated on each turn.
+- Showing Character Select, installing edited sprite frames, and resetting graphics restore a predictable forward start at the first frame. Existing timers, reduced-motion support, image decoding and IndexedDB overrides remain intact.
+- Added deterministic regression tests for multiple complete 10-step ping-pong cycles, neighbor-only transitions, single/two-frame edge cases and start/reset behavior. No combat mechanics or artwork changed.
+
 ## Alpha 1.22.10 · Evi idle animation ships with the game
 
 - Added **all six original 512 × 768 transparent RGBA PNG frames** directly to `public/assets/evi/idle/idle_001.png` … `idle_006.png`. The exact source bytes and alpha are preserved and SHA-256 verified by regression tests.
