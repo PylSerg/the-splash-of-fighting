@@ -1,8 +1,8 @@
 import type { FighterId } from '../combat/Fighter';
-import { FIGHTER_STYLES } from '../combat/CombatRhythm';
-import { COMBO_ROUTES } from '../combat/ComboRules';
-import { SPLASH_MOVES } from '../combat/SplashRules';
-import { getCharacter } from '../characters/Roster';
+import { FIGHTER_STYLES } from '../combat/CombatRhythm.ts';
+import { COMBO_ROUTES } from '../combat/ComboRules.ts';
+import { SPLASH_MOVES } from '../combat/SplashRules.ts';
+import { getCharacter } from '../characters/Roster.ts';
 
 export type GuideMove = { buttons:string; description:string };
 export type GuideSection = { title:string; moves:GuideMove[] };
