@@ -15,7 +15,6 @@ import gamePackage from '../package.json';
 import { getStage, type StageId } from './stages/Stages';
 import type { FighterId } from './combat/Fighter';
 import type { TrainingBehavior } from './combat/TrainingRules';
-import { ThreeEviLayer } from './three/ThreeEviLayer.ts';
 
 type Pair = { first: FighterId; second: FighterId; mode: MatchMode; training:boolean };
 type Screen = 'home' | 'characters' | 'stages' | 'battle' | 'menu' | 'layout';
@@ -50,14 +49,6 @@ const arena=new ArenaScene(controls, message => { status.textContent=message; })
 game.scene.add('Arena',arena,true);
 
 const frame=get<HTMLElement>('#game-frame');
-let threeLayer:ThreeEviLayer|null=null;
-try{
-  // A separate transparent WebGL renderer uses Phaser's exact arena grid.
-  // If a mobile GPU rejects another context, the original 2D game survives.
-  threeLayer=new ThreeEviLayer(frame);
-}catch(error){
-  console.warn('Three.js not supported on this device; using 2D Evi.',error);
-}
 const menuButton=get<HTMLButtonElement>('#btn-menu');
 const menuOverlay=get<HTMLElement>('#pause-overlay');
 const home=get<HTMLElement>('#home-screen');
@@ -80,28 +71,24 @@ const touchLayout=new TouchLayoutEditor();
 
 const spriteStatus=get<HTMLElement>('#evi-sprite-status');
 const importedSheets=new Set<EviSheetKind>();
-type EviDisplayMode='three'|'puppet'|'sheet'|'legacy';
-let activeEviMode:EviDisplayMode=threeLayer?'three':'puppet';
+type EviDisplayMode='puppet'|'sheet'|'legacy';
+let activeEviMode:EviDisplayMode='puppet';
 function describeSpriteState():void {
   const extras=importedSheets.size
-    ? ' Старі аркуші: '+(importedSheets.has('combat')?'бойові ✓':'бойові ✗')+
+    ? ' Імпортовані аркуші: '+(importedSheets.has('combat')?'бойові ✓':'бойові ✗')+
       ', '+(importedSheets.has('cinematic')?'кінематографічні ✓':'кінематографічні ✗')+'.'
-    : ' Старі аркуші ще не імпортовані.';
-  spriteStatus.textContent=activeEviMode==='three'
-    ?'✨ Активна справжня 3D-Еві. Three.js відображає її поверх бойової сцени Phaser.'+extras
-    :activeEviMode==='puppet'
-      ?'🌸 Активна стара піксельна 2D-модель Еві.'+extras
+    : ' Спрайт-листи ще не імпортовані.';
+  spriteStatus.textContent=activeEviMode==='puppet'
+    ?'🌸 Активна піксельна 2D-модель Еві.'+extras
     :activeEviMode==='sheet'
-      ?'🧩 Режим старих аркушів. '+
+      ?'🧩 Режим спрайт-листів. '+
         (importedSheets.has('combat')?'Бойові спрайти активні.':
           'Бойових спрайтів немає: тимчасово показую піксельну модель.')+extras
       :'↺ Активна початкова процедурна модель Еві.'+extras;
 }
 function selectEviMode(mode:EviDisplayMode):void {
-  activeEviMode=mode==='three'&&!threeLayer?'puppet':mode;
+  activeEviMode=mode;
   arena.setEviVisualMode(activeEviMode);
-  threeLayer?.setVisible(activeEviMode==='three' &&
-    (screen==='battle'||(screen==='menu'&&menuOrigin==='battle')));
 
   for(const button of document.querySelectorAll<HTMLButtonElement>('[data-evi-mode]')){
     const selected=button.dataset.eviMode===mode;
@@ -125,7 +112,7 @@ async function applyEviSheet(kind:EviSheetKind,blob:Blob,remember:boolean):Promi
   arena.installEviSheet(kind,image);
   importedSheets.add(kind);
   if(remember)selectEviMode('sheet'); // Explicit import previews artwork immediately.
-  else describeSpriteState(); // Stored sheets never override the new default rig.
+  else describeSpriteState(); // Saved sheets never override a manually chosen mode.
   if(remember){
     try{await storeEviSheet(kind,blob);}
     catch{spriteStatus.textContent+=' Не вдалося зберегти на пристрої, але у цій сесії спрайти працюють.';}
@@ -143,7 +130,7 @@ for(const kind of ['combat','cinematic'] as const){
   });
 }
 get<HTMLButtonElement>('#btn-evi-reset-art').addEventListener('click',()=>{
-  arena.removeEviSheets();importedSheets.clear();selectEviMode(threeLayer?'three':'puppet');
+  arena.removeEviSheets();importedSheets.clear();selectEviMode('puppet');
   void clearEviSheets().catch(()=>{
     spriteStatus.textContent+=' Збережені файли не вдалося очистити.';
   });
@@ -158,23 +145,6 @@ void (async()=>{
 })();
 
 let screen: Screen='home';
-/** The 3D canvas is only a presentation layer. It cannot advance hitboxes. */
-let threeLastFrame=0;
-function animateThree(now:number):void{
-  const dt=threeLastFrame?Math.max(0,Math.min(.05,(now-threeLastFrame)/1000)):0;
-  threeLastFrame=now;
-  if(threeLayer){
-    const battleVisible=screen==='battle'||(screen==='menu'&&menuOrigin==='battle');
-    const frameData=battleVisible?arena.getThreeBattleFrame():null;
-    const visible=activeEviMode==='three'&&!!frameData;
-    threeLayer.setVisible(visible);
-    if(visible && frameData){
-      threeLayer.render(frameData,screen==='battle'&&!frameData.frozen?dt:0);
-    }
-  }
-  requestAnimationFrame(animateThree);
-}
-requestAnimationFrame(animateThree);
 let menuOrigin: 'home' | 'battle'='battle';
 let characterOrigin: 'home' | 'menu'='home';
 let stageOrigin: 'new' | 'menu' | 'after-fighters'='new';
@@ -246,7 +216,6 @@ function resizeArena(): void {
     arena.resizeViewport(width);
   }
   frame.style.setProperty('--hud-scale',String(rect.height/540));
-  threeLayer?.resize(width);
   touchLayout.sync();
 }
 if(typeof ResizeObserver!=='undefined') new ResizeObserver(resizeArena).observe(frame);
@@ -782,13 +751,6 @@ document.addEventListener('visibilitychange',()=>{
 });
 
 // Initial splash screen has no AI, no round timer and no character selection.
-selectEviMode(threeLayer?'three':'puppet');
-if(threeLayer){
-  threeLayer.canvas.addEventListener('webglcontextlost',()=>{
-    // Graceful switch if a constrained mobile GPU discards the 3D context.
-    selectEviMode('puppet');
-    status.textContent='3D-контекст втрачено. Увімкнула резервну 2D-Еві.';
-  });
-}
+selectEviMode('puppet');
 goHome();
 resizeArena();

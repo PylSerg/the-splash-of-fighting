@@ -114,7 +114,7 @@ export class Fighter {
   private cinematic: {kind:'intro'|'victory';elapsed:number}|null=null;
   private pixelSprite?: Phaser.GameObjects.Image;
   private pixelPuppet?:EviPixelPuppet;
-  private eviVisualMode:'three'|'puppet'|'sheet'|'legacy'='puppet';
+  private eviVisualMode:'puppet'|'sheet'|'legacy'='puppet';
   attack: ActiveAttack | null = null;
   // Two-stage throw animations are controlled by the arena's grapple state.
   grabPose: 'reach' | 'hold' | 'held' | 'throw' | null = null;
@@ -328,7 +328,7 @@ export class Fighter {
       this.weapon,this.frontArm,this.hair,this.head,
     ])element.setVisible(true);
   }
-  setEviVisualMode(mode:'three'|'puppet'|'sheet'|'legacy'):void {
+  setEviVisualMode(mode:'puppet'|'sheet'|'legacy'):void {
     this.eviVisualMode=mode;
     this.refreshSpriteArt();
   }
@@ -344,9 +344,8 @@ export class Fighter {
     const useSheet=imported&&this.eviVisualMode==='sheet';
     const usePuppet=this.id==='evi'&&(
       this.eviVisualMode==='puppet'||(this.eviVisualMode==='sheet'&&!imported));
-    const useThree=this.id==='evi'&&this.eviVisualMode==='three';
     this.pixelPuppet?.setVisible(usePuppet);
-    for(const visual of graphics)visual.setVisible(!useSheet&&!usePuppet&&!useThree);
+    for(const visual of graphics)visual.setVisible(!useSheet&&!usePuppet);
     if(useSheet){
       this.pixelSprite=this.scene.add.image(0,0,key)
         .setOrigin(.5,EVI_FEET_ORIGIN_Y)
@@ -1240,19 +1239,6 @@ export class Fighter {
    */
   rewardDamage(actualDamage: number): void {
     this.energy=earnSpecialMeter(this.energy,actualDamage);
-  }
-
-  /** Read-only visual state consumed by the optional Three.js renderer.
-   * Physics, timers and hit detection remain 100% inside this Fighter.
-   */
-  getThreeSnapshot():{
-    id:FighterId;x:number;face:1|-1;yOffset:number;
-    motion:EviMotionInput;hitFlash:boolean;
-  }{
-    return {
-      id:this.id,x:this.x,face:this.face,yOffset:this.yOffset,
-      motion:this.eviMotionInput(),hitFlash:this.hitFlash>0,
-    };
   }
 
   private eviMotionInput():EviMotionInput {
