@@ -1,6 +1,7 @@
 import type { FighterId } from '../combat/Fighter';
 import { CHARACTERS, getCharacter, portraitSvg } from '../characters/Roster';
 import { characterFigureSvg } from '../characters/Figures';
+import { EVI_IDLE_FRAME_MS, preloadEviIdle } from './EviIdleAnimation';
 
 export type MatchMode = 'cpu' | 'versus';
 type Player = 0 | 1;
@@ -47,6 +48,9 @@ export class CharacterSelector {
   private allowBack = true;
   private swipe: [SwipeStart | null, SwipeStart | null] = [null, null];
   private suppressClicks: [number, number] = [0, 0];
+  private idleUrls: string[] = [];
+  private idleFrame = 0;
+  private idleTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     private readonly onStart: (p1: FighterId, p2: FighterId, mode: MatchMode) => void,
@@ -115,7 +119,8 @@ export class CharacterSelector {
         button.style.setProperty('--fighter-glow', character.glow);
         button.setAttribute('aria-label', 'Персонаж ' + character.name);
         button.innerHTML = `<span class="fighter-glow" aria-hidden="true"></span>
-          <span class="fighter-figure">${characterFigureSvg(character.id)}</span>
+          <span class="fighter-figure">${characterFigureSvg(character.id)}${character.id==='evi'
+            ? '<img class="evi-idle-sprite" alt="" draggable="false" hidden />' : ''}</span>
           <span class="fighter-ground" aria-hidden="true"></span>`;
         button.addEventListener('click', () => {
           if (performance.now() < this.suppressClicks[p]) return;
@@ -192,6 +197,7 @@ export class CharacterSelector {
     this.swipe = [null, null];
     this.suppressClicks = [0, 0];
     this.root.hidden = false;
+    this.startIdle();
     this.paint();
     this.areas[0].focus({ preventScroll: true });
   }
@@ -199,8 +205,47 @@ export class CharacterSelector {
   hide(): void {
     this.closeBio(false);
     this.root.hidden = true;
+    this.stopIdle();
     this.swipe = [null, null];
   }
+  /** Update the carousel without touching fighter logic, lineup or selections. */
+  async installEviIdle(frames:Blob[]):Promise<void>{
+    const urls=await preloadEviIdle(frames);
+    this.stopIdle();
+    const previous=this.idleUrls;
+    this.idleUrls=urls;
+    this.idleFrame=0;
+    this.renderIdleFrame();
+    previous.forEach(url=>URL.revokeObjectURL(url));
+    if(this.isOpen)this.startIdle();
+  }
+
+  private renderIdleFrame():void{
+    for(const img of this.root.querySelectorAll<HTMLImageElement>('.evi-idle-sprite')){
+      const hasFrames=this.idleUrls.length>0;
+      img.hidden=!hasFrames;
+      if(hasFrames) img.src=this.idleUrls[this.idleFrame];
+      img.parentElement?.classList.toggle('has-idle-animation',hasFrames);
+    }
+  }
+
+  private startIdle():void{
+    this.stopIdle();
+    if(!this.idleUrls.length)return;
+    this.renderIdleFrame();
+    if(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
+    this.idleTimer=setInterval(()=>{
+      if(this.root.hidden || !this.idleUrls.length)return;
+      this.idleFrame=(this.idleFrame+1)%this.idleUrls.length;
+      this.renderIdleFrame();
+    },EVI_IDLE_FRAME_MS);
+  }
+
+  private stopIdle():void{
+    if(this.idleTimer!==null)clearInterval(this.idleTimer);
+    this.idleTimer=null;
+  }
+
   get isOpen(): boolean { return !this.root.hidden; }
   get isBioOpen(): boolean { return !this.bioOverlay.hidden; }
   get canGoBack(): boolean { return this.allowBack; }
