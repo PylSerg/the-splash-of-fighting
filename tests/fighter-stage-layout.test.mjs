@@ -28,8 +28,10 @@ assert.match(fighter,/export const GROUND_Y = FIGHTER_GROUND_Y;/,
   'shadows, sprites AND combat hitboxes share the same forward feet line');
 assert.match(fighter,/y:GROUND_Y\+this\.yOffset\+band\.top/,
   'attack hitbox continues to follow the fighter baseline');
-assert.match(fighter,/y:GROUND_Y\+this\.yOffset-\(low\?73:145\)/,
-  'body hurtbox follows the same baseline');
+assert.match(fighter,/y:GROUND_Y\+this\.yOffset\+top/,
+  'expanded body hurtbox follows the new stage baseline');
+assert.match(fighter,/fighterHurtboxBand\(low\)/,
+  'fighter uses the same size-aware body dimensions tested in HitRules');
 assert.match(fighter,/this\.rig\.setScale\(this\.face\*FIGHTER_VISUAL_SCALE,/,
   'both ordinary and roll-facing graphics receive the scale from foot origin');
 assert.ok((fighter.match(/this\.face\*FIGHTER_VISUAL_SCALE/g)||[]).length===2,
