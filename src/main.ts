@@ -10,6 +10,7 @@ import { getMoveGuide } from './ui/MoveGuide';
 import {
   type EviSheetKind, readEviSheet,storeEviSheet,clearEviSheets,loadImageFromBlob,
 } from './ui/SpriteImport';
+import {parseEviIdleFiles,packEviIdleFrames} from './ui/EviIdleAnimation';
 import { CHARACTERS, getCharacter, portraitSvg } from './characters/Roster';
 import gamePackage from '../package.json';
 import { getStage, type StageId } from './stages/Stages';
@@ -131,6 +132,8 @@ for(const kind of ['combat','cinematic'] as const){
 }
 get<HTMLButtonElement>('#btn-evi-reset-art').addEventListener('click',()=>{
   arena.removeEviSheets();importedSheets.clear();selectEviMode('puppet');
+  characterSelector.clearEviIdle();
+  get<HTMLElement>('#evi-idle-status').textContent='Завантажити 6 кадрів';
   void clearEviSheets().catch(()=>{
     spriteStatus.textContent+=' Збережені файли не вдалося очистити.';
   });
@@ -195,6 +198,45 @@ const confirmationCopy: Record<DisruptiveAction,{
 
 const characterSelector=new CharacterSelector(onCharacterChosen, backFromCharacter);
 const stageSelector=new StageSelector(onStageChosen, backFromStage);
+
+// The first native-frame animation is only used on the select screen.
+// Store the ZIP locally, as with the existing two 2D combat sprite atlases.
+const idleInput=get<HTMLInputElement>('#input-evi-idle');
+const idleStatus=get<HTMLElement>('#evi-idle-status');
+idleInput.addEventListener('change',()=>{
+  const selected=Array.from(idleInput.files??[]);
+  if(selected.length===0)return;
+  idleStatus.textContent='Читаю кадри…';
+  void (async()=>{
+    const frames=await parseEviIdleFiles(selected);
+    await characterSelector.installEviIdle(frames);
+    idleStatus.textContent='6 кадрів · анімація ✓';
+    try {
+      const zip=selected.length===1 && /\\.zip$/i.test(selected[0].name)
+        ? selected[0]:await packEviIdleFrames(frames);
+      await storeEviSheet('idle-selection',zip);
+    }catch{
+      idleStatus.textContent='Анімація ✓ · зберегти не вдалося';
+    }
+  })().catch(error=>{
+    const message=error instanceof Error?error.message:'Не вдалося імпортувати Idle.';
+    idleStatus.textContent=message;
+    status.textContent=message;
+  }).finally(()=>{idleInput.value='';});
+});
+void (async()=>{
+  try {
+    const saved=await readEviSheet('idle-selection');
+    if(!saved)return;
+    const frames=await parseEviIdleFiles([
+      new File([saved],'evi_idle_frames.zip',{type:'application/zip'}),
+    ]);
+    await characterSelector.installEviIdle(frames);
+    idleStatus.textContent='6 кадрів · анімація ✓';
+  }catch{
+    idleStatus.textContent='Завантажити 6 кадрів';
+  }
+})();
 
 function isSamePair(a: Pair, b: Pair): boolean {
   return a.first===b.first && a.second===b.second && a.mode===b.mode &&
