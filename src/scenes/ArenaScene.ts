@@ -9,6 +9,9 @@ import {
 } from '../combat/StrikeClashRules';
 import { getCharacter } from '../characters/Roster';
 import {
+  EVI_COMBAT_IDLE_COUNT,eviCombatIdleKey,eviCombatIdleAssetUrl,
+} from '../combat/EviCombatIdle.ts';
+import {
   atlasRects,eviFrameTextureKey,EVI_COMBAT_COLUMNS,EVI_COMBAT_ROWS,
   EVI_CINEMATIC_COLUMNS,EVI_CINEMATIC_ROWS,
 } from '../combat/EviSpriteStates.ts';
@@ -148,6 +151,14 @@ export class ArenaScene extends Phaser.Scene {
     super({ key: 'Arena' });
     this.controls=controls;
     this.onStatus=onStatus;
+  }
+
+  preload():void{
+    // Separate real PNG textures (not an atlas). Phaser loads these once,
+    // before either fighter is constructed; on failure, keep the 2D puppet.
+    for(let i=0;i<EVI_COMBAT_IDLE_COUNT;i++)
+      this.load.image(eviCombatIdleKey(i),
+        eviCombatIdleAssetUrl(i,import.meta.env.BASE_URL));
   }
 
   create(): void {
