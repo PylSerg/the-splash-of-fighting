@@ -23,7 +23,7 @@ import {
 import { getStage, type StageId } from '../stages/Stages';
 import { SPLASH_WINDUP, SPLASH_MOVES, SPLASH_DUEL_WIN_GAIN,
   comboSplashBonus, canSplashGuard, guidedSplashPosition } from '../combat/SplashRules';
-import { awardRound, MATCH_MAX_ROUNDS, ROUND_INTRO_TOTAL, roundIntroText } from '../combat/MatchRules';
+import { awardRound, winnerByRemainingHealth, MATCH_MAX_ROUNDS, ROUND_INTRO_TOTAL, roundIntroText } from '../combat/MatchRules';
 
 type GameMode = 'cpu' | 'versus';
 interface DuelPending {
@@ -657,7 +657,8 @@ export class ArenaScene extends Phaser.Scene {
         ? getCharacter(defender.id).name+
           ' вчасно натискає ↓+A! Увесь сплеш заблоковано, 0 HP.'
         : getCharacter(attacker.id).name+' виконує '+move.name+
-          ' і завдає '+damage+' HP!'+(defender.knockedOut?' НОКАУТ!':''));
+          ' і завдає '+damage+' HP!'+(isBackStrike(attacker.x,defender.x,defender.face)?' Удар у спину ×1,5!':'')+
+          (defender.knockedOut?' НОКАУТ!':''));
       this.splash=null;
       this.splashFx?.clear();
       // Holding the cinematic chord must not queue a regular hit afterwards.
@@ -1345,8 +1346,7 @@ export class ArenaScene extends Phaser.Scene {
   private finishRound(): void {
     if(this.roundOver)return;
     this.roundOver=true;
-    const winnerIndex:0|1|null=this.player1.hp===this.player2.hp?null:
-      this.player1.hp>this.player2.hp?0:1;
+    const winnerIndex=winnerByRemainingHealth(this.player1.hp,this.player2.hp);
     const result=awardRound({wins:this.matchWins,roundsPlayed:this.roundsPlayed},winnerIndex);
     this.matchWins=result.wins;
     this.roundsPlayed=result.roundsPlayed;
