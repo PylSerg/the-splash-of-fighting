@@ -4,6 +4,10 @@ import {
   neutralEviPose,eviPoseFor,blendEviPose,
 } from './EviRigMotion.ts';
 import {groundedEviTumble} from './EviGroundedTumble.ts';
+import {
+  eviFanLocalRotation,eviFanTip,eviSlashGlow,isEviFanSlash,
+  EVI_FAN_TRAIL_LIFETIME,type Point,
+} from './EviFanSlash.ts';
 
 /** A modular pixel-art fighter rendered from individually drawn textures.
  * Parents use joints (shoulder→elbow→wrist, hip→knee→ankle), not an atlas
@@ -231,6 +235,9 @@ export class EviPixelPuppet {
   private readonly footL:Phaser.GameObjects.Image;
   private readonly footR:Phaser.GameObjects.Image;
   private readonly fan:Phaser.GameObjects.Image;
+  private readonly slashFx:Phaser.GameObjects.Graphics;
+  private slashTrail:{point:Point;age:number;strength:number}[]=[];
+  private previousSlashElapsed=0;
   private readonly frontHair:Phaser.GameObjects.Image;
   private readonly backHair:Phaser.GameObjects.Image;
   private readonly skirt:Phaser.GameObjects.Image;
@@ -298,22 +305,33 @@ export class EviPixelPuppet {
     this.head.add(image('head',0,1,.5,.50));
     this.frontHair=image('hairFront',-1,-12,.5,.42);
     this.head.add(this.frontHair);
+    // Overlay is parented to the same mirrorable 2D skeleton as the fan.
+    // One reused Graphics object draws a short-lived ribbon, never
+    // allocates a new particle per frame or changes a gameplay hitbox.
+    this.slashFx=scene.add.graphics();
+    this.root.add(this.slashFx);
     this.applyPose(this.pose);
   }
 
   setVisible(visible:boolean):void{
     this.root.setVisible(visible);
+    if(!visible){
+      this.slashTrail.length=0;
+      this.slashFx.clear();
+    }
   }
 
   update(input:EviMotionInput,dt:number,hitFlash=false):void {
     const next=eviPoseFor(input);
-    if(input.name!==this.lastName){
-      // Keep transitions fluid, but do not lose the full two seconds
-      // of entrance / victory pose when switching states.
-      this.lastName=input.name;
-    }
+    const newAttack=input.name!==this.lastName ||
+      (isEviFanSlash(input.name) &&
+       (input.elapsed??0)<this.previousSlashElapsed-.02);
+    if(newAttack)this.slashTrail.length=0;
+    this.lastName=input.name;
+    this.previousSlashElapsed=input.elapsed??0;
     this.pose=blendEviPose(this.pose,next,dt);
     this.applyPose(this.pose);
+    this.updateSlashTrail(input,dt);
     if(input.name==='roll'){
       // Genuine tucked somersault with recalculated ground contact every
       // frame. Parent Fighter remains anchored to x / GROUND_Y.
@@ -327,6 +345,50 @@ export class EviPixelPuppet {
     }
     // Tint the whole puppet on contact; no additional GPU textures.
     this.root.setAlpha(hitFlash ? 0.81 : 1);
+  }
+
+  /** Three narrow, fading pixel ribbons follow the REAL bladed-fan tip
+   * through the near-horizontal strike. FX exist only for the outgoing
+   * fan moves, so guarding, kicking and idling never paint ghost trails.
+   */
+  private updateSlashTrail(input:EviMotionInput,dt:number):void{
+    if(dt>0){
+      for(const point of this.slashTrail)point.age+=dt;
+      this.slashTrail=this.slashTrail.filter(
+        point=>point.age<EVI_FAN_TRAIL_LIFETIME);
+    }
+    const glow=eviSlashGlow(input);
+    if(glow>.045 && dt>0 && this.root.visible){
+      const tip=eviFanTip(this.pose);
+      const last=this.slashTrail[this.slashTrail.length-1];
+      if(!last || Math.hypot(tip.x-last.point.x,tip.y-last.point.y)>1.5){
+        this.slashTrail.push({point:tip,age:0,strength:glow});
+        if(this.slashTrail.length>15)this.slashTrail.shift();
+      }
+    }
+    this.slashFx.clear();
+    const color=input.name==='special'?0x9cfaff:
+      input.name==='duel'?0xeac0ff:0xffc8ee;
+    for(let i=1;i<this.slashTrail.length;i++){
+      const from=this.slashTrail[i-1],to=this.slashTrail[i];
+      const life=1-to.age/EVI_FAN_TRAIL_LIFETIME;
+      const alpha=Math.max(0,life*life*to.strength);
+      if(alpha<.025)continue;
+      const x1=from.point.x,y1=from.point.y;
+      const x2=to.point.x,y2=to.point.y;
+      this.slashFx.lineStyle(9,color,alpha*.20);
+      this.slashFx.lineBetween(x1,y1,x2,y2);
+      this.slashFx.lineStyle(5,0xfff1da,alpha*.53);
+      this.slashFx.lineBetween(x1,y1,x2,y2);
+      this.slashFx.lineStyle(2,0xffffff,alpha*.98);
+      this.slashFx.lineBetween(x1,y1,x2,y2);
+    }
+    if(glow>.55 && this.slashTrail.length>1){
+      const tip=this.slashTrail[this.slashTrail.length-1].point;
+      this.slashFx.fillStyle(0xffffff,.45*glow);
+      this.slashFx.fillTriangle(tip.x+6,tip.y,
+        tip.x-3,tip.y-3,tip.x-3,tip.y+3);
+    }
   }
 
   private applyPose(p:EviPose):void {
@@ -346,7 +408,10 @@ export class EviPixelPuppet {
     this.shinR.setRotation(p.kneeR);
     this.footL.setRotation(p.footL);
     this.footR.setRotation(p.footR);
-    this.fan.setRotation(p.fanAngle);
+    // The broad fan faces the rival (+X local, mirrored by Fighter.face).
+    // Cancel shoulder/elbow angles rather than letting them aim its blades
+    // backward into Evi's face during her horizontal swing.
+    this.fan.setRotation(eviFanLocalRotation(p));
     this.fan.setScale(2*p.fanScale);
     this.skirt.setRotation(p.skirtTilt);
     this.frontHair.setRotation(p.hairSwing*.35);
