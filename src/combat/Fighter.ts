@@ -373,7 +373,7 @@ export class Fighter {
     this.time+=dt;
     // A crouch guard retains the fighter's facing; only an unguarded
     // fighter tracks the rival during a cinematic ability.
-    if(phase!=='guard')this.face=opponentX>=this.x?1:-1;
+    if(phase==='startup' || phase==='attack')this.face=opponentX>=this.x?1:-1;
     this.splashPose=phase;
     this.splashProgress=Phaser.Math.Clamp(progress,0,1);
     this.attack=null;
