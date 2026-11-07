@@ -21,6 +21,9 @@ import {
   resolveDuel, duelDamage, type DuelChoice, type DuelStrike,
 } from '../combat/DuelRules';
 import { getStage, type StageId } from '../stages/Stages';
+import { SPLASH_WINDUP, SPLASH_MOVES, SPLASH_DUEL_WIN_GAIN,
+  comboSplashBonus, canSplashGuard } from '../combat/SplashRules';
+import { awardRound, MATCH_MAX_ROUNDS } from '../combat/MatchRules';
 
 type GameMode = 'cpu' | 'versus';
 interface DuelPending {
@@ -43,6 +46,13 @@ interface DuelSession {
   /** Index 0=P1, 1=P2; never revealed until resolution. */
   choices: [DuelChoice,DuelChoice];
   previous: [InputState,InputState];
+}
+interface SplashSession {
+  attacker:Fighter;
+  defender:Fighter;
+  elapsed:number;
+  guarded:boolean;
+  pulses:number;
 }
 interface Grapple {
   attacker: Fighter;
@@ -89,6 +99,7 @@ export class ArenaScene extends Phaser.Scene {
   private debugDraw!: Phaser.GameObjects.Graphics;
   private centerLabel!: Phaser.GameObjects.Text;
   private timeLabel!: Phaser.GameObjects.Text;
+  private roundLabel!: Phaser.GameObjects.Text;
   private leftName!: Phaser.GameObjects.Text;
   private rightName!: Phaser.GameObjects.Text;
   private extraHalf = 0;
@@ -103,6 +114,11 @@ export class ArenaScene extends Phaser.Scene {
   private duel: DuelSession | null = null;
   private duelPending: DuelPending | null = null;
   private duelAftermath: DuelAftermath | null = null;
+  private splash: SplashSession | null = null;
+  private matchWins:[number,number]=[0,0];
+  private roundsPlayed=0;
+  private matchWinner:0|1|null=null;
+  private roundTransition=0;
   private healthTrail1: HealthTrail = makeHealthTrail(100);
   private healthTrail2: HealthTrail = makeHealthTrail(100);
 
@@ -124,6 +140,10 @@ export class ArenaScene extends Phaser.Scene {
     this.timeLabel = this.add.text(480,25,'99',{
       fontFamily:'Rajdhani, Arial, sans-serif',fontSize:'42px',color:'#ffe7a6',fontStyle:'bold',
       stroke:'#251e3a',strokeThickness:5,
+    }).setOrigin(.5,0).setDepth(21);
+    this.roundLabel=this.add.text(480,81,'ROUND 1 / 3',{
+      fontFamily:'Rajdhani, Arial, sans-serif',fontSize:'18px',
+      color:'#fff0bd',fontStyle:'bold',stroke:'#19192f',strokeThickness:3,
     }).setOrigin(.5,0).setDepth(21);
     this.centerLabel = this.add.text(480,210,'READY?',{
       fontFamily:'Rajdhani, Impact, sans-serif',fontSize:'77px',color:'#fff1ca',fontStyle:'bold',
@@ -237,7 +257,7 @@ export class ArenaScene extends Phaser.Scene {
     this.hasMatch=true;
     this.leftName.setText(getCharacter(first).name);
     this.rightName.setText(getCharacter(second).name);
-    this.resetRound();
+    this.restartMatch();
     this.onStatus(mode==='cpu'
       ? getCharacter(first).name+' проти '+getCharacter(second).name+' (CPU)!'
       : getCharacter(first).name+' проти '+getCharacter(second).name+' (PvP)!');
@@ -329,7 +349,7 @@ export class ArenaScene extends Phaser.Scene {
 
   setMode(mode: GameMode): void {
     this.mode=mode;
-    if (this.hasMatch) this.resetRound();
+    if (this.hasMatch) this.restartMatch();
   }
   getMode(): GameMode { return this.mode; }
 
@@ -341,11 +361,20 @@ export class ArenaScene extends Phaser.Scene {
 
   getDebug(): boolean { return this.debug; }
 
-  resetRound(): void {
+  /** Starting a fresh match clears wins and both energy bars. */
+  restartMatch():void {
+    this.matchWins=[0,0];
+    this.roundsPlayed=0;
+    this.matchWinner=null;
+    this.resetRound(false);
+  }
+
+  /** Between rounds preserve only splash energy; reset regular special energy. */
+  resetRound(preserveSplash=false): void {
     if(!this.player1||!this.player2)return;
     this.controls.clear();
-    this.player1.reset(250,1);
-    this.player2.reset(710,-1);
+    this.player1.reset(250,1,preserveSplash);
+    this.player2.reset(710,-1,preserveSplash);
     this.healthTrail1=makeHealthTrail(this.player1.hp);
     this.healthTrail2=makeHealthTrail(this.player2.hp);
     this.prev1=ZERO();this.prev2=ZERO();
@@ -354,8 +383,11 @@ export class ArenaScene extends Phaser.Scene {
     this.duel=null;
     this.duelPending=null;
     this.duelAftermath=null;
+    this.splash=null;
+    this.roundTransition=0;
     this.aiCooldown=.85;this.aiCount=0;this.frameCount=0;this.accumulator=0;
     this.centerLabel.setText('READY?').setColor('#fff0c0').setVisible(true);
+    this.roundLabel.setText('ROUND '+(this.roundsPlayed+1)+' / '+MATCH_MAX_ROUNDS);
     this.paintHud();
   }
 
@@ -371,7 +403,7 @@ export class ArenaScene extends Phaser.Scene {
       frames++;
     }
     // HUD animations advance even after a KO or while fighters are recovering.
-    const visualDt=(this.duel || this.duelAftermath)?0:
+    const visualDt=(this.duel || this.duelAftermath || this.splash)?0:
       Math.min(Math.max(0,delta/1000),.10);
     this.healthTrail1=advanceHealthTrail(this.healthTrail1,this.player1.hp,visualDt);
     this.healthTrail2=advanceHealthTrail(this.healthTrail2,this.player2.hp,visualDt);
@@ -387,6 +419,10 @@ export class ArenaScene extends Phaser.Scene {
       if(this.readyTime===0)this.centerLabel.setVisible(false);
       return;
     }
+    if(this.splash){
+      this.stepSplash(dt);
+      return;
+    }
     // During a duel, movement, AI attacks, countdown and hit detection freeze.
     // Only the private button-selection timer is allowed to advance.
     if(this.duel) {
@@ -398,9 +434,15 @@ export class ArenaScene extends Phaser.Scene {
       return;
     }
     if(this.roundOver) {
-      // Let the defeated fighter finish falling AFTER the winner is announced
-      // (time-out loss); everybody else remains frozen.
       this.advanceFallenFighters(dt);
+      if(this.matchWinner===null){
+        this.roundTransition=Math.max(0,this.roundTransition-dt);
+        if(this.roundTransition===0 && this.player1.knockdownPhase!=='flying' &&
+           this.player2.knockdownPhase!=='flying'){
+          this.resetRound(true);
+          this.onStatus('Раунд '+(this.roundsPlayed+1)+' із 3. Заряд SPLASH збережено!');
+        }
+      }
       return;
     }
     // Once someone has 0 HP, freeze the remaining fight and let the KO fall
@@ -417,6 +459,31 @@ export class ArenaScene extends Phaser.Scene {
     const just1=justPressed(input1,this.prev1);
     const just2=justPressed(input2,this.prev2);
     this.prev1=input1;this.prev2=input2;
+
+    // Cinematic splash has priority over all component X/Y/L1/R1 inputs.
+    if(!this.grapple && !this.duelPending){
+      const splash1=just1.splash && this.player1.tryStartSplash();
+      const splash2=just2.splash && this.player2.tryStartSplash();
+      if(splash1&&splash2){
+        this.player1.endSplashPose();this.player2.endSplashPose();
+        this.player1.stunned=.5;this.player2.stunned=.5;
+        this.combatNotice('SPLASH CLASH!',480,GROUND_Y-215,0x9af4f4);
+        this.onStatus('Одночасні сплеші! Взаємне блокування: 0 шкоди.');
+        return;
+      }
+      if(splash1||splash2){
+        const attacker=splash1?this.player1:this.player2;
+        const defender=splash1?this.player2:this.player1;
+        this.splash={attacker,defender,elapsed:0,guarded:false,pulses:0};
+        this.combatNotice('SPLASH!',attacker.x,GROUND_Y-222,
+          SPLASH_MOVES[attacker.id].color);
+        this.onStatus(getCharacter(attacker.id).name+': '+
+          SPLASH_MOVES[attacker.id].name+
+          '! У суперника 0,5 с на ↓+A, звичайний блок не діє!');
+        this.stepSplash(dt);
+        return;
+      }
+    }
 
     if (!this.grapple && !this.duelPending) {
       // A duel opener has priority over its component B/Y attacks, and
@@ -785,6 +852,7 @@ export class ArenaScene extends Phaser.Scene {
       ...base,damage:duelDamage(winner.id==='runa'),stun:.5,push:430,
     },winner.face,true);
     winner.rewardDamage(hit.damage);
+    winner.gainSplash(SPLASH_DUEL_WIN_GAIN);
     this.cameras.main.shake(165,.008);
     this.spawnSparks(loser.x,GROUND_Y-103,false);
     this.combatNotice('DUEL WIN!',loser.x,GROUND_Y-240,0xffd18c);
@@ -998,6 +1066,7 @@ export class ArenaScene extends Phaser.Scene {
       this.combatNotice('SWEEP!',target.x,GROUND_Y-143,0xffd596);
     }
     attacker.rewardDamage(hit.damage);
+    attacker.gainSplash(comboSplashBonus(comboHits));
     if(comboHits===2) {
       this.combatNotice('2 HIT!',target.x,GROUND_Y-206,0x8ce9fa);
     } else if(comboHits===3) {
