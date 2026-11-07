@@ -633,6 +633,7 @@ export class Fighter {
     this.yOffset=0; this.vy=0; this.stunned=0; this.blockstun=0;
     this.wakeupGrace=0; this.blocking=false;
     this.crouching=false; this.walking=false; this.attack=null;
+    this.cinematic=null;
     this.hitFlash=0; this.blockFlash=0; this.impactVelocity=0; this.time=0;
     this.queuedSolo=null; this.queuedSpecial=0;
     this.clearCombo();this.comboRecovery=0;this.duelWhiffRecovery=0;
@@ -1211,6 +1212,38 @@ export class Fighter {
   }
 
   private draw(_dt: number): void {
+    if(this.pixelSprite){
+      const chosen=frameForEvi({
+        cinematic:this.cinematic,
+        splash:this.splashPose,
+        attack:this.attack&&{
+          name:this.attack.name,elapsed:this.attack.elapsed,
+          startup:this.attack.spec.duration,
+        },
+        grab:this.grabPose,
+        knockdown:this.knockdownPhase,
+        rolling:this.isRolling,airborne:this.airborne,
+        blocking:this.blocking,crouching:this.crouching,
+        stunned:this.stunned>0,walking:this.walking,
+        movingForward:this.movingForward,time:this.time,
+      });
+      const kind=chosen.sheet==='cinematic' && this.scene.textures.exists('evi-cinematic')
+        ?'evi-cinematic':'evi-combat';
+      const frame=kind==='evi-combat' && chosen.sheet==='cinematic'
+        ?(this.cinematic?.kind==='victory'?20:0):chosen.frame;
+      this.pixelSprite.setTexture(kind,'f'+frame);
+      this.pixelSprite.setTint(this.hitFlash>0?0xffcad8:0xffffff);
+      this.pixelSprite.setAlpha(this.knockedOut?.76:1);
+      this.pixelSprite.setPosition(0,10);
+    }
+    if(this.cinematic && !this.pixelSprite){
+      // Every roster fighter gets a 2s entrance/victory pose even while
+      // their custom pixel sheets have not been drawn yet.
+      const progress=Math.min(1,this.cinematic.elapsed/EVI_CINEMATIC_SECONDS);
+      const flourish=Math.sin(progress*Math.PI);
+      this.frontArm.rotation=-1.1-flourish*.5;
+      this.weapon.rotation=-1.0-flourish*1.7;
+    }
     const motion=this.walking?Math.sin(this.time*15):Math.sin(this.time*2.5)*.11;
     const swing=this.walking?Math.sin(this.time*15)*.30:0;
     this.leftLeg.rotation=swing;
@@ -1341,7 +1374,8 @@ export class Fighter {
       this.body.y=-9;
     }
     if (this.isRolling) {
-      // Procedural low somersault: until pixel-art roll frames arrive,
+      // Temporary rolling pose: rotate the sprite sheet's sweep frame
+      // until dedicated roll animation keyframes are drawn.
       // rotate the rig around the torso, not its feet. The adjusted pivot
       // keeps the fighter visually on the ground during a full turn.
       const progress = this.rollElapsed / ROLL_DURATION;
@@ -1376,7 +1410,9 @@ export class Fighter {
     }
     this.rig.setPosition(this.x,GROUND_Y+this.yOffset);
     this.rig.setScale(this.face,1);
-    this.rig.setRotation(this.face*fallAngle);
+    // Pixel-art fallen and prone poses are already horizontal. Rotating
+    // them again would flip the sprite upright and corrupt the silhouette.
+    this.rig.setRotation(this.pixelSprite?0:this.face*fallAngle);
     // A separate world-space shadow stays flat underneath the trajectory.
     this.shadow.setPosition(this.x,GROUND_Y+5);
     this.rig.alpha=this.knockedOut ? .65 : 1;
