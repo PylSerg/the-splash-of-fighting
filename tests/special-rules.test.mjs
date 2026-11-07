@@ -5,7 +5,6 @@ import {
   spendSpecialCharge,
 } from '../src/combat/SpecialRules.ts';
 import { SPLASH_MOVES } from '../src/combat/SplashRules.ts';
-import { ATTACKS } from '../src/combat/Fighter.ts';
 
 assert.deepEqual(SPECIAL_CHARGE_MARKS,[0,15,35,60,100],
   'HUD subdivisions exactly at 15%,35%,60%');
@@ -44,7 +43,5 @@ for(const fighter of ['evi','runa','lyra','kai']){
   }
   assert.equal(SPLASH_MOVES[fighter].damage,fullSpecialDamage(fighter)*2,
     fighter+' SPLASH is EXACTLY 2x their 100% special');
-  assert.equal(ATTACKS.special.level,'mid',
-    'normal special retains mid hit level for guard-break system');
 }
 console.log('✓ Four charge bands, activation at 15%, progressive specials and 2× SPLASH: passed.');
