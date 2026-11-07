@@ -21,6 +21,12 @@ npm run build
 npm run preview
 ```
 
+## Alpha 1.22.4 · Natural downward elbow bend
+
+- Fixed the 3D IK pole direction for **both arms**: the elbows now bend down toward the waist and outward instead of pointing above the shoulders in guard/idle poses.
+- Anatomical right-hand ownership of the fan, the 3D somersault, wrist reach, fixed bone lengths and all combat mechanics are unchanged.
+- Added a regression check covering all motion target samples to prevent the upside-down elbow from returning.
+
 ## Alpha 1.2.1 · Accurate build version labels
 
 - Fixed the main title screen, which still displayed **Alpha 1.1.1** despite the deployed game already running 1.2.0.

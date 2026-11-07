@@ -44,6 +44,8 @@ for(const name of motionNames){
       const origin=right?{x:.252,y:.55,z:.075}:{x:-.252,y:.55,z:-.075};
       near(diff(solved.knee,origin),EVI_UPPER_ARM_LENGTH,
         name+' upper arm keeps constant bone length');
+      assert.ok(solved.knee.y<origin.y,
+        name+' elbow must bend below its shoulder, not point upward');
       near(diff(solved.ankle,solved.knee),EVI_FOREARM_LENGTH,
         name+' forearm keeps constant bone length');
       near(diff(solved.ankle,target),0,
