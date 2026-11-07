@@ -4,6 +4,7 @@ import { stopsHit, strikeBand, type HitLevel, type GuardStance } from './HitRule
 import { crouchMoveForPress } from './CrouchRules';
 import { blockedGrabRecoil } from './GrabRules';
 import { earnSpecialMeter, SPECIAL_METER_COST } from './CombatFeedback';
+import { earnSplashEnergy, SPLASH_METER_MAX } from './SplashRules';
 import {
   DUEL_WHIFF_RECOVERY, DUEL_RESULT_ANIMATION, forwardHeld,
   canDuelCatchTarget, type DuelStrike,
@@ -87,6 +88,8 @@ export class Fighter {
   face: 1 | -1;
   hp = 100;
   energy = 0;
+  /** Separate, slow splash meter persists between rounds in one match. */
+  splashEnergy = 0;
   stunned = 0;
   blocking = false;
   crouching = false;
@@ -118,6 +121,8 @@ export class Fighter {
   private duelWhiffRecovery = 0;
   /** True only AFTER the entire Y challenge animation has finished. */
   private duelStarterFinished = false;
+  private splashPose: 'startup' | 'attack' | 'victim' | 'guard' | null = null;
+  private splashProgress = 0;
   private time = 0;
 
   readonly rig: Phaser.GameObjects.Container;
@@ -339,6 +344,45 @@ export class Fighter {
       !this.stunned && (!this.attack || earlyChordComponent) &&
       !this.comboRecovery && !this.grabRecovery && !this.duelWhiffRecovery;
   }
+  /** X+Y may arrive a frame apart. Only an unconnected early X/Y is cancellable. */
+  tryStartSplash(): boolean {
+    const earlyComponent=Boolean(this.attack &&
+      (this.attack.name==='light' || this.attack.name==='heavy') &&
+      this.attack.comboStage===1 && !this.attack.connected && this.attack.elapsed<.16);
+    if(this.splashEnergy<SPLASH_METER_MAX || this.knockedOut || this.knockedDown ||
+       this.airborne || this.crouching || this.isRolling || this.grabPose ||
+       this.stunned>0 || this.grabRecovery>0 || this.comboRecovery>0 ||
+       this.duelWhiffRecovery>0 || (this.attack && !earlyComponent)) return false;
+    this.splashEnergy=0;
+    this.attack=null;
+    this.queuedSolo=null;
+    this.queuedSpecial=0;
+    this.clearCombo();
+    this.blocking=false;this.walking=false;
+    this.splashPose='startup';this.splashProgress=0;
+    return true;
+  }
+  gainSplash(amount:number):void {
+    this.splashEnergy=earnSplashEnergy(this.splashEnergy,amount);
+  }
+  /** A cutscene pose is animated independently of ordinary attack hitboxes. */
+  stepSplashPose(dt:number,phase:'startup'|'attack'|'victim'|'guard',progress:number,opponentX:number):void {
+    this.time+=dt;
+    this.face=opponentX>=this.x?1:-1;
+    this.splashPose=phase;
+    this.splashProgress=Phaser.Math.Clamp(progress,0,1);
+    this.attack=null;
+    this.blocking=phase==='guard';
+    this.crouching=phase==='guard';
+    this.walking=false;
+    this.draw(dt);
+  }
+  endSplashPose():void {
+    this.splashPose=null;this.splashProgress=0;
+    this.blocking=false;this.crouching=false;
+    this.draw(0);
+  }
+
   /** The initial zero-damage swing cannot be blocked or shortened. */
   tryBeginDuel(input: InputState): boolean {
     if(!input.duel || input.special || !forwardHeld(this.face,input.left,input.right) ||
@@ -480,14 +524,16 @@ export class Fighter {
     return 0;
   }
 
-  reset(x: number, face: 1 | -1): void {
+  reset(x: number, face: 1 | -1, preserveSplash=false): void {
     this.x=x; this.face=face; this.hp=100; this.energy=0;
+    if(!preserveSplash) this.splashEnergy=0;
     this.yOffset=0; this.vy=0; this.stunned=0; this.blocking=false;
     this.crouching=false; this.walking=false; this.attack=null;
     this.hitFlash=0; this.blockFlash=0; this.impactVelocity=0; this.time=0;
     this.queuedSolo=null; this.queuedSpecial=0;
     this.clearCombo();this.comboRecovery=0;this.duelWhiffRecovery=0;
     this.duelStarterFinished=false;
+    this.splashPose=null;this.splashProgress=0;
     this.grabPose=null; this.grabRecovery=0;
     this.rollElapsed=-1; this.rollDirection=1; this.rollCooldown=0;
     this.knockdownPhase=null;this.knockdownTimer=0;this.knockdownFlightAge=0;
@@ -1069,7 +1115,47 @@ export class Fighter {
         this.weapon.rotation=-.35-recoil*1.5;
       }
     }
-    if(this.stunned>0) this.frontArm.rotation=-.5;
+    if(this.splashPose){
+      const p=this.splashProgress;
+      if(this.splashPose==='victim'){
+        this.frontArm.rotation=-.9-Math.sin(p*28)*.16;
+        this.backArm.rotation=.55;
+        this.body.y=Math.sin(p*28)*3;
+        this.head.y=this.body.y;this.hair.y=this.body.y;
+      } else if(this.splashPose==='guard'){
+        this.frontArm.rotation=-1.25;
+        this.backArm.rotation=-.95;
+        this.leftLeg.rotation=.8;this.rightLeg.rotation=-.8;
+        this.body.y=24;this.head.y=24;this.hair.y=24;
+      } else {
+        // Every fighter uses a different procedural choreography; sprite
+        // sheets can later replace these poses without changing the rules.
+        const wave=Math.sin(p*24*Math.PI);
+        if(this.id==='evi'){
+          this.frontArm.rotation=-1.7+wave*.55;
+          this.backArm.rotation=-.5-wave*.4;
+          this.weapon.rotation=-2.1+p*7*Math.PI;
+          this.rightLeg.rotation=-.30-wave*.25;
+        }else if(this.id==='runa'){
+          this.frontArm.rotation=-.9-p*1.7;
+          this.backArm.rotation=-.9-p*1.7;
+          this.weapon.rotation=-.2;
+          this.body.y=-14*Math.sin(p*Math.PI);
+          this.head.y=this.body.y;this.hair.y=this.body.y;
+        }else if(this.id==='lyra'){
+          this.frontArm.rotation=-1.6+wave*.35;
+          this.backArm.rotation=-1.1-wave*.6;
+          this.weapon.rotation=-1.7+p*5*Math.PI;
+          this.cape.rotation=wave*.22;
+        }else{
+          this.frontArm.rotation=-1.9+wave*.75;
+          this.backArm.rotation=-1.9-wave*.75;
+          this.weapon.rotation=wave*.6;
+          this.rightLeg.rotation=wave*.32;
+        }
+      }
+    }
+    if(this.stunned>0 && !this.splashPose) this.frontArm.rotation=-.5;
     if (this.knockedDown) {
       this.leftLeg.rotation=-.45;
       this.rightLeg.rotation=.5;
